@@ -8,6 +8,8 @@ import '../../../shared/widgets/mkes_text_field.dart';
 import '../../../shared/widgets/mkes_primary_button.dart';
 import '../models/user_profile.dart';
 import '../providers/users_provider.dart';
+import '../../department/models/department.dart';
+import '../../department/providers/departments_provider.dart';
 
 class UserFormDialog extends ConsumerStatefulWidget {
   const UserFormDialog({super.key, this.user});
@@ -22,14 +24,14 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
-  late final TextEditingController _departmentController;
   late final TextEditingController _designationController;
   late final TextEditingController _salaryController;
   late final TextEditingController _joiningDateController;
   late final TextEditingController _passwordController;
   late final TextEditingController _confirmPasswordController;
-  
+
   String _selectedRole = 'staff';
+  String? _selectedDepartmentId;
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -42,14 +44,18 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
     _nameController = TextEditingController(text: widget.user?.fullName);
     _emailController = TextEditingController(text: widget.user?.email);
     _phoneController = TextEditingController(text: widget.user?.phoneNumber);
-    _departmentController = TextEditingController(text: widget.user?.department);
-    _designationController = TextEditingController(text: widget.user?.designation);
-    _salaryController = TextEditingController(text: widget.user?.salary?.toString() ?? '');
-    _joiningDateController = TextEditingController(text: widget.user?.joiningDate?.toIso8601String().split('T').first ?? '');
+    _designationController =
+        TextEditingController(text: widget.user?.designation);
+    _salaryController =
+        TextEditingController(text: widget.user?.salary?.toString() ?? '');
+    _joiningDateController = TextEditingController(
+        text:
+            widget.user?.joiningDate?.toIso8601String().split('T').first ?? '');
     _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
     if (widget.user != null) {
       _selectedRole = widget.user!.role;
+      _selectedDepartmentId = widget.user!.departmentId;
     }
   }
 
@@ -58,7 +64,6 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _departmentController.dispose();
     _designationController.dispose();
     _salaryController.dispose();
     _joiningDateController.dispose();
@@ -76,16 +81,24 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
       if (_isCreating) {
         // Create new user
         await ref.read(usersProvider.notifier).createUser(
-          fullName: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          phoneNumber: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-          department: _departmentController.text.trim().isEmpty ? null : _departmentController.text.trim(),
-          designation: _designationController.text.trim().isEmpty ? null : _designationController.text.trim(),
-          role: _selectedRole,
-          salary: _salaryController.text.trim().isEmpty ? null : double.tryParse(_salaryController.text.trim()),
-          joiningDate: _joiningDateController.text.trim().isEmpty ? null : DateTime.tryParse(_joiningDateController.text.trim()),
-        );
+              fullName: _nameController.text.trim(),
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+              phoneNumber: _phoneController.text.trim().isEmpty
+                  ? null
+                  : _phoneController.text.trim(),
+              departmentId: _selectedDepartmentId,
+              designation: _designationController.text.trim().isEmpty
+                  ? null
+                  : _designationController.text.trim(),
+              role: _selectedRole,
+              salary: _salaryController.text.trim().isEmpty
+                  ? null
+                  : double.tryParse(_salaryController.text.trim()),
+              joiningDate: _joiningDateController.text.trim().isEmpty
+                  ? null
+                  : DateTime.tryParse(_joiningDateController.text.trim()),
+            );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('User created successfully.')),
@@ -96,11 +109,15 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
         await ref.read(usersProvider.notifier).updateUser(widget.user!.id, {
           'full_name': _nameController.text.trim(),
           'phone_number': _phoneController.text.trim(),
-          'department': _departmentController.text.trim(),
+          'department_id': _selectedDepartmentId,
           'designation': _designationController.text.trim(),
           'role': _selectedRole,
-          'salary': _salaryController.text.trim().isEmpty ? null : double.tryParse(_salaryController.text.trim()),
-          'joining_date': _joiningDateController.text.trim().isEmpty ? null : _joiningDateController.text.trim(),
+          'salary': _salaryController.text.trim().isEmpty
+              ? null
+              : double.tryParse(_salaryController.text.trim()),
+          'joining_date': _joiningDateController.text.trim().isEmpty
+              ? null
+              : _joiningDateController.text.trim(),
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -113,7 +130,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text(e.toString()), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -125,6 +143,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final departmentsState = ref.watch(departmentsProvider);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final viewInsets = MediaQuery.viewInsetsOf(context);
@@ -132,10 +151,12 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
     // Responsive max width: up to 500px, but always fits the screen with 32px margins.
     final dialogMaxWidth = (screenWidth - 32).clamp(280.0, 500.0);
     // Responsive max height: leave room for keyboard and status bar.
-    final dialogMaxHeight = (screenHeight - viewInsets.bottom - 80).clamp(300.0, 640.0);
+    final dialogMaxHeight =
+        (screenHeight - viewInsets.bottom - 80).clamp(300.0, 640.0);
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusLg)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg)),
       // insetPadding keeps the dialog from touching screen edges on small phones.
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
@@ -166,10 +187,12 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                   controller: _emailController,
                   label: 'Email Address',
                   keyboardType: TextInputType.emailAddress,
-                  enabled: _isCreating, // Prevent editing email for existing users
+                  enabled:
+                      _isCreating, // Prevent editing email for existing users
                   validator: (v) {
                     if (v!.isEmpty) return 'Required';
-                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    final emailRegex =
+                        RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                     if (!emailRegex.hasMatch(v)) return 'Invalid email format';
                     return null;
                   },
@@ -217,12 +240,17 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         size: 20,
                       ),
                       onPressed: () {
-                        setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                        setState(() =>
+                            _obscureConfirmPassword = !_obscureConfirmPassword);
                       },
                     ),
                     validator: (v) {
-                      if (v == null || v.isEmpty) return 'Please confirm the password';
-                      if (v != _passwordController.text) return 'Passwords do not match';
+                      if (v == null || v.isEmpty) {
+                        return 'Please confirm the password';
+                      }
+                      if (v != _passwordController.text) {
+                        return 'Passwords do not match';
+                      }
                       return null;
                     },
                   ),
@@ -253,12 +281,15 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                             decoration: InputDecoration(
                               labelText: 'Role',
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusMd),
                               ),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'staff', child: Text('Staff')),
-                              DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                              DropdownMenuItem(
+                                  value: 'staff', child: Text('Staff')),
+                              DropdownMenuItem(
+                                  value: 'admin', child: Text('Admin')),
                             ],
                             onChanged: (val) {
                               setState(() => _selectedRole = val!);
@@ -289,12 +320,15 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                             decoration: InputDecoration(
                               labelText: 'Role',
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusMd),
                               ),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'staff', child: Text('Staff')),
-                              DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                              DropdownMenuItem(
+                                  value: 'staff', child: Text('Staff')),
+                              DropdownMenuItem(
+                                  value: 'admin', child: Text('Admin')),
                             ],
                             onChanged: (val) {
                               setState(() => _selectedRole = val!);
@@ -309,9 +343,39 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                 Row(
                   children: [
                     Expanded(
-                      child: MkesTextField(
-                        controller: _departmentController,
-                        label: 'Department',
+                      child: departmentsState.when(
+                        loading: () => const LinearProgressIndicator(),
+                        error: (error, stackTrace) =>
+                            Text('Unable to load departments: $error'),
+                        data: (departments) => DropdownButtonFormField<String?>(
+                          initialValue: _selectedDepartmentId,
+                          decoration: InputDecoration(
+                            labelText: 'Department',
+                            border: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusMd),
+                            ),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('Unassigned'),
+                            ),
+                            ...departments
+                                .where((department) =>
+                                    department.isActive ||
+                                    department.id == _selectedDepartmentId)
+                                .map(
+                                  (Department department) =>
+                                      DropdownMenuItem<String?>(
+                                    value: department.id,
+                                    child: Text(department.name),
+                                  ),
+                                ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _selectedDepartmentId = value),
+                        ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -330,7 +394,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                       child: MkesTextField(
                         controller: _salaryController,
                         label: 'Salary',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -348,7 +413,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                      onPressed:
+                          _isLoading ? null : () => Navigator.of(context).pop(),
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: AppSpacing.md),

@@ -134,7 +134,8 @@ class StaffRosterCard extends ConsumerWidget {
                 ),
               ),
               data: (users) {
-                if (users.isEmpty) {
+                final staff = users.where((user) => user.role == 'staff').toList();
+                if (staff.isEmpty) {
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.all(AppSpacing.md),
@@ -144,10 +145,10 @@ class StaffRosterCard extends ConsumerWidget {
                 }
                 return Column(
                   children: [
-                    for (var i = 0; i < users.length; i++)
+                    for (var i = 0; i < staff.length; i++)
                       StaffMemberTile(
-                        user: users[i],
-                        showDivider: i < users.length - 1,
+                        user: staff[i],
+                        showDivider: i < staff.length - 1,
                       ),
                   ],
                 );

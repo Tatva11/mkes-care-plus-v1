@@ -102,7 +102,6 @@ class _NotificationCenterButtonState extends State<NotificationCenterButton> {
                 borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
               ),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Modal Header
                   Padding(

@@ -21,7 +21,8 @@ class StaffMemberTile extends StatelessWidget {
   static const _errorContainer = Color(0xFFFFDAD6);
   static const _secondaryFixed = Color(0xFFFFD8EB);
 
-  StaffStatus get _status => user.isActive ? StaffStatus.present : StaffStatus.offDuty;
+  StaffStatus get _status =>
+      user.isActive ? StaffStatus.present : StaffStatus.offDuty;
 
   Color get _statusBg {
     switch (_status) {
@@ -68,7 +69,7 @@ class StaffMemberTile extends StatelessWidget {
   }
 
   Color get _avatarBg {
-    switch (user.department) {
+    switch (user.departmentName ?? user.department) {
       case 'Dental':
         return _secondaryFixed.withValues(alpha: 0.5);
       case 'OPD':
@@ -79,7 +80,7 @@ class StaffMemberTile extends StatelessWidget {
   }
 
   Color get _avatarTextColor {
-    switch (user.department) {
+    switch (user.departmentName ?? user.department) {
       case 'Dental':
         return AppColors.secondary;
       case 'OPD':
@@ -91,7 +92,12 @@ class StaffMemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = user.fullName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase();
+    final initials = user.fullName
+        .split(' ')
+        .map((w) => w.isNotEmpty ? w[0] : '')
+        .take(2)
+        .join()
+        .toUpperCase();
 
     return Column(
       children: [
@@ -138,7 +144,7 @@ class StaffMemberTile extends StatelessWidget {
                       maxLines: 1,
                     ),
                     Text(
-                      '${user.designation ?? user.role.toUpperCase()} • ${user.department ?? '-'}',
+                      '${user.designation ?? user.role.toUpperCase()} • ${user.departmentName ?? user.department ?? '-'}',
                       style: AppTypography.bodySm,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -159,8 +165,7 @@ class StaffMemberTile extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: _statusBg,
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusSm),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -185,11 +190,14 @@ class StaffMemberTile extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.base),
                   Text(
-                    user.joiningDate != null ? user.joiningDate!.toIso8601String().split('T').first : '—',
+                    '${user.email} • ${user.phoneNumber ?? 'No phone'}',
                     style: AppTypography.bodySm.copyWith(
-                      fontFamily: 'JetBrains Mono',
                       fontSize: 12,
                     ),
+                  ),
+                  Text(
+                    'Joined: ${user.joiningDate?.toIso8601String().split('T').first ?? '—'} • Salary: ${user.salary?.toStringAsFixed(2) ?? '—'}',
+                    style: AppTypography.bodySm.copyWith(fontSize: 11),
                   ),
                 ],
               ),

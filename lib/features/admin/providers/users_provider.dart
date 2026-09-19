@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_profile.dart';
 import '../repositories/user_management_repository.dart';
 
-final usersProvider = StateNotifierProvider<UsersNotifier, AsyncValue<List<UserProfile>>>((ref) {
+final usersProvider =
+    StateNotifierProvider<UsersNotifier, AsyncValue<List<UserProfile>>>((ref) {
   final repo = ref.watch(userManagementRepositoryProvider);
   return UsersNotifier(repo);
 });
@@ -40,7 +41,9 @@ class UsersNotifier extends StateNotifier<AsyncValue<List<UserProfile>>> {
         return u.fullName.toLowerCase().contains(_searchQuery) ||
             u.email.toLowerCase().contains(_searchQuery) ||
             u.role.toLowerCase().contains(_searchQuery) ||
-            (u.department?.toLowerCase().contains(_searchQuery) ?? false);
+            (u.departmentName ?? u.department ?? '')
+                .toLowerCase()
+                .contains(_searchQuery);
       }).toList();
       state = AsyncValue.data(filtered);
     }
@@ -51,7 +54,7 @@ class UsersNotifier extends StateNotifier<AsyncValue<List<UserProfile>>> {
     required String email,
     required String password,
     String? phoneNumber,
-    String? department,
+    String? departmentId,
     String? designation,
     required String role,
     double? salary,
@@ -62,7 +65,7 @@ class UsersNotifier extends StateNotifier<AsyncValue<List<UserProfile>>> {
       email: email,
       password: password,
       phoneNumber: phoneNumber,
-      department: department,
+      departmentId: departmentId,
       designation: designation,
       role: role,
       salary: salary,

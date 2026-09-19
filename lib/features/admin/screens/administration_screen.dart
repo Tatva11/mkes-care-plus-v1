@@ -4,7 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../admin/widgets/admin_shell.dart';
-import '../../staff/screens/staff_management_screen.dart';
+import 'user_management_screen.dart';
 
 class AdministrationScreen extends StatelessWidget {
   const AdministrationScreen({super.key});
@@ -75,16 +75,15 @@ class AdministrationContent extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _buildSettingCard(
-                            Icons.manage_accounts_outlined,
-                            'Users',
-                            'Add, remove, or modify user accounts.',
-                            onTap: () {
-                              Navigator.of(context).pushReplacement(
-                                MaterialPageRoute(builder: (_) => const StaffManagementScreen()),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: AppSpacing.md),
+  Icons.manage_accounts_outlined,
+  'Users',
+  'Add, remove, or modify user accounts.',
+  onTap: () {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const UserManagementScreen()),
+    );
+  },
+), SizedBox(height: AppSpacing.md),
                           _buildSettingCard(
                             Icons.settings_suggest_outlined,
                             'Clinic Settings',
@@ -129,7 +128,7 @@ class AdministrationContent extends StatelessWidget {
                       'Add, remove, or modify user accounts.',
                       onTap: () {
                         Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const StaffManagementScreen()),
+                         MaterialPageRoute(builder: (_) => const UserManagementScreen()),
                         );
                       },
                     ),

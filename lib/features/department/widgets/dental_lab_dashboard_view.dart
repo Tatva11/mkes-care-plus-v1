@@ -45,7 +45,8 @@ class DentalLabDashboardView extends StatelessWidget {
               SizedBox(width: AppSpacing.md),
               Expanded(
                 child: DepartmentCopilotInsightCard(
-                  insightText: 'Zirconia shade matching for #DEN-4013 has a 12% opacity variance flag.',
+                  insightText:
+                      'Zirconia shade matching for #DEN-4013 has a 12% opacity variance flag.',
                   highlightedText: '12% opacity variance',
                 ),
               ),
@@ -73,7 +74,8 @@ class DentalLabDashboardView extends StatelessWidget {
               ),
               SizedBox(height: AppSpacing.md),
               DepartmentCopilotInsightCard(
-                insightText: 'Zirconia shade matching for #DEN-4013 has a 12% opacity variance flag.',
+                insightText:
+                    'Zirconia shade matching for #DEN-4013 has a 12% opacity variance flag.',
                 highlightedText: '12% opacity variance',
               ),
             ],
@@ -113,7 +115,6 @@ class DentalLabDashboardView extends StatelessWidget {
               _DentalCopilotActionCard(),
             ],
           ),
-
       ],
     );
   }
@@ -138,15 +139,19 @@ class _TechnicianWorkloadCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Technician Allocation', style: AppTypography.headlineMd),
-              const Icon(Icons.people_outline, color: AppColors.secondary, size: 20),
+              const Icon(Icons.people_outline,
+                  color: AppColors.secondary, size: 20),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          _buildTechRow('Tech Alex Vance', '5 Active Cases', 0.85, AppColors.primaryContainer),
+          _buildTechRow('Tech Alex Vance', '5 Active Cases', 0.85,
+              AppColors.primaryContainer),
           const SizedBox(height: AppSpacing.sm),
-          _buildTechRow('Tech Maria Lopez', '4 Active Cases', 0.65, AppColors.secondary),
+          _buildTechRow(
+              'Tech Maria Lopez', '4 Active Cases', 0.65, AppColors.secondary),
           const SizedBox(height: AppSpacing.sm),
-          _buildTechRow('Tech Sam Rivera', '2 Active Cases', 0.35, AppColors.tertiary),
+          _buildTechRow(
+              'Tech Sam Rivera', '2 Active Cases', 0.35, AppColors.tertiary),
         ],
       ),
     );
@@ -162,12 +167,15 @@ class _TechnicianWorkloadCard extends StatelessWidget {
             Expanded(
               child: Text(
                 name,
-                style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
+                style:
+                    AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 8),
-            Text(status, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+            Text(status,
+                style: AppTypography.bodySm
+                    .copyWith(color: AppColors.onSurfaceVariant)),
           ],
         ),
         const SizedBox(height: 4),
@@ -201,12 +209,14 @@ class _DentalCopilotActionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome, color: AppColors.secondary, size: 18),
+              const Icon(Icons.auto_awesome,
+                  color: AppColors.secondary, size: 18),
               const SizedBox(width: AppSpacing.xs),
               Flexible(
                 child: Text(
                   'AI CAD/CAM Suggestion',
-                  style: AppTypography.labelCaps.copyWith(color: AppColors.secondary),
+                  style: AppTypography.labelCaps
+                      .copyWith(color: AppColors.secondary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -225,7 +235,8 @@ class _DentalCopilotActionCard extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.secondary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm, vertical: 4),
               ),
               child: const Text('Auto-Assign'),
             ),

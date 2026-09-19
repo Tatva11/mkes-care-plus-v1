@@ -96,8 +96,10 @@ class OpticalInventoryCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: AppColors.secondaryContainer.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        color:
+                            AppColors.secondaryContainer.withValues(alpha: 0.3),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusMd),
                       ),
                       child: Icon(
                         Icons.inventory_2,
@@ -165,7 +167,8 @@ class OpticalInventoryCard extends StatelessWidget {
                               ),
                               if (item.hasWarning) ...[
                                 const SizedBox(width: 4),
-                                Icon(Icons.warning, size: 12, color: AppColors.error),
+                                Icon(Icons.warning,
+                                    size: 12, color: AppColors.error),
                               ],
                             ],
                           ),
@@ -174,7 +177,9 @@ class OpticalInventoryCard extends StatelessWidget {
                         Text(
                           item.count.toString(),
                           style: AppTypography.dataMono.copyWith(
-                            color: item.hasWarning ? AppColors.error : AppColors.onSurface,
+                            color: item.hasWarning
+                                ? AppColors.error
+                                : AppColors.onSurface,
                           ),
                         ),
                       ],
@@ -264,7 +269,8 @@ class DepartmentCopilotActionCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.primaryContainer.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  border: Border.all(color: AppColors.primaryContainer.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color: AppColors.primaryContainer.withValues(alpha: 0.2)),
                 ),
                 child: const Icon(Icons.psychology, color: AppColors.primary),
               ),
@@ -276,7 +282,8 @@ class DepartmentCopilotActionCard extends StatelessWidget {
                 ),
                 child: Text(
                   'Copilot',
-                  style: AppTypography.labelCaps.copyWith(color: AppColors.primary),
+                  style: AppTypography.labelCaps
+                      .copyWith(color: AppColors.primary),
                 ),
               ),
             ],
@@ -292,7 +299,8 @@ class DepartmentCopilotActionCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'AI suggests re-ordering queue based on rush requests and current blank availability to improve output by 14%.',
-                style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                style: AppTypography.bodySm
+                    .copyWith(color: AppColors.onSurfaceVariant),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),

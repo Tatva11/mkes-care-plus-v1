@@ -226,63 +226,63 @@ class _OrderRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        order.orderId,
-                        style: AppTypography.dataMono.copyWith(
-                          color: AppColors.outline,
-                        ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                order.orderId,
+                style: AppTypography.dataMono.copyWith(
+                  color: AppColors.outline,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                order.patient,
+                style: AppTypography.bodySm.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.onSurface,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      order.lensType,
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.onSurfaceVariant,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        order.patient,
-                        style: AppTypography.bodySm.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.onSurface,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              order.lensType,
-                              style: AppTypography.bodySm.copyWith(
-                                color: AppColors.onSurfaceVariant,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (order.hasAiHighlight) ...[
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.auto_awesome,
-                              size: 14,
-                              color: AppColors.primaryContainer,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: _ProgressCell(
-                        stepName: order.stepName,
-                        percent: order.progressPercent,
-                        status: order.status,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: _StatusBadge(status: order.status),
+                  ),
+                  if (order.hasAiHighlight) ...[
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.auto_awesome,
+                      size: 14,
+                      color: AppColors.primaryContainer,
                     ),
                   ],
-                ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: _ProgressCell(
+                stepName: order.stepName,
+                percent: order.progressPercent,
+                status: order.status,
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: _StatusBadge(status: order.status),
+            ),
+          ],
+        ),
       ),
     );
   }

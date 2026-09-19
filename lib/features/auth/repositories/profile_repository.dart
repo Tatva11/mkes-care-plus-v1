@@ -18,9 +18,9 @@ class ProfileRepository {
   /// Returns null if the profile does not exist.
   Future<ProfileModel?> fetchProfile(String userId) async {
     try {
-      final response = await _supabase
+        final response = await _supabase
           .from('profiles')
-          .select()
+          .select('*, department:departments(name)')
           .eq('id', userId)
           .maybeSingle();
 

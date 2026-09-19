@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -7,10 +8,8 @@ import '../../admin/widgets/admin_shell.dart';
 import '../../admin/screens/administration_screen.dart';
 import '../../patients/screens/patient_list_screen.dart';
 import '../../staff/screens/staff_management_screen.dart';
-import '../widgets/department_stat_cards.dart';
-import '../widgets/department_side_cards.dart';
-import '../widgets/dental_lab_dashboard_view.dart';
-import '../widgets/optical_production_queue_card.dart';
+import '../models/department.dart';
+import '../providers/departments_provider.dart';
 
 class DepartmentManagementScreen extends StatelessWidget {
   const DepartmentManagementScreen({super.key});
@@ -54,102 +53,168 @@ class DepartmentManagementScreen extends StatelessWidget {
   }
 }
 
-class DepartmentManagementContent extends StatefulWidget {
+class DepartmentManagementContent extends ConsumerStatefulWidget {
   const DepartmentManagementContent({super.key});
 
   @override
-  State<DepartmentManagementContent> createState() => _DepartmentManagementContentState();
+  ConsumerState<DepartmentManagementContent> createState() =>
+      _DepartmentManagementContentState();
 }
 
-class _DepartmentManagementContentState extends State<DepartmentManagementContent> {
-  int _selectedTabIndex = 0;
+class _DepartmentManagementContentState
+    extends ConsumerState<DepartmentManagementContent> {
+  Future<void> _openDepartmentDialog({Department? department}) async {
+    final result = await showDialog<_DepartmentFormResult>(
+      context: context,
+      builder: (_) => _DepartmentDialog(department: department),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      final notifier = ref.read(departmentsProvider.notifier);
+      if (department == null) {
+        await notifier.createDepartment(
+          name: result.name,
+          description: result.description,
+        );
+      } else {
+        await notifier.updateDepartment(
+          id: department.id,
+          name: result.name,
+          description: result.description,
+          isActive: result.isActive,
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to save department: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteDepartment(Department department) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete department'),
+        content: Text(
+            'Delete ${department.name}? Staff assigned to it must be reassigned first.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref
+          .read(departmentsProvider.notifier)
+          .deleteDepartment(department.id);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to delete department: $error')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth > 768; // Based on other screens
-
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(
-              isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
-            ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Context Header & Tabs
-                  if (isDesktop)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(child: _buildHeaderTexts()),
-                        const SizedBox(width: AppSpacing.md),
-                        _buildDepartmentTabs(isDesktop: true),
-                      ],
-                    )
-                  else ...[
-                    _buildHeaderTexts(),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildDepartmentTabs(isDesktop: false),
-                  ],
-
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // Tab Views
-                  if (_selectedTabIndex == 0) ...[
-                    if (isDesktop)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 8,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildKpiRow(isDesktop: true),
-                                const SizedBox(height: AppSpacing.md),
-                                const OpticalProductionQueueCard(),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            flex: 4,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: const [
-                                OpticalInventoryCard(),
-                                SizedBox(height: AppSpacing.md),
-                                DepartmentCopilotActionCard(),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildKpiRow(isDesktop: false),
-                          const SizedBox(height: AppSpacing.md),
-                          const OpticalProductionQueueCard(),
-                          const SizedBox(height: AppSpacing.md),
-                          const OpticalInventoryCard(),
-                          const SizedBox(height: AppSpacing.md),
-                          const DepartmentCopilotActionCard(),
-                        ],
-                      ),
-                  ] else ...[
-                    DentalLabDashboardView(isDesktop: isDesktop),
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  const AppFooter(),
-                ],
+    final departmentsState = ref.watch(departmentsProvider);
+    final isDesktop = MediaQuery.sizeOf(context).width > 768;
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(
+          isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildHeaderTexts()),
+              const SizedBox(width: AppSpacing.md),
+              FilledButton.icon(
+                onPressed: () => _openDepartmentDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Department'),
               ),
-            );
-        },
-      );
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          departmentsState.when(
+            loading: () => const Center(
+                child: Padding(
+              padding: EdgeInsets.all(AppSpacing.xl),
+              child: CircularProgressIndicator(),
+            )),
+            error: (error, stackTrace) => _StateMessage(
+              message: 'Unable to load departments: $error',
+              action: TextButton(
+                onPressed: () =>
+                    ref.read(departmentsProvider.notifier).fetchDepartments(),
+                child: const Text('Retry'),
+              ),
+            ),
+            data: (departments) => departments.isEmpty
+                ? const _StateMessage(message: 'No departments found.')
+                : Column(
+                    children: departments.map(_buildDepartmentTile).toList(),
+                  ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const AppFooter(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDepartmentTile(Department department) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.business_outlined, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(department.name, style: AppTypography.headlineMd),
+                if (department.description?.isNotEmpty == true)
+                  Text(department.description!, style: AppTypography.bodyMd),
+              ],
+            ),
+          ),
+          Text(department.isActive ? 'Active' : 'Inactive',
+              style: AppTypography.labelCaps),
+          IconButton(
+            tooltip: 'Edit department',
+            onPressed: () => _openDepartmentDialog(department: department),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            tooltip: 'Delete department',
+            onPressed: () => _deleteDepartment(department),
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildHeaderTexts() {
@@ -172,170 +237,112 @@ class _DepartmentManagementContentState extends State<DepartmentManagementConten
       ],
     );
   }
+}
 
-  Widget _buildDepartmentTabs({required bool isDesktop}) {
-    final tab1 = InkWell(
-      onTap: () => setState(() => _selectedTabIndex = 0),
-      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          boxShadow: _selectedTabIndex == 0
-              ? const [
-                  BoxShadow(
-                    color: Color(0x0A000000),
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.visibility,
-              size: 14,
-              color: _selectedTabIndex == 0 ? AppColors.secondary : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Optical Orders',
-              style: AppTypography.bodyMd.copyWith(
-                color: _selectedTabIndex == 0 ? AppColors.secondary : AppColors.onSurfaceVariant,
-                fontWeight: _selectedTabIndex == 0 ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+class _StateMessage extends StatelessWidget {
+  const _StateMessage({required this.message, this.action});
 
-    final tab2 = InkWell(
-      onTap: () => setState(() => _selectedTabIndex = 1),
-      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          boxShadow: _selectedTabIndex == 1
-              ? const [
-                  BoxShadow(
-                    color: Color(0x0A000000),
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.medical_services,
-              size: 14,
-              color: _selectedTabIndex == 1 ? AppColors.secondary : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Dental Lab Tracking',
-              style: AppTypography.bodyMd.copyWith(
-                color: _selectedTabIndex == 1 ? AppColors.secondary : AppColors.onSurfaceVariant,
-                fontWeight: _selectedTabIndex == 1 ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  final String message;
+  final Widget? action;
 
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      width: isDesktop ? null : double.infinity,
-      child: Row(
-        mainAxisSize: isDesktop ? MainAxisSize.min : MainAxisSize.max,
-        children: isDesktop
-            ? [tab1, tab2]
-            : [Expanded(child: tab1), Expanded(child: tab2)],
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          children: [Text(message), if (action != null) action!],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildKpiRow({required bool isDesktop}) {
-    if (isDesktop) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+class _DepartmentFormResult {
+  const _DepartmentFormResult(
+      {required this.name, this.description, required this.isActive});
+
+  final String name;
+  final String? description;
+  final bool isActive;
+}
+
+class _DepartmentDialog extends StatefulWidget {
+  const _DepartmentDialog({this.department});
+
+  final Department? department;
+
+  @override
+  State<_DepartmentDialog> createState() => _DepartmentDialogState();
+}
+
+class _DepartmentDialogState extends State<_DepartmentDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
+  late bool _isActive;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.department?.name);
+    _descriptionController =
+        TextEditingController(text: widget.department?.description);
+    _isActive = widget.department?.isActive ?? true;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+          widget.department == null ? 'Add Department' : 'Edit Department'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(child: _buildPendingOrdersCard()),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(child: _buildInProductionCard()),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(child: _buildCopilotInsightCard()),
+          TextField(
+              controller: _nameController,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Name')),
+          TextField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(labelText: 'Description')),
+          if (widget.department != null)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Active'),
+              value: _isActive,
+              onChanged: (value) => setState(() => _isActive = value),
+            ),
         ],
-      );
-    } else {
-      return Column(
-        children: [
-          _buildPendingOrdersCard(),
-          const SizedBox(height: AppSpacing.md),
-          _buildInProductionCard(),
-          const SizedBox(height: AppSpacing.md),
-          _buildCopilotInsightCard(),
-        ],
-      );
-    }
-  }
-
-  Widget _buildPendingOrdersCard() {
-    return const DepartmentStatCard(
-      title: 'Pending Orders',
-      icon: Icons.hourglass_top,
-      iconColor: AppColors.tertiary,
-      value: '24',
-      subtitle: '12%',
-      subtitleColor: AppColors.error,
-      subtitleIcon: Icons.arrow_upward,
-    );
-  }
-
-  Widget _buildInProductionCard() {
-    return const DepartmentStatCard(
-      title: 'In Production',
-      icon: Icons.build,
-      iconColor: AppColors.primaryContainer,
-      value: '18',
-      subtitle: 'On Track',
-      subtitleColor: AppColors.primaryContainer,
-    );
-  }
-
-  Widget _buildCopilotInsightCard() {
-    return const DepartmentCopilotInsightCard(
-      insightText: 'High demand for Progressive Lenses detected. Consider restocking blanks.',
-      highlightedText: 'Progressive Lenses',
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () {
+            final name = _nameController.text.trim();
+            if (name.isEmpty) return;
+            Navigator.pop(
+              context,
+              _DepartmentFormResult(
+                name: name,
+                description: _descriptionController.text.trim().isEmpty
+                    ? null
+                    : _descriptionController.text.trim(),
+                isActive: _isActive,
+              ),
+            );
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

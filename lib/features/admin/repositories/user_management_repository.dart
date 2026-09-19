@@ -5,7 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers/supabase_provider.dart';
 import '../models/user_profile.dart';
 
-final userManagementRepositoryProvider = Provider<UserManagementRepository>((ref) {
+final userManagementRepositoryProvider =
+    Provider<UserManagementRepository>((ref) {
   return UserManagementRepository(ref.watch(supabaseProvider));
 });
 
@@ -17,10 +18,12 @@ class UserManagementRepository {
   Future<List<UserProfile>> fetchUsers() async {
     final response = await _supabase
         .from('profiles')
-        .select()
+        .select('*, department:departments(name)')
         .order('created_at', ascending: false);
 
-    return (response as List).map((json) => UserProfile.fromJson(json)).toList();
+    return (response as List)
+        .map((json) => UserProfile.fromJson(json))
+        .toList();
   }
 
   /// Creates a new user via RPC function that handles both auth and profile creation
@@ -29,7 +32,7 @@ class UserManagementRepository {
     required String email,
     required String password,
     String? phoneNumber,
-    String? department,
+    String? departmentId,
     String? designation,
     required String role,
     double? salary,
@@ -44,7 +47,7 @@ class UserManagementRepository {
           'p_password': password,
           'p_full_name': fullName,
           'p_phone_number': phoneNumber,
-          'p_department': department,
+          'p_department_id': departmentId,
           'p_designation': designation,
           'p_role': role,
           'p_salary': salary,
@@ -52,7 +55,8 @@ class UserManagementRepository {
         },
       );
     } catch (e) {
-      if (e.toString().contains('duplicate key') || e.toString().contains('already registered')) {
+      if (e.toString().contains('duplicate key') ||
+          e.toString().contains('already registered')) {
         throw Exception('This email is already registered.');
       }
       if (e.toString().contains('Only active admins')) {
@@ -68,11 +72,13 @@ class UserManagementRepository {
   }
 
   Future<void> toggleUserStatus(String id, bool isActive) async {
-    await _supabase.from('profiles').update({'is_active': isActive}).eq('id', id);
+    await _supabase
+        .from('profiles')
+        .update({'is_active': isActive}).eq('id', id);
   }
 
   Future<void> deleteUser(String id) async {
-    // Usually, you should delete from auth.users (which cascades to profiles), 
+    // Usually, you should delete from auth.users (which cascades to profiles),
     // but client-side delete requires an RPC or Edge Function.
     await _supabase.rpc('delete_user_by_admin', params: {'target_user_id': id});
   }

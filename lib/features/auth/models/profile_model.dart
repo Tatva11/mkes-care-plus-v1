@@ -4,6 +4,8 @@ class ProfileModel {
   final String fullName;
   final String email;
   final String? phoneNumber;
+  final String? departmentId;
+  final String? departmentName;
   final String? department;
   final String? designation;
   final String role; // 'admin' | 'staff'
@@ -15,6 +17,8 @@ class ProfileModel {
     required this.fullName,
     required this.email,
     this.phoneNumber,
+    this.departmentId,
+    this.departmentName,
     this.department,
     this.designation,
     required this.role,
@@ -28,7 +32,12 @@ class ProfileModel {
       fullName: json['full_name'] as String,
       email: json['email'] as String,
       phoneNumber: json['phone_number'] as String?,
-      department: json['department'] as String?,
+      departmentId: json['department_id'] as String?,
+      departmentName:
+          (json['department'] as Map<String, dynamic>?)?['name'] as String? ??
+              json['department_name'] as String?,
+      department: json['legacy_department'] as String? ??
+          (json['department'] is String ? json['department'] as String : null),
       designation: json['designation'] as String?,
       role: json['role'] as String,
       isActive: json['is_active'] as bool? ?? true,

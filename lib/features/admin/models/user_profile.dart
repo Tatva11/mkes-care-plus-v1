@@ -3,6 +3,8 @@ class UserProfile {
   final String fullName;
   final String email;
   final String? phoneNumber;
+  final String? departmentId;
+  final String? departmentName;
   final String? department;
   final String? designation;
   final String role;
@@ -16,6 +18,8 @@ class UserProfile {
     required this.fullName,
     required this.email,
     this.phoneNumber,
+    this.departmentId,
+    this.departmentName,
     this.department,
     this.designation,
     required this.role,
@@ -31,12 +35,20 @@ class UserProfile {
       fullName: json['full_name'] as String,
       email: json['email'] as String,
       phoneNumber: json['phone_number'] as String?,
-      department: json['department'] as String?,
+      departmentId: json['department_id'] as String?,
+      departmentName:
+          (json['department'] as Map<String, dynamic>?)?['name'] as String? ??
+              json['department_name'] as String?,
+      department: json['legacy_department'] as String? ??
+          (json['department'] is String ? json['department'] as String : null),
       designation: json['designation'] as String?,
       role: json['role'] as String,
       isActive: json['is_active'] as bool,
-      salary: json['salary'] != null ? (json['salary'] as num).toDouble() : null,
-      joiningDate: json['joining_date'] != null ? DateTime.parse(json['joining_date'] as String) : null,
+      salary:
+          json['salary'] != null ? (json['salary'] as num).toDouble() : null,
+      joiningDate: json['joining_date'] != null
+          ? DateTime.parse(json['joining_date'] as String)
+          : null,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -47,6 +59,8 @@ class UserProfile {
       'full_name': fullName,
       'email': email,
       'phone_number': phoneNumber,
+      'department_id': departmentId,
+      'department_name': departmentName,
       'department': department,
       'designation': designation,
       'role': role,

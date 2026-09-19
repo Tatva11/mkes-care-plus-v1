@@ -123,10 +123,13 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             children: [
               Row(
                 children: [
-                  Text(
-                    'Sarah Jenkins',
-                    style: AppTypography.displayLg.copyWith(
-                      color: AppColors.onBackground,
+                  Flexible(
+                    child: Text(
+                      'Sarah Jenkins',
+                      style: AppTypography.displayLg.copyWith(
+                        color: AppColors.onBackground,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),

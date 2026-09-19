@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -15,6 +16,7 @@ import '../widgets/staff_stat_card.dart';
 import '../../admin/screens/admin_leave_screen.dart';
 import '../../admin/screens/admin_task_screen.dart';
 import '../../admin/screens/admin_performance_attendance_screens.dart';
+import '../../admin/providers/users_provider.dart';
 
 class StaffManagementScreen extends StatelessWidget {
   const StaffManagementScreen({super.key});
@@ -89,9 +91,7 @@ class _StaffManagementContentState extends State<StaffManagementContent> {
           const SizedBox(height: AppSpacing.md),
 
           // ── Main content ────────────────────────────────────────────────
-          isDesktop
-              ? _DesktopLayout()
-              : _MobileLayout(),
+          isDesktop ? _DesktopLayout() : _MobileLayout(),
         ],
       ),
     );
@@ -148,17 +148,20 @@ class _PageHeader extends StatelessWidget {
             Row(
               children: [
                 OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminLeaveScreen())),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const AdminLeaveScreen())),
                   child: const Text('Leave'),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminTaskScreen())),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const AdminTaskScreen())),
                   child: const Text('Tasks'),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminPerformanceScreen())),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const AdminPerformanceScreen())),
                   child: const Text('Performance'),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -211,7 +214,7 @@ class _AddStaffButton extends StatelessWidget {
 // Stat Row
 // ──────────────────────────────────────────────────────────────────────────────
 
-class _StatRow extends StatelessWidget {
+class _StatRow extends ConsumerWidget {
   const _StatRow({required this.isDesktop});
 
   final bool isDesktop;
@@ -219,12 +222,19 @@ class _StatRow extends StatelessWidget {
   static const _errorContainer = Color(0xFFFFDAD6);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usersState = ref.watch(usersProvider);
+    final users = (usersState.valueOrNull ?? const [])
+      .where((user) => user.role == 'staff')
+      .toList();
+    final activeCount = users.where((user) => user.isActive).length;
+    final inactiveCount = users.length - activeCount;
+
     return Row(
       children: [
         Expanded(
           child: StaffStatCard(
-            value: '45',
+            value: usersState.isLoading ? '...' : '${users.length}',
             label: 'Total Staff',
             valueColor: AppColors.onSurface,
             icon: Icons.people_outlined,
@@ -233,7 +243,7 @@ class _StatRow extends StatelessWidget {
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: StaffStatCard(
-            value: '42',
+            value: usersState.isLoading ? '...' : '$activeCount',
             label: 'Present',
             valueColor: AppColors.primary,
             icon: Icons.check_circle_outline,
@@ -242,8 +252,8 @@ class _StatRow extends StatelessWidget {
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: StaffStatCard(
-            value: '3',
-            label: 'On Leave',
+            value: usersState.isLoading ? '...' : '$inactiveCount',
+            label: 'Inactive',
             valueColor: AppColors.secondary,
             backgroundColor: _errorContainer.withValues(alpha: 0.2),
             borderColor: _errorContainer,

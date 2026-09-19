@@ -216,7 +216,8 @@ class _DentalRow extends StatelessWidget {
         border: Border(
           left: BorderSide(
             width: 4,
-            color: item.hasAiHighlight ? AppColors.secondary : Colors.transparent,
+            color:
+                item.hasAiHighlight ? AppColors.secondary : Colors.transparent,
           ),
         ),
       ),

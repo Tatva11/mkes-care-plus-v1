@@ -37,12 +37,15 @@ class MyProfileScreen extends ConsumerWidget {
       body: profileAsync.when(
         data: (profile) {
           final displayName = profile?.fullName ?? name ?? 'User';
-          final displayRole =
-              profile?.designation ?? profile?.roleDisplayName ?? role ?? 'Staff';
+          final displayRole = profile?.designation ??
+              profile?.roleDisplayName ??
+              role ??
+              'Staff';
           final displayInitials = profile?.initials ?? initials ?? '?';
           final displayEmail = profile?.email ?? '—';
           final displayPhone = profile?.phoneNumber ?? '—';
-          final displayDepartment = profile?.department ?? '—';
+          final displayDepartment =
+              profile?.departmentName ?? profile?.department ?? '—';
           final displayDesignation = profile?.designation ?? '—';
 
           return _buildContent(
@@ -63,7 +66,8 @@ class MyProfileScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                const Icon(Icons.error_outline,
+                    size: 48, color: AppColors.error),
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   'Could not load profile.',
@@ -178,8 +182,8 @@ class MyProfileScreen extends ConsumerWidget {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  AppColors.primaryContainer.withValues(alpha: 0.2),
+                              color: AppColors.primaryContainer
+                                  .withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../admin/screens/admin_dashboard_screen.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -47,14 +48,19 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
         ref: ref,
       );
 
-      if (!mounted) return;
+     if (result is LoginSuccess) {
+  if (!mounted) return;
+  // Navigate directly to the dashboard and clear the entire nav stack
+  // (role selection + login screen) so back-navigation can't return here.
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+    (route) => false,
+  );
+} else if (result is LoginFailure) {
+  _showError(result.message);
+}
 
-      if (result is LoginSuccess) {
-        // Pop all screens back to root so AuthWrapper's dashboard is visible.
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } else if (result is LoginFailure) {
-        _showError(result.message);
-      }
+      
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

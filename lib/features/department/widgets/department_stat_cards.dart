@@ -137,7 +137,8 @@ class DepartmentCopilotInsightCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
+              const Icon(Icons.auto_awesome,
+                  size: 14, color: AppColors.primary),
               const SizedBox(width: 4),
               Text(
                 'Copilot Insight',
