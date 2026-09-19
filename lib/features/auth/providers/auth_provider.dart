@@ -158,6 +158,13 @@ Future<LoginResult> performRoleEnforcedLogin({
       await authRepo.signOut();
     } catch (_) {}
 
+    // Log the raw GoTrue error for debugging (status code + exact message).
+    // This is the exact error returned by Supabase Auth — not the friendly UI copy.
+    debugPrint(
+      'performRoleEnforcedLogin AuthException '
+      '[status=${e.statusCode}]: "${e.message}"',
+    );
+
     return LoginFailure(_friendlyAuthError(e.message));
   } catch (e) {
     // Ensure session is cleared on unexpected failure.

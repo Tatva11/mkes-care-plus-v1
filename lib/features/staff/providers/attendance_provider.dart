@@ -8,6 +8,16 @@ final attendanceProvider = StateNotifierProvider.family<AttendanceNotifier, Asyn
   return AttendanceNotifier(repo, staffId);
 });
 
+final adminAttendanceForDateProvider = FutureProvider.family<List<AttendanceRecord>, DateTime>((ref, date) {
+  final repo = ref.watch(attendanceRepositoryProvider);
+  return repo.fetchAllStaffAttendanceForDate(date);
+});
+
+final adminAttendanceSummaryProvider = FutureProvider.family<Map<String, int>, DateTime>((ref, date) {
+  final repo = ref.watch(attendanceRepositoryProvider);
+  return repo.fetchDailySummary(date);
+});
+
 class AttendanceNotifier extends StateNotifier<AsyncValue<List<AttendanceRecord>>> {
   final AttendanceRepository _repository;
   final String _staffId;
@@ -36,7 +46,6 @@ class AttendanceNotifier extends StateNotifier<AsyncValue<List<AttendanceRecord>
       await _repository.checkIn(_staffId);
       await fetchCurrentMonth();
     } catch (e) {
-      // Re-throw to handle in UI
       rethrow;
     }
   }

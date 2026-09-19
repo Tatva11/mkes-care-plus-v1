@@ -16,11 +16,25 @@ class ManualAttendanceSource implements AttendanceSource {
   @override
   Future<void> recordCheckIn(String staffId, DateTime time) async {
     final dateStr = time.toIso8601String().split('T').first;
-    // Basic threshold logic, e.g. 9:00 AM
-    final isLate = time.hour >= 9 && time.minute > 0;
-    final lateMinutes = isLate ? ((time.hour - 9) * 60 + time.minute) : 0;
+    final existing = await _supabase
+        .from('staff_attendance')
+        .select('id, check_out_time')
+        .eq('staff_id', staffId)
+        .eq('record_date', dateStr)
+        .maybeSingle();
 
-    await _supabase.from('staff_attendance').upsert({
+    if (existing != null) {
+      final hasClockedOut = existing['check_out_time'] != null;
+      if (!hasClockedOut) {
+        throw Exception('Attendance already recorded for today. Please clock out instead.');
+      }
+      throw Exception('Attendance for today has already been completed.');
+    }
+
+    final isLate = time.hour > 9 || (time.hour == 9 && time.minute > 0);
+    final lateMinutes = isLate ? ((time.hour - 9) * 60 + time.minute).clamp(0, 999) : 0;
+
+    await _supabase.from('staff_attendance').insert({
       'staff_id': staffId,
       'record_date': dateStr,
       'check_in_time': time.toIso8601String(),
@@ -28,26 +42,30 @@ class ManualAttendanceSource implements AttendanceSource {
       'is_late': isLate,
       'late_minutes': lateMinutes,
       'updated_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'staff_id, record_date');
+    });
   }
 
   @override
   Future<void> recordCheckOut(String staffId, DateTime time) async {
     final dateStr = time.toIso8601String().split('T').first;
 
-    // Fetch existing record to calculate working hours
     final existing = await _supabase
         .from('staff_attendance')
-        .select('check_in_time')
+        .select('check_in_time, check_out_time')
         .eq('staff_id', staffId)
         .eq('record_date', dateStr)
         .maybeSingle();
 
-    double? workingHours;
-    if (existing != null && existing['check_in_time'] != null) {
-      final checkIn = DateTime.parse(existing['check_in_time'] as String);
-      workingHours = time.difference(checkIn).inMinutes / 60.0;
+    if (existing == null) {
+      throw Exception('No attendance record found for today. Please clock in first.');
     }
+
+    if (existing['check_out_time'] != null) {
+      throw Exception('Attendance for today has already been clocked out.');
+    }
+
+    final checkIn = DateTime.parse(existing['check_in_time'] as String);
+    final workingHours = time.difference(checkIn).inMinutes / 60.0;
 
     await _supabase.from('staff_attendance').update({
       'check_out_time': time.toIso8601String(),
@@ -79,6 +97,36 @@ class AttendanceRepository {
         .order('record_date', ascending: false);
 
     return (response as List).map((json) => AttendanceRecord.fromJson(json)).toList();
+  }
+
+  Future<List<AttendanceRecord>> fetchAllStaffAttendanceForDate(DateTime date) async {
+    final dateKey = date.toIso8601String().split('T').first;
+    final response = await _supabase
+        .from('staff_attendance')
+      .select('*, profiles!staff_attendance_staff_id_fkey!inner(full_name, role)')
+      .eq('profiles.role', 'staff')
+        .eq('record_date', dateKey)
+        .order('staff_id', ascending: true);
+
+    final records = (response as List)
+        .map((json) => AttendanceRecord.fromJson(json))
+        .toList();
+
+    return records;
+  }
+
+  Future<Map<String, int>> fetchDailySummary(DateTime date) async {
+    final records = await fetchAllStaffAttendanceForDate(date);
+    final summary = {'present': 0, 'late': 0, 'absent': 0, 'leave': 0, 'holiday': 0};
+
+    for (final record in records) {
+      final status = record.status.toLowerCase();
+      if (summary.containsKey(status)) {
+        summary[status] = summary[status]! + 1;
+      }
+    }
+
+    return summary;
   }
 
   Future<AttendanceRecord?> fetchTodayAttendance(String staffId) async {

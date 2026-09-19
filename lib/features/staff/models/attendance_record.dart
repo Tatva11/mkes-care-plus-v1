@@ -9,6 +9,7 @@ class AttendanceRecord {
   final double? workingHours;
   final int lateMinutes;
   final String? notes;
+  final String? staffName;
 
   AttendanceRecord({
     required this.id,
@@ -21,9 +22,11 @@ class AttendanceRecord {
     this.workingHours,
     required this.lateMinutes,
     this.notes,
+    this.staffName,
   });
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
+    final profile = json['profiles'] is Map ? json['profiles'] as Map<String, dynamic> : null;
     return AttendanceRecord(
       id: json['id'] as String,
       staffId: json['staff_id'] as String,
@@ -35,6 +38,7 @@ class AttendanceRecord {
       workingHours: json['working_hours'] != null ? (json['working_hours'] as num).toDouble() : null,
       lateMinutes: json['late_minutes'] as int? ?? 0,
       notes: json['notes'] as String?,
+      staffName: profile?['full_name'] as String? ?? json['staff_name'] as String?,
     );
   }
 
@@ -52,4 +56,25 @@ class AttendanceRecord {
       'notes': notes,
     };
   }
+
+  String get statusLabel {
+    switch (status.toLowerCase()) {
+      case 'present':
+        return 'Present';
+      case 'late':
+        return 'Late';
+      case 'absent':
+        return 'Absent';
+      case 'leave':
+        return 'Leave';
+      case 'holiday':
+        return 'Holiday';
+      default:
+        return status;
+    }
+  }
+
+  bool get isClockedIn => checkInTime != null && checkOutTime == null;
+
+  bool get isCompleted => checkInTime != null && checkOutTime != null;
 }

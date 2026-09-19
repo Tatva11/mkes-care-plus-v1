@@ -410,7 +410,6 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
                       onPressed:
@@ -419,11 +418,15 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                     ),
                     const SizedBox(width: AppSpacing.md),
                     if (_isLoading)
-                      const CircularProgressIndicator()
+                      const Expanded(
+                        child: Center(child: CircularProgressIndicator()),
+                      )
                     else
-                      MkesPrimaryButton(
-                        label: _isCreating ? 'Create User' : 'Save Changes',
-                        onPressed: _submit,
+                      Expanded(
+                        child: MkesPrimaryButton(
+                          label: _isCreating ? 'Create User' : 'Save Changes',
+                          onPressed: _submit,
+                        ),
                       ),
                   ],
                 ),

@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email        TEXT         NOT NULL UNIQUE,
   phone_number TEXT,
   department   TEXT,         -- references department name (denormalised for simplicity)
+  department_id UUID         REFERENCES public.departments(id) ON DELETE SET NULL,
   designation  TEXT,
   role         TEXT         NOT NULL CHECK (role IN ('admin', 'staff')),
   is_active    BOOLEAN      NOT NULL DEFAULT true,
@@ -50,6 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_role     ON public.profiles(role);
 CREATE INDEX IF NOT EXISTS idx_profiles_email    ON public.profiles(email);
 CREATE INDEX IF NOT EXISTS idx_profiles_active   ON public.profiles(is_active);
 CREATE INDEX IF NOT EXISTS idx_profiles_dept     ON public.profiles(department);
+CREATE INDEX IF NOT EXISTS idx_profiles_dept_id  ON public.profiles(department_id);
 
 -- Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -163,18 +165,26 @@ TO authenticated
 USING (is_admin());
 
 -- ============================================================
--- SECTION 6: RPC — create_user_by_admin
+-- SECTION 6: RPC — create_user_by_admin  [DEPRECATED]
 -- ============================================================
--- Creates a new Supabase auth user + clinic profile in a single
--- secure server-side call. The Flutter client NEVER sees or holds
--- the service-role key.
+-- ⚠️  DEPRECATED: This RPC is NO LONGER called by the Flutter app.
 --
--- IMPORTANT NOTE about auth.users direct insert:
--- In Supabase, inserting directly into auth.users works in the
--- SQL editor / service role context, but may have edge cases in
--- some Supabase versions. The recommended production approach is
--- to use the Supabase Admin SDK in an Edge Function. However,
--- this RPC provides a working client-safe approach for Sprint 1.
+-- Root-cause: pgcrypto.crypt() creates a bcrypt hash that GoTrue
+-- cannot verify, so staff login always failed with
+-- "Invalid login credentials".
+--
+-- Replacement: The Edge Function `create-staff-user` (see
+-- supabase/functions/create-staff-user/index.ts) calls
+-- supabase.auth.admin.createUser() which uses GoTrue's own bcrypt
+-- path. The Flutter repository now calls
+--   supabase.functions.invoke('create-staff-user', ...)
+-- instead of this RPC.
+--
+-- This function definition is kept here only for:
+--   • rollback reference
+--   • Supabase dashboard compatibility (function must exist for GRANT)
+-- It is safe to DROP it once the Edge Function has been in
+-- production for a sprint without issues.
 -- ============================================================
 DROP FUNCTION IF EXISTS create_user_by_admin(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, DECIMAL, DATE);
 DROP FUNCTION IF EXISTS create_user_by_admin(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT);
@@ -184,7 +194,7 @@ CREATE OR REPLACE FUNCTION create_user_by_admin(
   p_password     TEXT,
   p_full_name    TEXT,
   p_phone_number TEXT    DEFAULT NULL,
-  p_department   TEXT    DEFAULT NULL,
+  p_department_id UUID   DEFAULT NULL,
   p_designation  TEXT    DEFAULT NULL,
   p_role         TEXT    DEFAULT 'staff',
   p_salary       DECIMAL DEFAULT NULL,
@@ -197,6 +207,7 @@ SET search_path = public
 AS $$
 DECLARE
   new_user_id UUID;
+  auth_instance_id UUID;
 BEGIN
   -- 1. Role enforcement: only an active admin may call this.
   IF NOT is_admin() THEN
@@ -210,9 +221,21 @@ BEGIN
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
 
+  SELECT instance_id
+  INTO auth_instance_id
+  FROM auth.users
+  WHERE id = auth.uid();
+
+  IF auth_instance_id IS NULL THEN
+    RAISE EXCEPTION 'The current admin Auth account has no instance_id'
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
   -- 3. Create the auth user.
   --    We use pgcrypto's crypt() which is available in Supabase's PostgreSQL.
   INSERT INTO auth.users (
+    id,
+    instance_id,
     email,
     encrypted_password,
     email_confirmed_at,
@@ -222,8 +245,10 @@ BEGIN
     role
   )
   VALUES (
+    gen_random_uuid(),
+    auth_instance_id,
     p_email,
-    crypt(p_password, gen_salt('bf')),
+    extensions.crypt(p_password, extensions.gen_salt('bf')),
     now(),                                -- Auto-confirm email
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('full_name', p_full_name),
@@ -238,7 +263,7 @@ BEGIN
     full_name,
     email,
     phone_number,
-    department,
+    department_id,
     designation,
     role,
     is_active,
@@ -249,7 +274,7 @@ BEGIN
     p_full_name,
     p_email,
     p_phone_number,
-    p_department,
+    p_department_id,
     p_designation,
     p_role,
     true,
@@ -292,7 +317,7 @@ $$;
 -- ============================================================
 -- SECTION 8: GRANT EXECUTE PERMISSIONS
 -- ============================================================
-GRANT EXECUTE ON FUNCTION create_user_by_admin(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, DECIMAL, DATE) TO authenticated;
+GRANT EXECUTE ON FUNCTION create_user_by_admin(TEXT, TEXT, TEXT, TEXT, UUID, TEXT, TEXT, DECIMAL, DATE) TO authenticated;
 GRANT EXECUTE ON FUNCTION delete_user_by_admin(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_admin() TO authenticated;
 

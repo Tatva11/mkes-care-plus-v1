@@ -52,6 +52,7 @@ SET search_path = public
 AS $$
 DECLARE
   new_user_id UUID;
+  auth_instance_id UUID;
 BEGIN
   IF NOT is_admin() THEN
     RAISE EXCEPTION 'Only active admins can create users'
@@ -63,12 +64,23 @@ BEGIN
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
 
+  SELECT instance_id
+  INTO auth_instance_id
+  FROM auth.users
+  WHERE id = auth.uid();
+
+  IF auth_instance_id IS NULL THEN
+    RAISE EXCEPTION 'The current admin Auth account has no instance_id'
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
   INSERT INTO auth.users (
-    email, encrypted_password, email_confirmed_at,
+    id, instance_id, email, encrypted_password, email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data, aud, role
   )
   VALUES (
-    p_email, crypt(p_password, gen_salt('bf')), now(),
+    gen_random_uuid(), auth_instance_id, p_email,
+    extensions.crypt(p_password, extensions.gen_salt('bf')), now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('full_name', p_full_name),
     'authenticated', 'authenticated'
