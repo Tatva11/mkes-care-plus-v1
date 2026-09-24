@@ -38,24 +38,29 @@ class StaffPatientProfileScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text('Sarah Jenkins', style: AppTypography.headlineMd),
+                          Text('Sarah Jenkins',
+                              style: AppTypography.headlineMd),
                           const SizedBox(width: AppSpacing.xs),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryContainer.withValues(alpha: 0.2),
+                              color: AppColors.primaryContainer
+                                  .withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               'Active Patient',
-                              style: AppTypography.labelCaps.copyWith(color: AppColors.primaryContainer),
+                              style: AppTypography.labelCaps
+                                  .copyWith(color: AppColors.primaryContainer),
                             ),
                           ),
                         ],
                       ),
                       Text(
-                        'ID: #P-4092 • 34 yrs, Female • Room 204',
-                        style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                        'ID: #E1 • 34 yrs, Female • Room 204',
+                        style: AppTypography.bodySm
+                            .copyWith(color: AppColors.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -89,7 +94,8 @@ class StaffPatientProfileScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Staff Shift Notes', style: AppTypography.headlineMd),
+                      Text('Staff Shift Notes',
+                          style: AppTypography.headlineMd),
                       IconButton(
                         icon: const Icon(Icons.add_comment_outlined),
                         onPressed: () {},
@@ -100,10 +106,14 @@ class StaffPatientProfileScreen extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     '"Patient rested comfortably post-consultation at 09:30 AM. Accompanied to waiting lounge B. Patient history updated for attending specialist."',
-                    style: AppTypography.bodyMd.copyWith(fontStyle: FontStyle.italic, color: AppColors.onSurfaceVariant),
+                    style: AppTypography.bodyMd.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.onSurfaceVariant),
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  Text('— Nurse Jane Doe, 10:15 AM Today', style: AppTypography.labelCaps.copyWith(color: AppColors.outline)),
+                  Text('— Nurse Jane Doe, 10:15 AM Today',
+                      style: AppTypography.labelCaps
+                          .copyWith(color: AppColors.outline)),
                 ],
               ),
             ),
@@ -120,15 +130,18 @@ class StaffPatientProfileScreen extends StatelessWidget {
         'doctor': 'Dr. Sarah Vance, O.D. (Optometry)',
         'procedure': 'Comprehensive Refraction & Corneal Topography',
         'diagnosis': 'Mild Astigmatism; early presbyopia flags noted.',
-        'notes': 'Prescribed anti-reflective blue-light lenses. Scheduled 3-month corneal monitoring check.',
+        'notes':
+            'Prescribed anti-reflective blue-light lenses. Scheduled 3-month corneal monitoring check.',
         'badgeColor': AppColors.primaryContainer,
       },
       {
         'date': 'May 04, 2026',
         'doctor': 'Dr. Robert Sterling (Visiting Retina Specialist)',
         'procedure': 'Dilated Macular Exam & OCT Scan',
-        'diagnosis': 'Normal retinal nerve fiber layer thickness. No diabetic retinopathy.',
-        'notes': 'Maintain routine annual screening. Advised UV protective outdoor eyewear.',
+        'diagnosis':
+            'Normal retinal nerve fiber layer thickness. No diabetic retinopathy.',
+        'notes':
+            'Maintain routine annual screening. Advised UV protective outdoor eyewear.',
         'badgeColor': AppColors.secondary,
       },
       {
@@ -136,7 +149,8 @@ class StaffPatientProfileScreen extends StatelessWidget {
         'doctor': 'Dr. Elena Rostova (Dental Surgeon)',
         'procedure': 'Crown Prep & Intraoral 3D Impression',
         'diagnosis': 'Tooth #14 distal caries, crown indicated.',
-        'notes': 'Permanent crown fitting completed cleanly. Zero post-op sensitivity reported.',
+        'notes':
+            'Permanent crown fitting completed cleanly. Zero post-op sensitivity reported.',
         'badgeColor': AppColors.tertiary,
       },
     ];
@@ -156,9 +170,11 @@ class StaffPatientProfileScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.history_edu, color: AppColors.primary, size: 22),
+                  const Icon(Icons.history_edu,
+                      color: AppColors.primary, size: 22),
                   const SizedBox(width: AppSpacing.xs),
-                  Text('Patient Visit History', style: AppTypography.headlineMd),
+                  Text('Patient Visit History',
+                      style: AppTypography.headlineMd),
                 ],
               ),
               Container(
@@ -170,7 +186,8 @@ class StaffPatientProfileScreen extends StatelessWidget {
                 ),
                 child: Text(
                   '3 Previous Visits',
-                  style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10),
+                  style: AppTypography.labelCaps.copyWith(
+                      color: AppColors.onSurfaceVariant, fontSize: 10),
                 ),
               ),
             ],
@@ -194,23 +211,30 @@ class StaffPatientProfileScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today, size: 14, color: AppColors.outline),
+                          const Icon(Icons.calendar_today,
+                              size: 14, color: AppColors.outline),
                           const SizedBox(width: 6),
                           Text(
                             v['date'] as String,
-                            style: AppTypography.dataMono.copyWith(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                            style: AppTypography.dataMono.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: AppColors.primary),
                           ),
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: (v['badgeColor'] as Color).withValues(alpha: 0.15),
+                          color: (v['badgeColor'] as Color)
+                              .withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           'Verified Visit',
-                          style: AppTypography.labelCaps.copyWith(color: v['badgeColor'] as Color, fontSize: 10),
+                          style: AppTypography.labelCaps.copyWith(
+                              color: v['badgeColor'] as Color, fontSize: 10),
                         ),
                       ),
                     ],
@@ -218,24 +242,31 @@ class StaffPatientProfileScreen extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xs),
                   Row(
                     children: [
-                      const Icon(Icons.medical_information, size: 14, color: AppColors.secondary),
+                      const Icon(Icons.medical_information,
+                          size: 14, color: AppColors.secondary),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           v['doctor'] as String,
-                          style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600, color: AppColors.onSurface),
+                          style: AppTypography.bodySm.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.onSurface),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  _buildVisitField('Treatment / Procedure', v['procedure'] as String, Icons.healing),
+                  _buildVisitField('Treatment / Procedure',
+                      v['procedure'] as String, Icons.healing),
                   const SizedBox(height: 4),
-                  _buildVisitField('Diagnosis / Observations', v['diagnosis'] as String, Icons.biotech),
+                  _buildVisitField('Diagnosis / Observations',
+                      v['diagnosis'] as String, Icons.biotech),
                   if ((v['notes'] as String).isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    _buildVisitField('Follow-up Notes', v['notes'] as String, Icons.note_alt_outlined, isItalic: true),
+                    _buildVisitField('Follow-up Notes', v['notes'] as String,
+                        Icons.note_alt_outlined,
+                        isItalic: true),
                   ],
                 ],
               );
@@ -246,7 +277,8 @@ class StaffPatientProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVisitField(String label, String value, IconData icon, {bool isItalic = false}) {
+  Widget _buildVisitField(String label, String value, IconData icon,
+      {bool isItalic = false}) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Row(
@@ -260,7 +292,8 @@ class StaffPatientProfileScreen extends StatelessWidget {
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                style: AppTypography.bodySm
+                    .copyWith(color: AppColors.onSurfaceVariant),
                 children: [
                   TextSpan(
                     text: '$label: ',
@@ -270,7 +303,9 @@ class StaffPatientProfileScreen extends StatelessWidget {
                     text: value,
                     style: TextStyle(
                       fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-                      color: isItalic ? AppColors.onSurface : AppColors.onSurfaceVariant,
+                      color: isItalic
+                          ? AppColors.onSurface
+                          : AppColors.onSurfaceVariant,
                     ),
                   ),
                 ],

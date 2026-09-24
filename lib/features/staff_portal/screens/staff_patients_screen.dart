@@ -10,28 +10,28 @@ class StaffPatientsScreen extends StatelessWidget {
 
   static const _patients = [
     {
-      'id': 'P-4092',
+      'id': 'E1',
       'name': 'Sarah Jenkins',
       'lastVisit': 'July 18, 2026 • Dr. Vance (Optometry)',
       'room': 'Room 102',
       'status': 'Awaiting Doctor',
     },
     {
-      'id': 'P-4093',
+      'id': 'E2',
       'name': 'Michael Chen',
       'lastVisit': 'May 04, 2026 • Dr. Sterling (Visiting Retina)',
       'room': 'Dental Suite 3',
       'status': 'In Procedure',
     },
     {
-      'id': 'P-4094',
+      'id': 'E3',
       'name': 'Elena Rodriguez',
       'lastVisit': 'June 22, 2026 • Dr. Patel (Post-op)',
       'room': 'Waiting Lounge B',
       'status': 'Checked In',
     },
     {
-      'id': 'P-4095',
+      'id': 'D1',
       'name': 'James Wilson',
       'lastVisit': 'April 15, 2026 • Dr. Vance (Glaucoma)',
       'room': 'Room 105',
@@ -44,7 +44,8 @@ class StaffPatientsScreen extends StatelessWidget {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
+      padding: EdgeInsets.all(
+          isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -56,9 +57,13 @@ class StaffPatientsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('My Shift Patients', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground)),
+                      Text('My Shift Patients',
+                          style: AppTypography.displayLg
+                              .copyWith(color: AppColors.onBackground)),
                       const SizedBox(height: AppSpacing.xs),
-                      Text('Active patients assigned to your care today', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
+                      Text('Active patients assigned to your care today',
+                          style: AppTypography.bodyLg
+                              .copyWith(color: AppColors.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -78,9 +83,13 @@ class StaffPatientsScreen extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('My Shift Patients', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground, fontSize: 26)),
+                Text('My Shift Patients',
+                    style: AppTypography.displayLg
+                        .copyWith(color: AppColors.onBackground, fontSize: 26)),
                 const SizedBox(height: AppSpacing.xs),
-                Text('Active patients assigned to your care today', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
+                Text('Active patients assigned to your care today',
+                    style: AppTypography.bodyLg
+                        .copyWith(color: AppColors.onSurfaceVariant)),
                 const SizedBox(height: AppSpacing.sm),
                 FilledButton.icon(
                   onPressed: () {},
@@ -94,9 +103,7 @@ class StaffPatientsScreen extends StatelessWidget {
               ],
             ),
           ],
-
           const SizedBox(height: AppSpacing.lg),
-
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -121,36 +128,47 @@ class StaffPatientsScreen extends StatelessWidget {
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(AppSpacing.md),
                   leading: CircleAvatar(
-                    backgroundColor: AppColors.primaryContainer.withValues(alpha: 0.2),
+                    backgroundColor:
+                        AppColors.primaryContainer.withValues(alpha: 0.2),
                     radius: 24,
                     child: Text(
                       p['name']!.split(' ').map((e) => e[0]).join(),
-                      style: AppTypography.labelCaps.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                      style: AppTypography.labelCaps.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                   title: Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text(p['name']!, style: AppTypography.headlineMd.copyWith(fontSize: 18)),
+                      Text(p['name']!,
+                          style:
+                              AppTypography.headlineMd.copyWith(fontSize: 18)),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(p['id']!, style: AppTypography.dataMono.copyWith(fontSize: 12, color: AppColors.primary)),
+                        child: Text(p['id']!,
+                            style: AppTypography.dataMono.copyWith(
+                                fontSize: 12, color: AppColors.primary)),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.secondaryContainer.withValues(alpha: 0.2),
+                          color: AppColors.secondaryContainer
+                              .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           p['status']!,
-                          style: AppTypography.labelCaps.copyWith(color: AppColors.secondary, fontSize: 10),
+                          style: AppTypography.labelCaps.copyWith(
+                              color: AppColors.secondary, fontSize: 10),
                         ),
                       ),
                     ],
@@ -159,23 +177,29 @@ class StaffPatientsScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.history_outlined, size: 14, color: AppColors.primary),
+                        const Icon(Icons.history_outlined,
+                            size: 14, color: AppColors.primary),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             'Previous Visit: ${p['lastVisit']!}',
-                            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Icon(Icons.meeting_room, size: 14, color: AppColors.onSurfaceVariant),
+                        const Icon(Icons.meeting_room,
+                            size: 14, color: AppColors.onSurfaceVariant),
                         const SizedBox(width: 4),
-                        Text(p['room']!, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                        Text(p['room']!,
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant)),
                       ],
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, color: AppColors.outline),
+                  trailing:
+                      const Icon(Icons.chevron_right, color: AppColors.outline),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(

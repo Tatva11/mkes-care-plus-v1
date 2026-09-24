@@ -87,7 +87,7 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
                     _SearchResultItem(
                       icon: Icons.personal_injury_outlined,
                       title: 'Sarah Jenkins',
-                      subtitle: 'Patient • ID: P-4092',
+                      subtitle: 'Patient • ID: E1',
                       onTap: () {},
                     ),
                     _SearchResultItem(

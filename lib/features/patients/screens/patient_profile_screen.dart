@@ -153,7 +153,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Patient ID: P-4092 • Female, 34 yrs • DOB: 12/05/1989',
+                'Patient ID: E1 • Female, 34 yrs • DOB: 12/05/1989',
                 style: AppTypography.bodyMd.copyWith(
                   color: AppColors.onSurfaceVariant,
                 ),
@@ -263,12 +263,13 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
               _infoRow('Blood Group', 'O+ (Positive)'),
               _infoRow('Height / Weight', '168 cm / 62 kg'),
               _infoRow('Primary Physician', 'Dr. Alex Morgan'),
-              _infoRow('Emergency Contact', 'Mark Jenkins (Spouse) - +1 555 901 2345'),
+              _infoRow('Emergency Contact',
+                  'Mark Jenkins (Spouse) - +1 555 901 2345'),
             ]),
           ] else if (_selectedTabIndex == 1) ...[
             _buildInfoGrid('Patient Information', [
               _infoRow('Full Name', 'Sarah Jenkins'),
-              _infoRow('Patient ID', 'P-4092'),
+              _infoRow('Patient ID', 'E1'),
               _infoRow('Date of Birth', '12 May 1989 (34 Years)'),
               _infoRow('Gender', 'Female'),
               _infoRow('Marital Status', 'Married'),
@@ -278,42 +279,55 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             _buildInfoGrid('Contact Details', [
               _infoRow('Phone Number', '+1 (555) 234-5678'),
               _infoRow('Email Address', 'sarah.jenkins@example.com'),
-              _infoRow('Residential Address', '742 Evergreen Terrace, Springfield, OR 97477'),
+              _infoRow('Residential Address',
+                  '742 Evergreen Terrace, Springfield, OR 97477'),
               _infoRow('Preferred Contact', 'Email & SMS Notifications'),
             ]),
           ] else if (_selectedTabIndex == 3) ...[
             _buildInfoGrid('Medical History', [
-              _infoRow('Known Allergies', 'Penicillin (Severe Reaction - Anaphylaxis)'),
-              _infoRow('Chronic Conditions', 'Recurrent Migraine with Aura, Mild Hypertension'),
+              _infoRow('Known Allergies',
+                  'Penicillin (Severe Reaction - Anaphylaxis)'),
+              _infoRow('Chronic Conditions',
+                  'Recurrent Migraine with Aura, Mild Hypertension'),
               _infoRow('Past Surgeries', 'Appendectomy (2018)'),
               _infoRow('Family History', 'Type 2 Diabetes (Maternal)'),
             ]),
           ] else if (_selectedTabIndex == 4) ...[
             _buildInfoGrid('Appointments History', [
-              _infoRow('Upcoming Visit', 'Oct 28, 2023 at 10:30 AM - Optometry Consultation'),
-              _infoRow('Last Visit', 'Oct 12, 2023 at 02:00 PM - Routine Follow-up'),
+              _infoRow('Upcoming Visit',
+                  'Oct 28, 2023 at 10:30 AM - Optometry Consultation'),
+              _infoRow(
+                  'Last Visit', 'Oct 12, 2023 at 02:00 PM - Routine Follow-up'),
               _infoRow('Attending Doctor', 'Dr. Sarah Smith (Optometry)'),
             ]),
           ] else if (_selectedTabIndex == 5) ...[
             _buildInfoGrid('Prescriptions & Medications', [
-              _infoRow('Sumatriptan 50mg', 'Oral Tablet • Take 1 at onset of migraine. Max 200mg/day.'),
-              _infoRow('Propranolol 40mg', 'Oral Tablet • Take 1 tablet daily every morning.'),
+              _infoRow('Sumatriptan 50mg',
+                  'Oral Tablet • Take 1 at onset of migraine. Max 200mg/day.'),
+              _infoRow('Propranolol 40mg',
+                  'Oral Tablet • Take 1 tablet daily every morning.'),
               _infoRow('Prescribing Doctor', 'Dr. Alex Morgan (Neurology)'),
             ]),
           ] else if (_selectedTabIndex == 6) ...[
             _buildInfoGrid('Lab & Diagnostic Reports', [
-              _infoRow('Blood Panel Report', 'Normal - Hemoglobin 13.5 g/dL, WBC 6.8k (Oct 10, 2023)'),
-              _infoRow('Intraoral Scan', 'Completed - Zirconia Shade Match #A2 (Oct 12, 2023)'),
+              _infoRow('Blood Panel Report',
+                  'Normal - Hemoglobin 13.5 g/dL, WBC 6.8k (Oct 10, 2023)'),
+              _infoRow('Intraoral Scan',
+                  'Completed - Zirconia Shade Match #A2 (Oct 12, 2023)'),
             ]),
           ] else if (_selectedTabIndex == 7) ...[
             _buildInfoGrid('Billing & Invoices', [
-              _infoRow('Invoice #INV-2023-089', '\$240.00 • Paid via Visa ending in 4092 (Oct 12, 2023)'),
-              _infoRow('Outstanding Balance', '\$0.00 (Account in Good Standing)'),
+              _infoRow('Invoice #INV-2023-089',
+                  '\$240.00 • Paid via Visa ending in 4092 (Oct 12, 2023)'),
+              _infoRow(
+                  'Outstanding Balance', '\$0.00 (Account in Good Standing)'),
             ]),
           ] else ...[
             _buildInfoGrid('Documents & Activity Log', [
-              _infoRow('Uploaded Documents', 'Patient_Consent_Form.pdf, ID_Card_Scan.jpg'),
-              _infoRow('Recent Activity', 'Profile updated by Dr. Alex Morgan at 11:30 AM Today'),
+              _infoRow('Uploaded Documents',
+                  'Patient_Consent_Form.pdf, ID_Card_Scan.jpg'),
+              _infoRow('Recent Activity',
+                  'Profile updated by Dr. Alex Morgan at 11:30 AM Today'),
             ]),
           ],
         ],

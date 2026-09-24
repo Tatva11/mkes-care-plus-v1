@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../admin/widgets/admin_shell.dart';
+import '../widgets/patient_form_dialog.dart';
 import 'patient_profile_screen.dart';
 
 class PatientListScreen extends StatelessWidget {
@@ -32,26 +33,33 @@ class PatientListContent extends StatefulWidget {
 }
 
 class _PatientListContentState extends State<PatientListContent> {
+  Future<void> _openNewPatientDialog() async {
+    await showDialog(
+      context: context,
+      builder: (_) => const PatientFormDialog(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth > 768;
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(
-              isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(isDesktop),
-                const SizedBox(height: AppSpacing.lg),
-                _buildPatientTable(),
-              ],
-            ),
-          );
-        },
-      );
+        final isDesktop = constraints.maxWidth > 768;
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(
+            isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(isDesktop),
+              const SizedBox(height: AppSpacing.lg),
+              _buildPatientTable(),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildHeader(bool isDesktop) {
@@ -79,7 +87,7 @@ class _PatientListContentState extends State<PatientListContent> {
             ],
           ),
           FilledButton.icon(
-            onPressed: () {},
+            onPressed: _openNewPatientDialog,
             icon: const Icon(Icons.person_add),
             label: const Text('New Patient'),
             style: FilledButton.styleFrom(
@@ -116,7 +124,7 @@ class _PatientListContentState extends State<PatientListContent> {
         ),
         const SizedBox(height: AppSpacing.sm),
         FilledButton.icon(
-          onPressed: () {},
+          onPressed: _openNewPatientDialog,
           icon: const Icon(Icons.person_add),
           label: const Text('New Patient'),
           style: FilledButton.styleFrom(
@@ -179,7 +187,8 @@ class _PatientListContentState extends State<PatientListContent> {
                     ),
                     Expanded(
                       flex: 2,
-                      child: Text('AGE / GENDER', style: AppTypography.labelCaps),
+                      child:
+                          Text('AGE / GENDER', style: AppTypography.labelCaps),
                     ),
                     Expanded(
                       flex: 3,
@@ -202,11 +211,16 @@ class _PatientListContentState extends State<PatientListContent> {
                 width: 780,
                 child: Column(
                   children: [
-                    _buildPatientRow('P-4092', 'Sarah Jenkins', '34 / Female', '+1 (555) 234-5678', 'Oct 12, 2023', 'Active'),
-                    _buildPatientRow('P-4093', 'Michael Chen', '42 / Male', '+1 (555) 876-5432', 'Oct 15, 2023', 'Active'),
-                    _buildPatientRow('P-4094', 'Elena Rodriguez', '29 / Female', '+1 (555) 345-6789', 'Sep 28, 2023', 'Inactive'),
-                    _buildPatientRow('P-4095', 'James Wilson', '58 / Male', '+1 (555) 987-6543', 'Oct 20, 2023', 'Active'),
-                    _buildPatientRow('P-4096', 'Amanda Taylor', '31 / Female', '+1 (555) 456-7890', 'Oct 22, 2023', 'Active'),
+                    _buildPatientRow('E1', 'Sarah Jenkins', '34 / Female',
+                        '+1 (555) 234-5678', 'Oct 12, 2023', 'Active'),
+                    _buildPatientRow('E2', 'Michael Chen', '42 / Male',
+                        '+1 (555) 876-5432', 'Oct 15, 2023', 'Active'),
+                    _buildPatientRow('E3', 'Elena Rodriguez', '29 / Female',
+                        '+1 (555) 345-6789', 'Sep 28, 2023', 'Inactive'),
+                    _buildPatientRow('E4', 'James Wilson', '58 / Male',
+                        '+1 (555) 987-6543', 'Oct 20, 2023', 'Active'),
+                    _buildPatientRow('D1', 'Amanda Taylor', '31 / Female',
+                        '+1 (555) 456-7890', 'Oct 22, 2023', 'Active'),
                   ],
                 ),
               ),
@@ -252,11 +266,13 @@ class _PatientListContentState extends State<PatientListContent> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+                    border: Border.all(
+                        color: AppColors.outlineVariant.withValues(alpha: 0.5)),
                   ),
                   child: Text(
                     id,
