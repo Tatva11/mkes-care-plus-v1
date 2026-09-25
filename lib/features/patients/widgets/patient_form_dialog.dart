@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -50,6 +51,22 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
     _addressController.dispose();
     _referenceController.dispose();
     super.dispose();
+  }
+
+  /// Validates a standard Indian 10-digit mobile number.
+  /// Valid: starts with 6, 7, 8, or 9 and is exactly 10 digits.
+  String? _validateIndianMobile(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null; // Mobile is optional — only validate if provided.
+    }
+    final digits = value.trim();
+    if (digits.length != 10) {
+      return 'Mobile number must be exactly 10 digits';
+    }
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) {
+      return 'Enter a valid Indian mobile number (starts with 6, 7, 8, or 9)';
+    }
+    return null;
   }
 
   Future<void> _submit() async {
@@ -236,10 +253,15 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                           Expanded(
                             child: MkesTextField(
                               controller: _mobileController,
-                              label: 'Phone Number',
-                              hintText: '+1 (555) 000-0000',
-                              keyboardType: TextInputType.phone,
+                              label: 'Mobile Number',
+                              hintText: '9876543210',
+                              keyboardType: TextInputType.number,
                               prefixIcon: Icons.phone_outlined,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(10),
+                              ],
+                              validator: _validateIndianMobile,
                             ),
                           ),
                           const SizedBox(width: AppSpacing.md),

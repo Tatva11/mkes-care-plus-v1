@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../admin/widgets/admin_shell.dart';
+import '../models/patient_model.dart';
+import '../providers/patients_provider.dart';
 import '../widgets/patient_form_dialog.dart';
 import 'patient_profile_screen.dart';
 
@@ -25,23 +29,31 @@ class PatientListScreen extends StatelessWidget {
   }
 }
 
-class PatientListContent extends StatefulWidget {
+class PatientListContent extends ConsumerStatefulWidget {
   const PatientListContent({super.key});
 
   @override
-  State<PatientListContent> createState() => _PatientListContentState();
+  ConsumerState<PatientListContent> createState() => _PatientListContentState();
 }
 
-class _PatientListContentState extends State<PatientListContent> {
+class _PatientListContentState extends ConsumerState<PatientListContent> {
+  String _department = 'eye';
+
   Future<void> _openNewPatientDialog() async {
-    await showDialog(
+    final created = await showDialog<PatientModel>(
       context: context,
-      builder: (_) => const PatientFormDialog(),
+      builder: (_) => PatientFormDialog(initialDepartment: _department),
     );
+    if (created != null && mounted) {
+      ref.invalidate(patientsByDepartmentProvider(_department));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final selectedDepartment = _department;
+    final patientsAsync =
+        ref.watch(patientsByDepartmentProvider(selectedDepartment));
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth > 768;
@@ -54,12 +66,38 @@ class _PatientListContentState extends State<PatientListContent> {
             children: [
               _buildHeader(isDesktop),
               const SizedBox(height: AppSpacing.lg),
-              _buildPatientTable(),
+              _buildDepartmentFilter(),
+              const SizedBox(height: AppSpacing.md),
+              _buildPatientTable(patientsAsync),
             ],
           ),
         );
       },
     );
+  }
+
+  Widget _buildDepartmentFilter() {
+    return Wrap(
+      spacing: AppSpacing.sm,
+      children: [
+        ChoiceChip(
+          label: const Text('Eye'),
+          selected: _department == 'eye',
+          onSelected: (_) => _selectDepartment('eye'),
+        ),
+        ChoiceChip(
+          label: const Text('Dental'),
+          selected: _department == 'dental',
+          onSelected: (_) => _selectDepartment('dental'),
+        ),
+      ],
+    );
+  }
+
+  void _selectDepartment(String department) {
+    if (department != 'eye' && department != 'dental') return;
+    setState(() => _department = department);
+    ref.invalidate(patientsByDepartmentProvider(department));
   }
 
   Widget _buildHeader(bool isDesktop) {
@@ -143,7 +181,7 @@ class _PatientListContentState extends State<PatientListContent> {
     );
   }
 
-  Widget _buildPatientTable() {
+  Widget _buildPatientTable(AsyncValue<List<PatientModel>> patientsAsync) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
@@ -200,28 +238,40 @@ class _PatientListContentState extends State<PatientListContent> {
                     ),
                     Expanded(
                       flex: 2,
-                      child: Text('STATUS', style: AppTypography.labelCaps),
+                      child: Text('DEPARTMENT', style: AppTypography.labelCaps),
                     ),
                     const SizedBox(width: 48), // Action button space
                   ],
                 ),
               ),
-              // Table Body (Mock Data)
               SizedBox(
                 width: 780,
-                child: Column(
-                  children: [
-                    _buildPatientRow('E1', 'Sarah Jenkins', '34 / Female',
-                        '+1 (555) 234-5678', 'Oct 12, 2023', 'Active'),
-                    _buildPatientRow('E2', 'Michael Chen', '42 / Male',
-                        '+1 (555) 876-5432', 'Oct 15, 2023', 'Active'),
-                    _buildPatientRow('E3', 'Elena Rodriguez', '29 / Female',
-                        '+1 (555) 345-6789', 'Sep 28, 2023', 'Inactive'),
-                    _buildPatientRow('E4', 'James Wilson', '58 / Male',
-                        '+1 (555) 987-6543', 'Oct 20, 2023', 'Active'),
-                    _buildPatientRow('D1', 'Amanda Taylor', '31 / Female',
-                        '+1 (555) 456-7890', 'Oct 22, 2023', 'Active'),
-                  ],
+                child: patientsAsync.when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.all(AppSpacing.lg),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (error, stackTrace) => Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Column(
+                      children: [
+                        Text('Unable to load patients: $error'),
+                        TextButton(
+                          onPressed: () => ref.invalidate(
+                              patientsByDepartmentProvider(_department)),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  data: (patients) => patients.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.all(AppSpacing.lg),
+                          child: Center(
+                              child:
+                                  Text('No patients in this department yet.')),
+                        )
+                      : Column(children: patients.map(_patientRow).toList()),
                 ),
               ),
             ],
@@ -237,10 +287,8 @@ class _PatientListContentState extends State<PatientListContent> {
     String ageGender,
     String contact,
     String lastVisit,
-    String status,
+    String department,
   ) {
-    final isActive = status == 'Active';
-
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
@@ -289,9 +337,8 @@ class _PatientListContentState extends State<PatientListContent> {
               flex: 3,
               child: Text(
                 name,
-                style: AppTypography.bodyMd.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style:
+                    AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             Expanded(
@@ -331,18 +378,13 @@ class _PatientListContentState extends State<PatientListContent> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.primaryContainer.withValues(alpha: 0.1)
-                        : AppColors.surfaceVariant,
+                    color: AppColors.primaryContainer.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                   ),
                   child: Text(
-                    status,
-                    style: AppTypography.labelCaps.copyWith(
-                      color: isActive
-                          ? AppColors.primaryContainer
-                          : AppColors.onSurfaceVariant,
-                    ),
+                    department,
+                    style: AppTypography.labelCaps
+                        .copyWith(color: AppColors.primaryContainer),
                   ),
                 ),
               ),
@@ -361,6 +403,24 @@ class _PatientListContentState extends State<PatientListContent> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _patientRow(PatientModel patient) {
+    final ageLabel = patient.dob == null
+        ? '—'
+        : '${DateTime.now().year - patient.dob!.year}';
+    final visitDate = patient.visitDate == null
+        ? '—'
+        : DateFormat('MMM d, yyyy').format(patient.visitDate!.toLocal());
+    final departmentLabel = patient.department == 'eye' ? 'Eye' : 'Dental';
+    return _buildPatientRow(
+      patient.patientNumber,
+      patient.name,
+      ageLabel,
+      patient.mobile ?? '—',
+      visitDate,
+      departmentLabel,
     );
   }
 }
