@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../staff/models/leave_request.dart';
 import '../../staff/providers/leave_provider.dart';
 
 class StaffLeaveScreen extends ConsumerStatefulWidget {
@@ -28,11 +29,22 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
   }
 
   Future<void> _submitRequest(String staffId) async {
-    if (_startDate == null || _endDate == null || _reasonController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    try {
+      LeaveRequest.validateSubmission(
+        startDate: _startDate,
+        endDate: _endDate,
+        reason: _reasonController.text,
+      );
+    } on ArgumentError catch (error) {
+      if (!mounted) return;
+      messenger?.showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
       return;
     }
-    
+
     setState(() => _isSubmitting = true);
     try {
       await ref.read(staffLeaveRequestsProvider(staffId).notifier).createRequest(
@@ -41,7 +53,7 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
         reason: _reasonController.text.trim(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Leave request submitted')));
+      messenger?.showSnackBar(const SnackBar(content: Text('Leave request submitted')));
       _reasonController.clear();
       setState(() {
         _startDate = null;
@@ -49,7 +61,7 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      messenger?.showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -97,7 +109,14 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                               firstDate: DateTime.now(),
                               lastDate: DateTime.now().add(const Duration(days: 365)),
                             );
-                            if (date != null) setState(() => _startDate = date);
+                            if (date != null) {
+                              setState(() {
+                                _startDate = date;
+                                if (_endDate != null && _endDate!.isBefore(date)) {
+                                  _endDate = null;
+                                }
+                              });
+                            }
                           },
                           icon: const Icon(Icons.calendar_today),
                           label: Text(_startDate != null ? DateFormat('MMM d, yyyy').format(_startDate!) : 'Start Date'),
@@ -107,13 +126,23 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
+                            final messenger = ScaffoldMessenger.maybeOf(context);
                             final date = await showDatePicker(
                               context: context,
                               initialDate: _startDate ?? DateTime.now(),
                               firstDate: _startDate ?? DateTime.now(),
                               lastDate: DateTime.now().add(const Duration(days: 365)),
                             );
-                            if (date != null) setState(() => _endDate = date);
+                            if (date != null) {
+                              if (_startDate != null && date.isBefore(_startDate!)) {
+                                if (!mounted) return;
+                                messenger?.showSnackBar(
+                                  const SnackBar(content: Text('End date cannot be before the start date.')),
+                                );
+                                return;
+                              }
+                              setState(() => _endDate = date);
+                            }
                           },
                           icon: const Icon(Icons.calendar_today),
                           label: Text(_endDate != null ? DateFormat('MMM d, yyyy').format(_endDate!) : 'End Date'),

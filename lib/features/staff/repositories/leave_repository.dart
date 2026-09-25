@@ -25,8 +25,9 @@ class LeaveRepository {
   Future<List<LeaveRequest>> fetchAllPendingLeaveRequests() async {
     final response = await _supabase
         .from('leave_requests')
-        .select()
+        .select('*, profiles!leave_requests_staff_id_fkey!inner(full_name, role)')
         .eq('status', 'pending')
+        .eq('profiles.role', 'staff')
         .order('created_at', ascending: false);
     return (response as List).map((json) => LeaveRequest.fromJson(json)).toList();
   }
@@ -37,15 +38,23 @@ class LeaveRepository {
     required DateTime endDate,
     required String reason,
   }) async {
+    LeaveRequest.validateSubmission(
+      startDate: startDate,
+      endDate: endDate,
+      reason: reason,
+    );
+
     final days = endDate.difference(startDate).inDays + 1.0;
-    if (days <= 0) throw Exception("End date must be after or equal to start date.");
+    if (days <= 0) {
+      throw Exception('End date must be on or after the start date.');
+    }
 
     await _supabase.from('leave_requests').insert({
       'staff_id': staffId,
       'start_date': startDate.toIso8601String().split('T').first,
       'end_date': endDate.toIso8601String().split('T').first,
       'leave_days': days,
-      'reason': reason,
+      'reason': reason.trim(),
       'status': 'pending',
     });
   }

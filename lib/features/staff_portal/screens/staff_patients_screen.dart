@@ -1,193 +1,123 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../patients/screens/staff_patient_profile_screen.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../patients/models/patient.dart';
+import '../../patients/models/patient_attendance.dart';
+import '../../patients/providers/patient_attendance_provider.dart';
+import '../../patients/providers/patient_provider.dart';
+import '../../patients/screens/patient_details_screen.dart';
 
-class StaffPatientsScreen extends StatelessWidget {
+class StaffPatientsScreen extends ConsumerWidget {
   const StaffPatientsScreen({super.key});
 
-  static const _patients = [
-    {
-      'id': 'P-4092',
-      'name': 'Sarah Jenkins',
-      'lastVisit': 'July 18, 2026 • Dr. Vance (Optometry)',
-      'room': 'Room 102',
-      'status': 'Awaiting Doctor',
-    },
-    {
-      'id': 'P-4093',
-      'name': 'Michael Chen',
-      'lastVisit': 'May 04, 2026 • Dr. Sterling (Visiting Retina)',
-      'room': 'Dental Suite 3',
-      'status': 'In Procedure',
-    },
-    {
-      'id': 'P-4094',
-      'name': 'Elena Rodriguez',
-      'lastVisit': 'June 22, 2026 • Dr. Patel (Post-op)',
-      'room': 'Waiting Lounge B',
-      'status': 'Checked In',
-    },
-    {
-      'id': 'P-4095',
-      'name': 'James Wilson',
-      'lastVisit': 'April 15, 2026 • Dr. Vance (Glaucoma)',
-      'room': 'Room 105',
-      'status': 'Scheduled',
-    },
-  ];
-
   @override
-  Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(currentUserProvider);
+    if (currentUser == null) return const Center(child: CircularProgressIndicator());
+
+    final patientsAsync = ref.watch(patientsProvider);
+    final attendanceAsync = ref.watch(staffPatientAttendanceProvider(currentUser.id));
+    final isDesktop = MediaQuery.sizeOf(context).width >= 768;
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isDesktop)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('My Shift Patients', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground)),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text('Active patients assigned to your care today', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.history_edu),
-                  label: const Text('View Visit Records'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            )
-          else ...[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('My Shift Patients', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground, fontSize: 26)),
-                const SizedBox(height: AppSpacing.xs),
-                Text('Active patients assigned to your care today', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
-                const SizedBox(height: AppSpacing.sm),
-                FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.history_edu),
-                  label: const Text('View Visit Records'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ],
-
+          Text('My Shift Patients', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground, fontSize: isDesktop ? null : 26)),
+          const SizedBox(height: AppSpacing.xs),
+          Text('Record the patients you attend today.', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
           const SizedBox(height: AppSpacing.lg),
-
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _patients.length,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-            itemBuilder: (context, index) {
-              final p = _patients[index];
-
-              return Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  border: Border.all(color: AppColors.outlineVariant),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0A000000),
-                      blurRadius: 8,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(AppSpacing.md),
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primaryContainer.withValues(alpha: 0.2),
-                    radius: 24,
-                    child: Text(
-                      p['name']!.split(' ').map((e) => e[0]).join(),
-                      style: AppTypography.labelCaps.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  title: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(p['name']!, style: AppTypography.headlineMd.copyWith(fontSize: 18)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(p['id']!, style: AppTypography.dataMono.copyWith(fontSize: 12, color: AppColors.primary)),
+          patientsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stackTrace) => Text('Unable to load patients: $error'),
+            data: (patients) => attendanceAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stackTrace) => Text('Unable to load attendance: $error'),
+              data: (records) {
+                final recordByPatient = {for (final record in records) record.patientId: record};
+                if (patients.isEmpty) return const Text('No patients are available today.');
+                return Column(
+                  children: patients.map((patient) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: _PatientAttendanceCard(
+                        patient: patient,
+                        record: recordByPatient[patient.id],
+                        onAttend: () async {
+                          try {
+                            await ref.read(staffPatientAttendanceProvider(currentUser.id).notifier).markAttended(patient.id);
+                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Patient marked as attended.')));
+                          } catch (error) {
+                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to record attendance: $error')));
+                          }
+                        },
+                        onOpen: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailsScreen(patientId: patient.id))),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondaryContainer.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          p['status']!,
-                          style: AppTypography.labelCaps.copyWith(color: AppColors.secondary, fontSize: 10),
-                        ),
-                      ),
-                    ],
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Row(
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PatientAttendanceCard extends StatelessWidget {
+  const _PatientAttendanceCard({required this.patient, required this.record, required this.onAttend, required this.onOpen});
+
+  final Patient patient;
+  final PatientAttendance? record;
+  final VoidCallback onAttend;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final attended = record != null;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: onOpen,
+              child: Row(
+                children: [
+                  CircleAvatar(child: Text(patient.fullName.split(' ').map((part) => part[0]).join())),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.history_outlined, size: 14, color: AppColors.primary),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            'Previous Visit: ${p['lastVisit']!}',
-                            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        const Icon(Icons.meeting_room, size: 14, color: AppColors.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(p['room']!, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                        Text(patient.fullName, style: AppTypography.headlineMd),
+                        Text('${patient.departmentName ?? 'No department'} • ${patient.registrationNumber}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
                       ],
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, color: AppColors.outline),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const StaffPatientProfileScreen(),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ],
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(attended ? '✓ Attended' : 'Status: Pending', style: AppTypography.bodyMd.copyWith(color: attended ? Colors.green : Colors.orange, fontWeight: FontWeight.w600)),
+            if (attended) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text('Attended by: ${record!.staffName ?? 'Current staff'}'),
+              Text('Time: ${DateFormat('h:mm a').format(record!.attendedAt.toLocal())}'),
+            ] else ...[
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(width: double.infinity, child: FilledButton(onPressed: onAttend, child: const Text('I ATTENDED'))),
+            ],
+          ],
+        ),
       ),
     );
   }

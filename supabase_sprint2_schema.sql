@@ -150,11 +150,11 @@ CREATE POLICY "Staff can view assigned tasks" ON public.tasks
 FOR SELECT TO authenticated
 USING (auth.uid() = assigned_to);
 
--- Staff can UPDATE status/completed_at on tasks assigned to them
+-- Staff can complete their own pending tasks only. Completed tasks are final.
 CREATE POLICY "Staff can update assigned task status" ON public.tasks
 FOR UPDATE TO authenticated
-USING (auth.uid() = assigned_to)
-WITH CHECK (auth.uid() = assigned_to);
+USING (auth.uid() = assigned_to AND status = 'pending')
+WITH CHECK (auth.uid() = assigned_to AND status = 'completed');
 
 
 -- ============================================================
@@ -197,10 +197,14 @@ USING (
   )
 );
 
--- Staff can INSERT task history for tasks assigned to them
+-- Staff can record only their own pending-to-completed transition.
 CREATE POLICY "Staff can insert own task history" ON public.task_history
 FOR INSERT TO authenticated
 WITH CHECK (
+  changed_by = auth.uid()
+  AND old_status = 'pending'
+  AND new_status = 'completed'
+  AND
   EXISTS (
     SELECT 1 FROM public.tasks
     WHERE tasks.id = task_id

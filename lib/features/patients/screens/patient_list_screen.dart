@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../admin/screens/admin_patient_attendance_screen.dart';
 import '../../admin/widgets/admin_shell.dart';
-import 'patient_profile_screen.dart';
+import '../models/patient.dart';
+import '../providers/patient_provider.dart';
+import '../widgets/patient_form_dialog.dart';
+import 'patient_details_screen.dart';
 
 class PatientListScreen extends StatelessWidget {
   const PatientListScreen({super.key});
@@ -16,7 +21,6 @@ class PatientListScreen extends StatelessWidget {
       onNavItemSelected: (item) {
         if (item == AdminNavItem.dashboard) {
           Navigator.of(context).popUntil((route) => route.isFirst);
-          return;
         }
       },
       body: const PatientListContent(),
@@ -24,326 +28,193 @@ class PatientListScreen extends StatelessWidget {
   }
 }
 
-class PatientListContent extends StatefulWidget {
+class PatientListContent extends ConsumerStatefulWidget {
   const PatientListContent({super.key});
 
   @override
-  State<PatientListContent> createState() => _PatientListContentState();
+  ConsumerState<PatientListContent> createState() => _PatientListContentState();
 }
 
-class _PatientListContentState extends State<PatientListContent> {
+class _PatientListContentState extends ConsumerState<PatientListContent> {
+  final _searchController = TextEditingController();
+
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth > 768;
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(
-              isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(isDesktop),
-                const SizedBox(height: AppSpacing.lg),
-                _buildPatientTable(),
-              ],
-            ),
-          );
-        },
-      );
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
-  Widget _buildHeader(bool isDesktop) {
-    if (isDesktop) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
+  @override
+  Widget build(BuildContext context) {
+    final patientsAsync = ref.watch(patientsProvider);
+    final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+
+    return Padding(
+      padding: EdgeInsets.all(
+          isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Patients',
-                style: AppTypography.displayLg.copyWith(
-                  color: AppColors.onBackground,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Manage patient records and clinical history.',
-                style: AppTypography.bodyLg.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-            ],
+          _buildHeader(isDesktop),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _searchController,
+            onChanged: (value) =>
+                ref.read(patientsProvider.notifier).search(value),
+            decoration: InputDecoration(
+              hintText:
+                  'Search patients by name, phone, or registration number',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        ref.read(patientsProvider.notifier).search('');
+                        setState(() {});
+                      },
+                    ),
+              border: const OutlineInputBorder(),
+            ),
           ),
-          FilledButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.person_add),
-            label: const Text('New Patient'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.onPrimary,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
+          const SizedBox(height: AppSpacing.md),
+          Expanded(
+            child: patientsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stackTrace) => _ErrorRetry(
+                error: error,
+                onRetry: () =>
+                    ref.read(patientsProvider.notifier).fetchPatients(),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              ),
+              data: (patients) => patients.isEmpty
+                  ? const Center(child: Text('No registered patients found.'))
+                  : ListView.separated(
+                      itemCount: patients.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) =>
+                          _PatientTile(patient: patients[index]),
+                    ),
             ),
           ),
         ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+  }
+
+  Widget _buildHeader(bool isDesktop) {
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
       children: [
         Text(
           'Patients',
           style: AppTypography.displayLg.copyWith(
             color: AppColors.onBackground,
-            fontSize: 26,
+            fontSize: isDesktop ? null : 26,
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Manage patient records and clinical history.',
-          style: AppTypography.bodyLg.copyWith(
-            color: AppColors.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        FilledButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.person_add),
-          label: const Text('New Patient'),
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.onPrimary,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
+        Wrap(
+          spacing: AppSpacing.sm,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const AdminPatientAttendanceScreen()),
+              ),
+              icon: const Icon(Icons.how_to_reg),
+              label: const Text("Today's Attendance"),
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            FilledButton.icon(
+              onPressed: () => _openPatientDialog(),
+              icon: const Icon(Icons.person_add),
+              label: const Text('New Patient'),
             ),
-          ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildPatientTable() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 8,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 780),
-          child: Column(
-            children: [
-              // Table Header
-              Container(
-                width: 780,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: AppColors.outlineVariant),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text('PATIENT ID', style: AppTypography.labelCaps),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text('NAME', style: AppTypography.labelCaps),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text('AGE / GENDER', style: AppTypography.labelCaps),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text('CONTACT', style: AppTypography.labelCaps),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text('LAST VISIT', style: AppTypography.labelCaps),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text('STATUS', style: AppTypography.labelCaps),
-                    ),
-                    const SizedBox(width: 48), // Action button space
-                  ],
-                ),
-              ),
-              // Table Body (Mock Data)
-              SizedBox(
-                width: 780,
-                child: Column(
-                  children: [
-                    _buildPatientRow('P-4092', 'Sarah Jenkins', '34 / Female', '+1 (555) 234-5678', 'Oct 12, 2023', 'Active'),
-                    _buildPatientRow('P-4093', 'Michael Chen', '42 / Male', '+1 (555) 876-5432', 'Oct 15, 2023', 'Active'),
-                    _buildPatientRow('P-4094', 'Elena Rodriguez', '29 / Female', '+1 (555) 345-6789', 'Sep 28, 2023', 'Inactive'),
-                    _buildPatientRow('P-4095', 'James Wilson', '58 / Male', '+1 (555) 987-6543', 'Oct 20, 2023', 'Active'),
-                    _buildPatientRow('P-4096', 'Amanda Taylor', '31 / Female', '+1 (555) 456-7890', 'Oct 22, 2023', 'Active'),
-                  ],
-                ),
-              ),
-            ],
-          ),
+  /// Opens [PatientFormDialog] for creating a new patient, or editing [patient]
+  /// when provided. The dialog is a fully self-contained [ConsumerStatefulWidget]
+  /// and handles all its own lifecycle, async safety, and controller disposal.
+  void _openPatientDialog({Patient? patient}) {
+    showDialog<void>(
+      context: context,
+      // Prevent accidental dismissal while a save is in flight.
+      barrierDismissible: !_dialogSaving,
+      builder: (_) => PatientFormDialog(patient: patient),
+    );
+  }
+
+  /// The dialog manages its own loading state. We keep [barrierDismissible]
+  /// true so the user can always tap outside to cancel even if this flag
+  /// is stale; the dialog's own Cancel button is the reliable escape path.
+  final bool _dialogSaving = false;
+}
+
+// ── Patient tile ─────────────────────────────────────────────────────────────
+
+class _PatientTile extends ConsumerWidget {
+  const _PatientTile({required this.patient});
+
+  final Patient patient;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      child: ListTile(
+        title: Text(patient.fullName),
+        subtitle: Text(
+          '${patient.patientNumber} • ${patient.departmentName ?? 'No department'}\n'
+          '${patient.mobile ?? '—'}',
+        ),
+        isThreeLine: true,
+        trailing: IconButton(
+          tooltip: 'Edit patient',
+          icon: const Icon(Icons.edit_outlined),
+          onPressed: () {
+            final listState = context
+                .findAncestorStateOfType<_PatientListContentState>();
+            listState?._openPatientDialog(patient: patient);
+          },
+        ),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: (_) => PatientDetailsScreen(patientId: patient.id)),
         ),
       ),
     );
   }
+}
 
-  Widget _buildPatientRow(
-    String id,
-    String name,
-    String ageGender,
-    String contact,
-    String lastVisit,
-    String status,
-  ) {
-    final isActive = status == 'Active';
+// ── Error/retry widget ────────────────────────────────────────────────────────
 
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const PatientProfileScreen(),
+class _ErrorRetry extends StatelessWidget {
+  const _ErrorRetry({required this.error, required this.onRetry});
+
+  final Object error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Unable to load patients.'),
+          Text('$error', textAlign: TextAlign.center),
+          const SizedBox(height: AppSpacing.sm),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
           ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.outlineVariant),
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
-                  ),
-                  child: Text(
-                    id,
-                    style: AppTypography.dataMono.copyWith(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                name,
-                style: AppTypography.bodyMd.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 2,
-              child: Text(
-                ageGender,
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                contact,
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 2,
-              child: Text(
-                lastVisit,
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 2,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.primaryContainer.withValues(alpha: 0.1)
-                        : AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                  ),
-                  child: Text(
-                    status,
-                    style: AppTypography.labelCaps.copyWith(
-                      color: isActive
-                          ? AppColors.primaryContainer
-                          : AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              color: AppColors.outline,
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PatientProfileScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

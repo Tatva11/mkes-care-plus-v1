@@ -31,6 +31,12 @@ class StaffLeaveNotifier extends StateNotifier<AsyncValue<List<LeaveRequest>>> {
     required DateTime endDate,
     required String reason,
   }) async {
+    LeaveRequest.validateSubmission(
+      startDate: startDate,
+      endDate: endDate,
+      reason: reason,
+    );
+
     await _repository.createLeaveRequest(
       staffId: _staffId,
       startDate: startDate,

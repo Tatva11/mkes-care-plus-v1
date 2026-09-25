@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-
 import '../../admin/models/user_profile.dart';
+import '../../admin/providers/users_provider.dart';
+import '../../admin/screens/user_form_dialog.dart';
 
 enum StaffStatus { present, onLeave, offDuty }
 
-class StaffMemberTile extends StatelessWidget {
+/// A single row in the Staff Roster.
+///
+/// Displays the staff member's avatar, name, role, status badge, and two
+/// direct action buttons:
+///   • **Modify** — opens [UserFormDialog] to edit profile fields.
+///   • **Activate / Deactivate** — shows a confirmation dialog then calls
+///     [UsersNotifier.toggleStatus] directly, without opening the Modify form.
+class StaffMemberTile extends ConsumerStatefulWidget {
   const StaffMemberTile({
     super.key,
     required this.user,
@@ -18,11 +27,20 @@ class StaffMemberTile extends StatelessWidget {
   final UserProfile user;
   final bool showDivider;
 
+  @override
+  ConsumerState<StaffMemberTile> createState() => _StaffMemberTileState();
+}
+
+class _StaffMemberTileState extends ConsumerState<StaffMemberTile> {
+  bool _statusLoading = false;
+
   static const _errorContainer = Color(0xFFFFDAD6);
   static const _secondaryFixed = Color(0xFFFFD8EB);
 
+  // ── Status helpers ────────────────────────────────────────────────────────
+
   StaffStatus get _status =>
-      user.isActive ? StaffStatus.present : StaffStatus.offDuty;
+      widget.user.isActive ? StaffStatus.present : StaffStatus.offDuty;
 
   Color get _statusBg {
     switch (_status) {
@@ -69,7 +87,7 @@ class StaffMemberTile extends StatelessWidget {
   }
 
   Color get _avatarBg {
-    switch (user.departmentName ?? user.department) {
+    switch (widget.user.departmentName ?? widget.user.department) {
       case 'Dental':
         return _secondaryFixed.withValues(alpha: 0.5);
       case 'OPD':
@@ -80,7 +98,7 @@ class StaffMemberTile extends StatelessWidget {
   }
 
   Color get _avatarTextColor {
-    switch (user.departmentName ?? user.department) {
+    switch (widget.user.departmentName ?? widget.user.department) {
       case 'Dental':
         return AppColors.secondary;
       case 'OPD':
@@ -90,9 +108,73 @@ class StaffMemberTile extends StatelessWidget {
     }
   }
 
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  void _openModify() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => UserFormDialog(user: widget.user),
+    );
+  }
+
+  Future<void> _confirmToggleStatus() async {
+    final isCurrentlyActive = widget.user.isActive;
+    final action = isCurrentlyActive ? 'Deactivate' : 'Activate';
+    final name = widget.user.fullName;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('$action $name?'),
+        content: Text(
+          isCurrentlyActive
+              ? '$name will be marked inactive and will lose access to the staff portal.'
+              : '$name will be reactivated and can log in to the staff portal again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: isCurrentlyActive
+                ? FilledButton.styleFrom(backgroundColor: AppColors.error)
+                : null,
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    setState(() => _statusLoading = true);
+    try {
+      await ref
+          .read(usersProvider.notifier)
+          .toggleStatus(widget.user.id, !isCurrentlyActive);
+      // List is refreshed by the notifier; no extra setState needed.
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to $action ${widget.user.fullName}: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _statusLoading = false);
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final initials = user.fullName
+    final initials = widget.user.fullName
         .split(' ')
         .map((w) => w.isNotEmpty ? w[0] : '')
         .take(2)
@@ -107,8 +189,9 @@ class StaffMemberTile extends StatelessWidget {
             horizontal: AppSpacing.xs,
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Avatar
+              // ── Avatar ───────────────────────────────────────────────────
               Container(
                 width: 40,
                 height: 40,
@@ -130,22 +213,30 @@ class StaffMemberTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              // Name + role
+
+              // ── Name + role + contact ─────────────────────────────────────
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      user.fullName,
-                      style: AppTypography.bodyMd.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      widget.user.fullName,
+                      style: AppTypography.bodyMd
+                          .copyWith(fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
                     Text(
-                      '${user.designation ?? user.role.toUpperCase()} • ${user.departmentName ?? user.department ?? '-'}',
+                      '${widget.user.designation ?? widget.user.role.toUpperCase()} '
+                      '• ${widget.user.departmentName ?? widget.user.department ?? '—'}',
                       style: AppTypography.bodySm,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    Text(
+                      widget.user.email,
+                      style:
+                          AppTypography.bodySm.copyWith(fontSize: 11),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
@@ -153,9 +244,11 @@ class StaffMemberTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
-              // Shift
+
+              // ── Status badge + action buttons ────────────────────────────
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Status badge
                   Container(
@@ -165,7 +258,8 @@ class StaffMemberTile extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: _statusBg,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      borderRadius:
+                          BorderRadius.circular(AppSpacing.radiusSm),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -181,30 +275,61 @@ class StaffMemberTile extends StatelessWidget {
                         const SizedBox(width: AppSpacing.base),
                         Text(
                           _statusLabel,
-                          style: AppTypography.labelCaps.copyWith(
-                            color: _statusTextColor,
-                          ),
+                          style: AppTypography.labelCaps
+                              .copyWith(color: _statusTextColor),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.base),
-                  Text(
-                    '${user.email} • ${user.phoneNumber ?? 'No phone'}',
-                    style: AppTypography.bodySm.copyWith(
-                      fontSize: 12,
-                    ),
-                  ),
-                  Text(
-                    'Joined: ${user.joiningDate?.toIso8601String().split('T').first ?? '—'} • Salary: ${user.salary?.toStringAsFixed(2) ?? '—'}',
-                    style: AppTypography.bodySm.copyWith(fontSize: 11),
+                  const SizedBox(height: AppSpacing.xs),
+
+                  // Action buttons row
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Modify button
+                      _ActionChip(
+                        label: 'Modify',
+                        icon: Icons.edit_outlined,
+                        onTap: _openModify,
+                        foreground: AppColors.primary,
+                        background: AppColors.primaryFixed
+                            .withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: AppSpacing.base),
+
+                      // Activate / Deactivate button
+                      _statusLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : _ActionChip(
+                              label: widget.user.isActive
+                                  ? 'Deactivate'
+                                  : 'Activate',
+                              icon: widget.user.isActive
+                                  ? Icons.block_outlined
+                                  : Icons.check_circle_outline,
+                              onTap: _confirmToggleStatus,
+                              foreground: widget.user.isActive
+                                  ? AppColors.error
+                                  : AppColors.primaryContainer,
+                              background: widget.user.isActive
+                                  ? _errorContainer.withValues(alpha: 0.5)
+                                  : AppColors.surfaceContainerLow,
+                            ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
         ),
-        if (showDivider)
+        if (widget.showDivider)
           Divider(
             height: 1,
             thickness: 1,
@@ -213,6 +338,57 @@ class StaffMemberTile extends StatelessWidget {
             endIndent: AppSpacing.xs,
           ),
       ],
+    );
+  }
+}
+
+// ── _ActionChip ────────────────────────────────────────────────────────────────
+
+/// Small pill-shaped tappable chip used for Modify and Activate/Deactivate.
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    required this.foreground,
+    required this.background,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color foreground;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.base,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 12, color: foreground),
+              const SizedBox(width: 3),
+              Text(
+                label,
+                style: AppTypography.labelCaps.copyWith(
+                  color: foreground,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -9,7 +9,7 @@ import '../../../shared/widgets/notification_center_modal.dart';
 import '../../../shared/widgets/user_profile_menu.dart';
 import '../../auth/providers/auth_provider.dart';
 
-enum StaffNavItem { schedule, patients, tasks, attendance }
+enum StaffNavItem { schedule, patients, tasks, taskHistory, attendance }
 
 class StaffShell extends ConsumerWidget {
   const StaffShell({
@@ -232,6 +232,13 @@ class _DesktopNavCluster extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.md),
         _DesktopNavLink(
+          label: 'History',
+          icon: Icons.history,
+          selected: selectedItem == StaffNavItem.taskHistory,
+          onTap: () => onNavItemSelected?.call(StaffNavItem.taskHistory),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        _DesktopNavLink(
           label: 'Attendance',
           icon: Icons.access_time_outlined,
           selected: selectedItem == StaffNavItem.attendance,
@@ -335,6 +342,12 @@ class _StaffBottomNavBar extends StatelessWidget {
                 icon: Icons.task_alt_outlined,
                 selected: selectedItem == StaffNavItem.tasks,
                 onTap: () => onNavItemSelected?.call(StaffNavItem.tasks),
+              ),
+              _BottomNavItem(
+                label: 'History',
+                icon: Icons.history,
+                selected: selectedItem == StaffNavItem.taskHistory,
+                onTap: () => onNavItemSelected?.call(StaffNavItem.taskHistory),
               ),
               _BottomNavItem(
                 label: 'Attendance',

@@ -29,8 +29,14 @@ class StaffTasksNotifier extends StateNotifier<AsyncValue<List<TaskItem>>> {
     }
   }
 
-  Future<void> updateStatus(String taskId, String newStatus, String oldStatus, {String? note}) async {
-    await _repository.updateTaskStatus(taskId, newStatus, _staffId, oldStatus, note: note);
+  Future<void> completeTask(String taskId, String oldStatus) async {
+    await _repository.updateTaskStatus(
+      taskId,
+      'completed',
+      _staffId,
+      oldStatus,
+      note: 'Task marked as completed by staff member',
+    );
     await fetchTasks();
   }
 }

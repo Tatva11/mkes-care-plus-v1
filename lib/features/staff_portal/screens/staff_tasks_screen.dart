@@ -64,7 +64,7 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
             data: (tasks) {
               final pendingCount = tasks.where((t) => t.status != 'completed' && t.status != 'cancelled').length;
               final completedCount = tasks.where((t) => t.status == 'completed').length;
-              
+
               final filtered = tasks.where((t) {
                 final isCompleted = t.status == 'completed';
                 if (_filterIndex == 1) return !isCompleted && t.status != 'cancelled';
@@ -91,7 +91,7 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                   if (filtered.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(AppSpacing.lg),
-                      child: Text('No tasks found for this category.'),
+                      child: Text('No tasks assigned to you right now.'),
                     )
                   else
                     ListView.separated(
@@ -101,67 +101,110 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
                       itemBuilder: (context, index) {
                         final item = filtered[index];
+                        final priorityColor = switch (item.priority.toLowerCase()) {
+                          'critical' || 'high' => AppColors.error,
+                          'medium' => AppColors.primaryContainer,
+                          _ => AppColors.onSurfaceVariant,
+                        };
                         final isCompleted = item.status == 'completed';
-                        
-                        Color priorityColor;
-                        if (item.priority == 'critical' || item.priority == 'high') {
-                          priorityColor = AppColors.error;
-                        } else if (item.priority == 'medium') {
-                          priorityColor = AppColors.primaryContainer;
-                        } else {
-                          priorityColor = AppColors.onSurfaceVariant;
-                        }
 
                         return Container(
                           decoration: BoxDecoration(
-                            color: isCompleted ? AppColors.surfaceContainerLow.withValues(alpha: 0.5) : AppColors.surfaceContainerLowest,
+                            color: isCompleted
+                                ? AppColors.surfaceContainerLow.withValues(alpha: 0.5)
+                                : AppColors.surfaceContainerLowest,
                             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                             border: Border.all(color: AppColors.outlineVariant),
                           ),
-                          child: CheckboxListTile(
-                            value: isCompleted,
-                            onChanged: (val) async {
-                              final newStatus = (val ?? false) ? 'completed' : 'pending';
-                              try {
-                                await ref.read(staffTasksProvider(currentUser.id).notifier).updateStatus(item.id, newStatus, item.status);
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating task: $e')));
-                                }
-                              }
-                            },
-                            activeColor: AppColors.primary,
-                            controlAffinity: ListTileControlAffinity.leading,
-                            title: Text(
-                              item.title,
-                              style: AppTypography.bodyMd.copyWith(
-                                fontWeight: FontWeight.w600,
-                                decoration: isCompleted ? TextDecoration.lineThrough : null,
-                                color: isCompleted ? AppColors.outline : AppColors.onSurface,
-                              ),
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Row(
-                                children: [
-                                  if (item.dueDate != null) ...[
-                                    const Icon(Icons.access_time, size: 12, color: AppColors.outline),
-                                    const SizedBox(width: 4),
-                                    Text(DateFormat('MMM d, h:mm a').format(item.dueDate!), style: AppTypography.dataMono.copyWith(fontSize: 11, color: item.isOverdue ? AppColors.error : AppColors.outline)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        item.title,
+                                        style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: priorityColor.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        item.priority.toUpperCase(),
+                                        style: AppTypography.labelCaps.copyWith(color: priorityColor, fontSize: 10),
+                                      ),
+                                    ),
                                   ],
+                                ),
+                                if (item.description != null && item.description!.trim().isNotEmpty) ...[
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(item.description!, style: AppTypography.bodySm),
                                 ],
-                              ),
-                            ),
-                            secondary: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: priorityColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                item.priority.toUpperCase(),
-                                style: AppTypography.labelCaps.copyWith(color: priorityColor, fontSize: 10),
-                              ),
+                                const SizedBox(height: AppSpacing.sm),
+                                if (item.dueDate != null)
+                                  Text(
+                                    'Due: ${DateFormat('MMM d, yyyy').format(item.dueDate!)}',
+                                    style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                                  ),
+                                const SizedBox(height: AppSpacing.sm),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Status: ${isCompleted ? 'Completed' : 'Pending'}',
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: isCompleted ? Colors.green : AppColors.onSurfaceVariant,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    if (isCompleted) ...[
+                                      const SizedBox(width: AppSpacing.sm),
+                                      const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                if (!isCompleted)
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: FilledButton(
+                                      onPressed: () async {
+                                        try {
+                                          await ref.read(staffTasksProvider(currentUser.id).notifier).completeTask(
+                                            item.id,
+                                            item.status,
+                                          );
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Task marked as completed.')),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('Error updating task: $e')),
+                                            );
+                                          }
+                                        }
+                                      },
+                                      child: const Text('Complete'),
+                                    ),
+                                  )
+                                else
+                                  const SizedBox(
+                                    width: double.infinity,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text('Completed', style: TextStyle(fontWeight: FontWeight.w600)),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         );
