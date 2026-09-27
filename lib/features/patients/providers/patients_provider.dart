@@ -42,7 +42,31 @@ class PatientsNotifier extends StateNotifier<AsyncValue<List<PatientModel>>> {
       rethrow;
     }
   }
+
+  Future<PatientModel> updatePatient(PatientModel updatedPatient) async {
+    try {
+      final updated = await _repository.updatePatient(updatedPatient);
+      await loadPatients();
+      return updated;
+    } catch (e) {
+      debugPrint('Error updating patient: $e');
+      rethrow;
+    }
+  }
 }
+
+final patientDetailsProvider =
+    FutureProvider.family<PatientModel, String>((ref, id) {
+  return ref.watch(patientRepositoryProvider).getPatient(id);
+});
+
+final patientSearchProvider = FutureProvider.family<List<PatientModel>,
+    ({String department, String query})>((ref, params) {
+  return ref.watch(patientRepositoryProvider).fetchPatients(
+        department: params.department,
+        searchQuery: params.query,
+      );
+});
 
 final patientsByDepartmentProvider =
     FutureProvider.family<List<PatientModel>, String>((ref, department) {
@@ -57,3 +81,4 @@ final patientsByDepartmentProvider =
           .where((patient) => patient.department == department)
           .toList());
 });
+

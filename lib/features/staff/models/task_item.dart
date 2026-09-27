@@ -1,9 +1,18 @@
 class TaskItem {
+  static const List<String> validStatuses = [
+    'pending',
+    'in_progress',
+    'completed',
+    'overdue',
+    'cancelled',
+  ];
+
   final String id;
   final String title;
   final String? description;
   final String assignedTo;
   final String? assignedBy;
+  final String? staffName;
   final DateTime? dueDate;
   final String priority; // 'low', 'medium', 'high', 'critical'
   final String status; // 'pending', 'in_progress', 'completed', 'overdue', 'cancelled'
@@ -17,6 +26,7 @@ class TaskItem {
     this.description,
     required this.assignedTo,
     this.assignedBy,
+    this.staffName,
     this.dueDate,
     required this.priority,
     required this.status,
@@ -26,15 +36,21 @@ class TaskItem {
   });
 
   factory TaskItem.fromJson(Map<String, dynamic> json) {
+    final profiles = json['profiles'];
+    final staffName = profiles is Map<String, dynamic>
+        ? (profiles['full_name'] as String?)
+        : null;
+
     return TaskItem(
       id: json['id'] as String,
       title: json['title'] as String,
       description: json['description'] as String?,
       assignedTo: json['assigned_to'] as String,
       assignedBy: json['assigned_by'] as String?,
+      staffName: staffName,
       dueDate: json['due_date'] != null ? DateTime.parse(json['due_date'] as String) : null,
-      priority: json['priority'] as String,
-      status: json['status'] as String,
+      priority: (json['priority'] as String? ?? 'medium').toLowerCase(),
+      status: (json['status'] as String? ?? 'pending').toLowerCase(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at'] as String) : null,
@@ -45,6 +61,21 @@ class TaskItem {
     if (status == 'completed' || status == 'cancelled') return false;
     if (dueDate == null) return false;
     return dueDate!.isBefore(DateTime.now());
+  }
+
+  String get statusLabel {
+    switch (status.toLowerCase()) {
+      case 'in_progress':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'overdue':
+        return 'Overdue';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Pending';
+    }
   }
 
   Map<String, dynamic> toJson() {

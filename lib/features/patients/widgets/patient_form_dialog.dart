@@ -14,9 +14,11 @@ class PatientFormDialog extends ConsumerStatefulWidget {
   const PatientFormDialog({
     super.key,
     this.initialDepartment = 'eye',
+    this.patient,
   });
 
   final String initialDepartment;
+  final PatientModel? patient;
 
   @override
   ConsumerState<PatientFormDialog> createState() => _PatientFormDialogState();
@@ -34,14 +36,18 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
   DateTime? _selectedDob;
   bool _isLoading = false;
 
+  bool get _isEditing => widget.patient != null;
+
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _mobileController = TextEditingController();
-    _addressController = TextEditingController();
-    _referenceController = TextEditingController();
-    _selectedDepartment = widget.initialDepartment;
+    final p = widget.patient;
+    _nameController = TextEditingController(text: p?.name ?? '');
+    _mobileController = TextEditingController(text: p?.mobile ?? '');
+    _addressController = TextEditingController(text: p?.address ?? '');
+    _referenceController = TextEditingController(text: p?.reference ?? '');
+    _selectedDepartment = p?.department ?? widget.initialDepartment;
+    _selectedDob = p?.dob;
   }
 
   @override
@@ -53,13 +59,24 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
     super.dispose();
   }
 
+
+  String _sanitizeMobile(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('91') && digits.length == 12) {
+      digits = digits.substring(2);
+    } else if (digits.startsWith('0') && digits.length == 11) {
+      digits = digits.substring(1);
+    }
+    return digits;
+  }
+
   /// Validates a standard Indian 10-digit mobile number.
-  /// Valid: starts with 6, 7, 8, or 9 and is exactly 10 digits.
+  /// Valid: starts with 6, 7, 8, or 9 and is exactly 10 digits after sanitization.
   String? _validateIndianMobile(String? value) {
     if (value == null || value.trim().isEmpty) {
       return null; // Mobile is optional — only validate if provided.
     }
-    final digits = value.trim();
+    final digits = _sanitizeMobile(value.trim());
     if (digits.length != 10) {
       return 'Mobile number must be exactly 10 digits';
     }
@@ -75,54 +92,105 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final newPatient = PatientModel(
-        id: '', // Will be assigned by Supabase
-        patientNumber: '',
-        name: _nameController.text.trim(),
-        mobile: _mobileController.text.trim().isNotEmpty
-            ? _mobileController.text.trim()
-            : null,
-        department: _selectedDepartment,
-        dob: _selectedDob,
-        address: _addressController.text.trim().isNotEmpty
-            ? _addressController.text.trim()
-            : null,
-        reference: _referenceController.text.trim().isNotEmpty
-            ? _referenceController.text.trim()
-            : null,
-        visitDate: DateTime.now(),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+      final rawMobile = _mobileController.text.trim();
+      final sanitizedMobile =
+          rawMobile.isNotEmpty ? _sanitizeMobile(rawMobile) : null;
 
-      final created =
-          await ref.read(patientsProvider.notifier).createPatient(newPatient);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.primaryContainer,
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    'Patient ${created.name} (${created.patientNumber}) registered successfully!',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ),
+      if (_isEditing) {
+        final existing = widget.patient!;
+        final updatedPatient = existing.copyWith(
+          name: _nameController.text.trim(),
+          mobile: sanitizedMobile,
+          department: _selectedDepartment,
+          dob: _selectedDob,
+          address: _addressController.text.trim().isNotEmpty
+              ? _addressController.text.trim()
+              : null,
+          reference: _referenceController.text.trim().isNotEmpty
+              ? _referenceController.text.trim()
+              : null,
+          updatedAt: DateTime.now(),
         );
-        Navigator.of(context).pop(created);
+
+        final saved = await ref
+            .read(patientsProvider.notifier)
+            .updatePatient(updatedPatient);
+
+        ref.invalidate(patientDetailsProvider(saved.id));
+        ref.invalidate(patientsByDepartmentProvider('eye'));
+        ref.invalidate(patientsByDepartmentProvider('dental'));
+        ref.invalidate(patientSearchProvider);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.primaryContainer,
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      'Patient ${saved.name} (${saved.patientNumber}) updated successfully!',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+          Navigator.of(context).pop(saved);
+        }
+      } else {
+        final newPatient = PatientModel(
+          id: '', // Will be assigned by Supabase
+          patientNumber: '',
+          name: _nameController.text.trim(),
+          mobile: sanitizedMobile,
+          department: _selectedDepartment,
+          dob: _selectedDob,
+          address: _addressController.text.trim().isNotEmpty
+              ? _addressController.text.trim()
+              : null,
+          reference: _referenceController.text.trim().isNotEmpty
+              ? _referenceController.text.trim()
+              : null,
+          visitDate: DateTime.now(),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        final created =
+            await ref.read(patientsProvider.notifier).createPatient(newPatient);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.primaryContainer,
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      'Patient ${created.name} (${created.patientNumber}) registered successfully!',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+          Navigator.of(context).pop(created);
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to register patient: $e'),
+            content: Text(_isEditing
+                ? 'Failed to update patient: $e'
+                : 'Failed to register patient: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -179,15 +247,17 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                             borderRadius:
                                 BorderRadius.circular(AppSpacing.radiusSm),
                           ),
-                          child: const Icon(
-                            Icons.person_add_alt_1,
+                          child: Icon(
+                            _isEditing
+                                ? Icons.edit_outlined
+                                : Icons.person_add_alt_1,
                             color: AppColors.primary,
                             size: 20,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Text(
-                          'Register New Patient',
+                          _isEditing ? 'Edit Patient' : 'Register New Patient',
                           style: AppTypography.headlineMd,
                         ),
                       ],
@@ -212,8 +282,12 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('ASSIGNED IDENTIFIER',
-                              style: AppTypography.labelCaps),
+                          Text(
+                            _isEditing
+                                ? 'PATIENT NUMBER'
+                                : 'ASSIGNED IDENTIFIER',
+                            style: AppTypography.labelCaps,
+                          ),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 2),
@@ -224,7 +298,9 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                                   Border.all(color: AppColors.outlineVariant),
                             ),
                             child: Text(
-                              '${_selectedDepartment == 'eye' ? 'E' : 'D'} (assigned on save)',
+                              _isEditing
+                                  ? widget.patient!.patientNumber
+                                  : '${_selectedDepartment == 'eye' ? 'E' : 'D'} (assigned on save)',
                               style: AppTypography.dataMono.copyWith(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.bold,
@@ -233,6 +309,7 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                           ),
                         ],
                       ),
+
                       const SizedBox(height: AppSpacing.md),
 
                       // Full Name
@@ -258,8 +335,8 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                               keyboardType: TextInputType.number,
                               prefixIcon: Icons.phone_outlined,
                               inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(10),
+                                FilteringTextInputFormatter.allow(RegExp(r'[\d\s+\-]')),
+                                LengthLimitingTextInputFormatter(16),
                               ],
                               validator: _validateIndianMobile,
                             ),
@@ -378,7 +455,7 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                     else
                       Expanded(
                         child: MkesPrimaryButton(
-                          label: 'Register Patient',
+                          label: _isEditing ? 'Save Changes' : 'Register Patient',
                           onPressed: _submit,
                         ),
                       ),

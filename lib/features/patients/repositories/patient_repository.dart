@@ -69,6 +69,52 @@ class PatientRepository {
       },
     );
 
-    return PatientModel.fromJson(response as Map<String, dynamic>);
+    final map = response is Map<String, dynamic>
+        ? response
+        : Map<String, dynamic>.from(response as Map);
+    return PatientModel.fromJson(map);
+  }
+
+  /// Fetch a single patient by ID from Supabase.
+  Future<PatientModel> getPatient(String id) async {
+    final response = await _supabase
+        .from('patients')
+        .select()
+        .eq('id', id)
+        .single();
+    return PatientModel.fromJson(response);
+  }
+
+  /// Update an existing patient in the database.
+  /// Modifies only: name, mobile, department, dob, address, reference, updated_at.
+  /// Patient number is strictly preserved.
+  Future<PatientModel> updatePatient(PatientModel patient) async {
+    final department = patient.department?.trim().toLowerCase();
+    if (department != null && department.isNotEmpty) {
+      if (department != 'eye' && department != 'dental') {
+        throw ArgumentError.value(
+            patient.department, 'department', 'Must be eye or dental.');
+      }
+    }
+
+    final updateData = <String, dynamic>{
+      'name': patient.name.trim(),
+      'mobile': patient.mobile,
+      'department': department,
+      'dob': patient.dob?.toIso8601String().split('T').first,
+      'address': patient.address,
+      'reference': patient.reference,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    final response = await _supabase
+        .from('patients')
+        .update(updateData)
+        .eq('id', patient.id)
+        .select()
+        .single();
+
+    return PatientModel.fromJson(response);
   }
 }
+

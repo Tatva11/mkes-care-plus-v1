@@ -7,6 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../staff/providers/task_provider.dart';
+import 'staff_task_history_screen.dart';
 
 class StaffTasksScreen extends ConsumerStatefulWidget {
   const StaffTasksScreen({super.key});
@@ -45,18 +46,51 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                     ],
                   ),
                 ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StaffTaskHistoryScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.history, size: 18),
+                  label: const Text('History'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
+                ),
               ],
             )
           else ...[
-            Column(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('My Shift Tasks', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground, fontSize: 26)),
-                const SizedBox(height: AppSpacing.xs),
-                Text('Clinical checklist and patient care duties', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('My Shift Tasks', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground, fontSize: 26)),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text('Clinical checklist and patient care duties', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StaffTaskHistoryScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.history, size: 16),
+                  label: const Text('History'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                ),
               ],
             ),
           ],
+
 
           const SizedBox(height: AppSpacing.lg),
 
