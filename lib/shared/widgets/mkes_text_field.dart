@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -17,6 +18,8 @@ class MkesTextField extends StatefulWidget {
     this.validator,
     this.enabled,
     this.onChanged,
+    this.maxLines = 1,
+    this.inputFormatters,
   });
 
   final String? label;
@@ -29,6 +32,8 @@ class MkesTextField extends StatefulWidget {
   final String? Function(String?)? validator;
   final bool? enabled;
   final void Function(String)? onChanged;
+  final int? maxLines;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   State<MkesTextField> createState() => _MkesTextFieldState();
@@ -73,10 +78,12 @@ class _MkesTextFieldState extends State<MkesTextField> {
           controller: widget.controller,
           focusNode: _focusNode,
           obscureText: widget.obscureText,
+          maxLines: widget.obscureText ? 1 : widget.maxLines,
           keyboardType: widget.keyboardType,
           validator: widget.validator,
           enabled: widget.enabled,
           onChanged: widget.onChanged,
+          inputFormatters: widget.inputFormatters,
           style: AppTypography.bodyMd,
           decoration: InputDecoration(
             hintText: widget.hintText,

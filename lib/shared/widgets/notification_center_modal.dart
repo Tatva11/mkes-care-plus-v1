@@ -28,7 +28,8 @@ class NotificationCenterButton extends StatefulWidget {
   const NotificationCenterButton({super.key});
 
   @override
-  State<NotificationCenterButton> createState() => _NotificationCenterButtonState();
+  State<NotificationCenterButton> createState() =>
+      _NotificationCenterButtonState();
 }
 
 class _NotificationCenterButtonState extends State<NotificationCenterButton> {
@@ -36,7 +37,8 @@ class _NotificationCenterButtonState extends State<NotificationCenterButton> {
     NotificationItem(
       id: '1',
       title: 'New Appointment',
-      message: 'Sarah Jenkins scheduled an Optometry checkup for 2:30 PM today.',
+      message:
+          'Sarah Jenkins scheduled an Optometry checkup for 2:30 PM today.',
       time: '5m ago',
       icon: Icons.calendar_today_outlined,
       iconColor: AppColors.primary,
@@ -45,7 +47,8 @@ class _NotificationCenterButtonState extends State<NotificationCenterButton> {
     NotificationItem(
       id: '2',
       title: 'Inventory Alert',
-      message: 'Progressive Lens Blanks (CR-39) reached critical low threshold (4 remaining).',
+      message:
+          'Progressive Lens Blanks (CR-39) reached critical low threshold (4 remaining).',
       time: '25m ago',
       icon: Icons.inventory_2_outlined,
       iconColor: AppColors.error,
@@ -63,7 +66,8 @@ class _NotificationCenterButtonState extends State<NotificationCenterButton> {
     NotificationItem(
       id: '4',
       title: 'AI Insight Available',
-      message: 'Patient triage flow peak predicted at 11:00 AM. Consider adjusting desk support.',
+      message:
+          'Patient triage flow peak predicted at 11:00 AM. Consider adjusting desk support.',
       time: '2h ago',
       icon: Icons.auto_awesome,
       iconColor: AppColors.primaryContainer,
@@ -72,7 +76,7 @@ class _NotificationCenterButtonState extends State<NotificationCenterButton> {
     NotificationItem(
       id: '5',
       title: 'Patient Registration',
-      message: 'New patient profile registered: Robert Wilson (#P-4095).',
+      message: 'New patient profile registered: Robert Wilson (#D1).',
       time: '3h ago',
       icon: Icons.person_add_alt_outlined,
       iconColor: AppColors.tertiary,
@@ -163,7 +167,8 @@ class _NotificationCenterButtonState extends State<NotificationCenterButton> {
                               ),
                             if (_notifications.isNotEmpty)
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20),
+                                icon:
+                                    const Icon(Icons.delete_outline, size: 20),
                                 color: AppColors.onSurfaceVariant,
                                 tooltip: 'Clear All',
                                 onPressed: () {
@@ -207,24 +212,29 @@ class _NotificationCenterButtonState extends State<NotificationCenterButton> {
                         : ListView.separated(
                             padding: EdgeInsets.zero,
                             itemCount: _notifications.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            separatorBuilder: (_, __) =>
+                                const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final item = _notifications[index];
                               return Container(
                                 color: item.isRead
                                     ? Colors.transparent
-                                    : AppColors.surfaceContainerLow.withValues(alpha: 0.5),
+                                    : AppColors.surfaceContainerLow
+                                        .withValues(alpha: 0.5),
                                 child: ListTile(
                                   contentPadding: const EdgeInsets.symmetric(
                                     horizontal: AppSpacing.md,
                                     vertical: AppSpacing.xs,
                                   ),
                                   leading: CircleAvatar(
-                                    backgroundColor: item.iconColor.withValues(alpha: 0.15),
-                                    child: Icon(item.icon, color: item.iconColor, size: 20),
+                                    backgroundColor:
+                                        item.iconColor.withValues(alpha: 0.15),
+                                    child: Icon(item.icon,
+                                        color: item.iconColor, size: 20),
                                   ),
                                   title: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Text(
