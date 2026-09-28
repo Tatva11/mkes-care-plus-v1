@@ -2,6 +2,7 @@ class AttendanceRecord {
   final String id;
   final String staffId;
   final DateTime date;
+  DateTime get recordDate => date;
   final DateTime? checkInTime;
   final DateTime? checkOutTime;
   final String status;

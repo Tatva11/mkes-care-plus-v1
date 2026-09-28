@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../staff/providers/task_provider.dart';
 import '../models/user_profile.dart';
 import '../providers/users_provider.dart';
+import '../widgets/task_form_dialog.dart';
 import 'admin_task_history_screen.dart';
 
 class AdminTaskScreen extends ConsumerWidget {
@@ -22,6 +25,11 @@ class AdminTaskScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('All Tasks (Admin)'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Tasks',
+            onPressed: () => ref.read(adminTasksProvider.notifier).fetchTasks(),
+          ),
           OutlinedButton.icon(
             onPressed: () {
               Navigator.of(context).push(
@@ -42,7 +50,10 @@ class AdminTaskScreen extends ConsumerWidget {
             tooltip: 'Assign Task',
             onPressed: () {
               if (currentUser != null) {
-                _showCreateTaskDialog(context, ref, currentUser.id, usersAsync);
+                showDialog(
+                  context: context,
+                  builder: (_) => const TaskFormDialog(),
+                );
               }
             },
           ),
@@ -52,187 +63,196 @@ class AdminTaskScreen extends ConsumerWidget {
       body: tasksAsync.when(
         data: (tasks) {
           if (tasks.isEmpty) {
-            return const Center(child: Text('No tasks found.'));
+            return RefreshIndicator(
+              onRefresh: () => ref.read(adminTasksProvider.notifier).fetchTasks(),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.4,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.assignment_outlined, size: 48, color: AppColors.outline),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text('No tasks found.', style: AppTypography.headlineMd),
+                          const SizedBox(height: AppSpacing.xs),
+                          const Text('Create and assign a new task to get started.'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
           final users = usersAsync.valueOrNull ?? <UserProfile>[];
-          return ListView.builder(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-              final assignedStaff = users.where((u) => u.id == task.assignedTo).firstOrNull;
-              final staffLabel = assignedStaff?.fullName ?? task.assignedTo;
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: ListTile(
-                  title: Text(task.title),
-                  subtitle: Text(
-                    'Assigned to: $staffLabel\nStatus: ${task.status.toUpperCase()}${task.dueDate != null ? ' • Due: ${DateFormat('MMM d, yyyy').format(task.dueDate!)}' : ''}',
+          return RefreshIndicator(
+            onRefresh: () => ref.read(adminTasksProvider.notifier).fetchTasks(),
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              itemCount: tasks.length,
+              itemBuilder: (context, index) {
+                final task = tasks[index];
+                final assignedStaff = users.where((u) => u.id == task.assignedTo).firstOrNull;
+                final staffLabel = assignedStaff?.fullName ?? task.staffName ?? task.assignedTo;
+
+                Color priorityColor;
+                if (task.priority == 'critical' || task.priority == 'high') {
+                  priorityColor = AppColors.error;
+                } else if (task.priority == 'medium') {
+                  priorityColor = AppColors.primaryContainer;
+                } else {
+                  priorityColor = AppColors.outline;
+                }
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    side: const BorderSide(color: AppColors.outlineVariant),
                   ),
-                  trailing: Text(
-                    task.priority.toUpperCase(),
-                    style: TextStyle(
-                      color: task.priority == 'critical'
-                          ? Colors.red
-                          : task.priority == 'high'
-                              ? Colors.orange
-                              : Colors.grey,
-                      fontWeight: FontWeight.bold,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
                     ),
-                  ),
-                  isThreeLine: true,
-                ),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(child: Text('Error: $e')),
-      ),
-    );
-  }
-
-  void _showCreateTaskDialog(
-    BuildContext context,
-    WidgetRef ref,
-    String adminId,
-    AsyncValue<List<UserProfile>> usersAsync,
-  ) {
-    final titleController = TextEditingController();
-    final descriptionController = TextEditingController();
-    String? selectedStaffId;
-    String selectedPriority = 'medium';
-    DateTime? dueDate;
-
-    final staffUsers = usersAsync.valueOrNull
-            ?.where((user) => user.role == 'staff' && user.isActive)
-            .toList() ??
-        <UserProfile>[];
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Create Task'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: titleController,
-                      decoration: const InputDecoration(labelText: 'Task title *'),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextField(
-                      controller: descriptionController,
-                      minLines: 2,
-                      maxLines: 4,
-                      decoration: const InputDecoration(labelText: 'Description (optional)'),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    DropdownButtonFormField<String>(
-                      initialValue: staffUsers.any((user) => user.id == selectedStaffId)
-                          ? selectedStaffId
-                          : null,
-                      decoration: const InputDecoration(labelText: 'Assign to staff *'),
-                      items: staffUsers
-                          .map((user) => DropdownMenuItem(
-                                value: user.id,
-                                child: Text(user.fullName),
-                              ))
-                          .toList(),
-                      onChanged: (value) => setState(() => selectedStaffId = value),
-                      hint: const Text('Select staff member'),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedPriority,
-                      decoration: const InputDecoration(labelText: 'Priority'),
-                      items: const [
-                        DropdownMenuItem(value: 'low', child: Text('Low')),
-                        DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                        DropdownMenuItem(value: 'high', child: Text('High')),
-                        DropdownMenuItem(value: 'critical', child: Text('Critical')),
-                      ],
-                      onChanged: (value) => setState(() => selectedPriority = value ?? 'medium'),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
+                    title: Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              final date = await showDatePicker(
-                                context: dialogContext,
-                                initialDate: DateTime.now(),
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 3650)),
-                              );
-                              if (date != null) setState(() => dueDate = date);
-                            },
-                            icon: const Icon(Icons.calendar_today),
-                            label: Text(
-                              dueDate != null
-                                  ? DateFormat('MMM d, yyyy').format(dueDate!)
-                                  : 'Due date (optional)',
+                          child: Text(
+                            task.title,
+                            style: AppTypography.bodyLg.copyWith(
+                              fontWeight: FontWeight.w600,
+                              decoration: task.status == 'completed'
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: priorityColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            task.priority.toUpperCase(),
+                            style: AppTypography.labelCaps.copyWith(
+                              color: priorityColor,
+                              fontSize: 10,
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    final trimmedTitle = titleController.text.trim();
-                    if (trimmedTitle.isEmpty ||
-                        selectedStaffId == null ||
-                        selectedStaffId!.isEmpty) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        const SnackBar(
-                          content: Text('Task title and assigned staff are required.'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (task.description != null && task.description!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            task.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.bodySm.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.person_outline, size: 14, color: AppColors.outline),
+                            const SizedBox(width: 4),
+                            Text(
+                              staffLabel,
+                              style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: task.status == 'completed'
+                                    ? Colors.green.withValues(alpha: 0.15)
+                                    : AppColors.surfaceContainerHigh,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                task.statusLabel,
+                                style: AppTypography.labelCaps.copyWith(
+                                  fontSize: 10,
+                                  color: task.status == 'completed'
+                                      ? Colors.green.shade800
+                                      : AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            if (task.dueDate != null) ...[
+                              const SizedBox(width: AppSpacing.sm),
+                              Icon(
+                                Icons.access_time,
+                                size: 13,
+                                color: task.isOverdue ? AppColors.error : AppColors.outline,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                DateFormat('MMM d').format(task.dueDate!),
+                                style: AppTypography.bodySm.copyWith(
+                                  fontSize: 11,
+                                  color: task.isOverdue ? AppColors.error : AppColors.outline,
+                                  fontWeight: task.isOverdue ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      );
-                      return;
-                    }
-
-                    try {
-                      await ref.read(adminTasksProvider.notifier).createTask(
-                        title: trimmedTitle,
-                        description: descriptionController.text.trim().isEmpty
-                            ? null
-                            : descriptionController.text.trim(),
-                        assignedTo: selectedStaffId!,
-                        adminId: adminId,
-                        dueDate: dueDate,
-                        priority: selectedPriority,
-                      );
-                      if (dialogContext.mounted) Navigator.pop(dialogContext);
-                    } catch (e) {
-                      if (dialogContext.mounted) {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          SnackBar(content: Text('Error creating task: $e')),
+                      ],
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                      tooltip: 'Edit Task',
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => TaskFormDialog(task: task),
                         );
-                      }
-                    }
-                  },
-                  child: const Text('Create'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+                      },
+                    ),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => TaskFormDialog(task: task),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, st) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+              const SizedBox(height: AppSpacing.sm),
+              Text('Error loading tasks: $e', textAlign: TextAlign.center),
+              const SizedBox(height: AppSpacing.md),
+              FilledButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                onPressed: () => ref.read(adminTasksProvider.notifier).fetchTasks(),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -27,6 +27,15 @@ class StaffTaskHistoryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('My Task History'),
         backgroundColor: AppColors.surface,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: () => ref
+                .read(staffTasksProvider(currentUser.id).notifier)
+                .fetchTasks(),
+          ),
+        ],
       ),
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
