@@ -4,10 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
-import 'features/auth/providers/auth_provider.dart';
-import 'features/auth/screens/role_selection_screen.dart';
-import 'features/admin/screens/admin_dashboard_screen.dart';
-import 'features/staff_portal/screens/staff_dashboard_screen.dart';
+import 'features/auth/widgets/auth_wrapper.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,106 +53,6 @@ class MkesCareApp extends StatelessWidget {
       theme: AppTheme.light,
       home: const AuthWrapper(),
     );
-  }
-}
-
-/// Central authentication routing wrapper.
-///
-/// Flow:
-///   App Start
-///     → Listen to Supabase auth state
-///     → No session → RoleSelectionScreen
-///     → Session exists → fetch profile
-///       → profile.role == 'admin' && is_active → AdminDashboardScreen
-///       → profile.role == 'staff' && is_active → StaffDashboardScreen
-///       → inactive / missing / wrong role → sign out + error message
-class AuthWrapper extends ConsumerWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final authStateAsync = ref.watch(authStateProvider);
-
-    return authStateAsync.when(
-      data: (authState) {
-        final session = authState.session;
-
-        // No active session → show role selection (portal landing).
-        if (session == null) {
-          return const RoleSelectionScreen();
-        }
-
-        // Session exists — resolve the user's role via profile.
-        final roleAsync = ref.watch(currentUserRoleProvider);
-
-        return roleAsync.when(
-          data: (role) {
-            switch (role) {
-              case 'admin':
-                return const AdminDashboardScreen();
-
-              case 'staff':
-                return const StaffDashboardScreen();
-
-              case 'inactive':
-                _signOutWithMessage(
-                  context,
-                  'Your account is currently inactive. Please contact an administrator.',
-                );
-                return _loadingScaffold();
-
-              case null:
-                _signOutWithMessage(
-                  context,
-                  'Your account is authenticated, but your clinic profile could not be found. '
-                  'Please contact your administrator.',
-                );
-                return _loadingScaffold();
-
-              default:
-                // Unknown role — sign out.
-                _signOutWithMessage(
-                  context,
-                  'Your account has an unrecognised role. Please contact your administrator.',
-                );
-                return _loadingScaffold();
-            }
-          },
-          loading: _loadingScaffold,
-          error: (e, st) {
-            debugPrint('AuthWrapper role resolution error: $e');
-            _signOutWithMessage(
-              context,
-              'Failed to verify your account. Please sign in again.',
-            );
-            return _loadingScaffold();
-          },
-        );
-      },
-      loading: _loadingScaffold,
-      error: (e, st) => const RoleSelectionScreen(),
-    );
-  }
-
-  Widget _loadingScaffold() {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
-  }
-
-  void _signOutWithMessage(BuildContext context, String message) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 6),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      Supabase.instance.client.auth.signOut();
-    });
   }
 }
 

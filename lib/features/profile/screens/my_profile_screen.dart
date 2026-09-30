@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../admin/widgets/admin_shell.dart';
 import '../../auth/providers/auth_provider.dart';
 
 /// Displays the currently logged-in user's own profile, sourced from Supabase.
@@ -27,40 +26,35 @@ class MyProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(currentProfileProvider);
 
-    return AdminShell(
-      selectedItem: AdminNavItem.dashboard,
-      onNavItemSelected: (item) {
-        if (item == AdminNavItem.dashboard) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      },
-      body: profileAsync.when(
-        data: (profile) {
-          final displayName = profile?.fullName ?? name ?? 'User';
-          final displayRole = profile?.designation ??
-              profile?.roleDisplayName ??
-              role ??
-              'Staff';
-          final displayInitials = profile?.initials ?? initials ?? '?';
-          final displayEmail = profile?.email ?? '—';
-          final displayPhone = profile?.phoneNumber ?? '—';
-          final displayDepartment =
-              profile?.departmentName ?? profile?.department ?? '—';
-          final displayDesignation = profile?.designation ?? '—';
+    return profileAsync.when(
+      data: (profile) {
+        final displayName = profile?.fullName ?? name ?? 'User';
+        final displayRole =
+            profile?.designation ?? profile?.roleDisplayName ?? role ?? 'Staff';
+        final displayInitials = profile?.initials ?? initials ?? '?';
+        final displayEmail = profile?.email ?? '—';
+        final displayPhone = profile?.phoneNumber ?? '—';
+        final displayDepartment =
+            profile?.departmentName ?? profile?.department ?? '—';
+        final displayDesignation = profile?.designation ?? '—';
 
-          return _buildContent(
-            context,
-            displayName: displayName,
-            displayRole: displayRole,
-            displayInitials: displayInitials,
-            displayEmail: displayEmail,
-            displayPhone: displayPhone,
-            displayDepartment: displayDepartment,
-            displayDesignation: displayDesignation,
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(
+        final content = _buildContent(
+          context,
+          displayName: displayName,
+          displayRole: displayRole,
+          displayInitials: displayInitials,
+          displayEmail: displayEmail,
+          displayPhone: displayPhone,
+          displayDepartment: displayDepartment,
+          displayDesignation: displayDesignation,
+        );
+        return Scaffold(body: content);
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, st) => Scaffold(
+        body: Center(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
@@ -117,10 +111,12 @@ class MyProfileScreen extends ConsumerWidget {
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    'My Profile',
-                    style: AppTypography.displayLg.copyWith(
-                      color: AppColors.onBackground,
+                  Expanded(
+                    child: Text(
+                      'My Profile',
+                      style: AppTypography.displayLg.copyWith(
+                        color: AppColors.onBackground,
+                      ),
                     ),
                   ),
                 ],

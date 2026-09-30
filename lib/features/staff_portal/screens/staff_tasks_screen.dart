@@ -7,7 +7,6 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../staff/providers/task_provider.dart';
-import 'staff_task_history_screen.dart';
 
 class StaffTasksScreen extends ConsumerStatefulWidget {
   const StaffTasksScreen({super.key});
@@ -23,12 +22,15 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
     final currentUser = ref.watch(currentUserProvider);
-    if (currentUser == null) return const Center(child: CircularProgressIndicator());
+    if (currentUser == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     final tasksAsync = ref.watch(staffTasksProvider(currentUser.id));
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
+      padding: EdgeInsets.all(
+          isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -40,22 +42,14 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('My Shift Tasks', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground)),
+                      Text('My Shift Tasks',
+                          style: AppTypography.displayLg
+                              .copyWith(color: AppColors.onBackground)),
                       const SizedBox(height: AppSpacing.xs),
-                      Text('Clinical checklist and patient care duties', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
+                      Text('Clinical checklist and patient care duties',
+                          style: AppTypography.bodyLg
+                              .copyWith(color: AppColors.onSurfaceVariant)),
                     ],
-                  ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const StaffTaskHistoryScreen(),
-                    ),
-                  ),
-                  icon: const Icon(Icons.history, size: 18),
-                  label: const Text('History'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   ),
                 ),
               ],
@@ -69,40 +63,37 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('My Shift Tasks', style: AppTypography.displayLg.copyWith(color: AppColors.onBackground, fontSize: 26)),
+                      Text('My Shift Tasks',
+                          style: AppTypography.displayLg.copyWith(
+                              color: AppColors.onBackground, fontSize: 26)),
                       const SizedBox(height: AppSpacing.xs),
-                      Text('Clinical checklist and patient care duties', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant)),
+                      Text('Clinical checklist and patient care duties',
+                          style: AppTypography.bodyLg
+                              .copyWith(color: AppColors.onSurfaceVariant)),
                     ],
-                  ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const StaffTaskHistoryScreen(),
-                    ),
-                  ),
-                  icon: const Icon(Icons.history, size: 16),
-                  label: const Text('History'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
                 ),
               ],
             ),
           ],
-
-
           const SizedBox(height: AppSpacing.lg),
-
           tasksAsync.when(
             data: (tasks) {
-              final pendingCount = tasks.where((t) => t.status != 'completed' && t.status != 'cancelled').length;
-              final completedCount = tasks.where((t) => t.status == 'completed').length;
-              
+              final pendingCount = tasks
+                  .where(
+                      (t) => t.status != 'completed' && t.status != 'cancelled')
+                  .length;
+              final completedCount =
+                  tasks.where((t) => t.status == 'completed').length;
+
               final filtered = tasks.where((t) {
                 final isCompleted = t.status == 'completed';
-                if (_filterIndex == 1) return !isCompleted && t.status != 'cancelled';
-                if (_filterIndex == 2) return isCompleted;
+                if (_filterIndex == 1) {
+                  return !isCompleted && t.status != 'cancelled';
+                }
+                if (_filterIndex == 2) {
+                  return isCompleted;
+                }
                 return t.status != 'cancelled';
               }).toList();
 
@@ -113,7 +104,8 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildFilterChip('All (${pendingCount + completedCount})', 0),
+                        _buildFilterChip(
+                            'All (${pendingCount + completedCount})', 0),
                         const SizedBox(width: AppSpacing.sm),
                         _buildFilterChip('Pending ($pendingCount)', 1),
                         const SizedBox(width: AppSpacing.sm),
@@ -132,13 +124,15 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm),
                       itemBuilder: (context, index) {
                         final item = filtered[index];
                         final isCompleted = item.status == 'completed';
-                        
+
                         Color priorityColor;
-                        if (item.priority == 'critical' || item.priority == 'high') {
+                        if (item.priority == 'critical' ||
+                            item.priority == 'high') {
                           priorityColor = AppColors.error;
                         } else if (item.priority == 'medium') {
                           priorityColor = AppColors.primaryContainer;
@@ -148,19 +142,31 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
 
                         return Container(
                           decoration: BoxDecoration(
-                            color: isCompleted ? AppColors.surfaceContainerLow.withValues(alpha: 0.5) : AppColors.surfaceContainerLowest,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                            color: isCompleted
+                                ? AppColors.surfaceContainerLow
+                                    .withValues(alpha: 0.5)
+                                : AppColors.surfaceContainerLowest,
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusLg),
                             border: Border.all(color: AppColors.outlineVariant),
                           ),
                           child: CheckboxListTile(
                             value: isCompleted,
                             onChanged: (val) async {
-                              final newStatus = (val ?? false) ? 'completed' : 'pending';
+                              final newStatus =
+                                  (val ?? false) ? 'completed' : 'pending';
                               try {
-                                await ref.read(staffTasksProvider(currentUser.id).notifier).updateStatus(item.id, newStatus, item.status);
+                                await ref
+                                    .read(staffTasksProvider(currentUser.id)
+                                        .notifier)
+                                    .updateStatus(
+                                        item.id, newStatus, item.status);
                               } catch (e) {
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating task: $e')));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content:
+                                              Text('Error updating task: $e')));
                                 }
                               }
                             },
@@ -170,8 +176,12 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                               item.title,
                               style: AppTypography.bodyMd.copyWith(
                                 fontWeight: FontWeight.w600,
-                                decoration: isCompleted ? TextDecoration.lineThrough : null,
-                                color: isCompleted ? AppColors.outline : AppColors.onSurface,
+                                decoration: isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: isCompleted
+                                    ? AppColors.outline
+                                    : AppColors.onSurface,
                               ),
                             ),
                             subtitle: Padding(
@@ -179,22 +189,32 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                               child: Row(
                                 children: [
                                   if (item.dueDate != null) ...[
-                                    const Icon(Icons.access_time, size: 12, color: AppColors.outline),
+                                    const Icon(Icons.access_time,
+                                        size: 12, color: AppColors.outline),
                                     const SizedBox(width: 4),
-                                    Text(DateFormat('MMM d, h:mm a').format(item.dueDate!), style: AppTypography.dataMono.copyWith(fontSize: 11, color: item.isOverdue ? AppColors.error : AppColors.outline)),
+                                    Text(
+                                        DateFormat('MMM d, h:mm a')
+                                            .format(item.dueDate!),
+                                        style: AppTypography.dataMono.copyWith(
+                                            fontSize: 11,
+                                            color: item.isOverdue
+                                                ? AppColors.error
+                                                : AppColors.outline)),
                                   ],
                                 ],
                               ),
                             ),
                             secondary: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
                                 color: priorityColor.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
                                 item.priority.toUpperCase(),
-                                style: AppTypography.labelCaps.copyWith(color: priorityColor, fontSize: 10),
+                                style: AppTypography.labelCaps.copyWith(
+                                    color: priorityColor, fontSize: 10),
                               ),
                             ),
                           ),

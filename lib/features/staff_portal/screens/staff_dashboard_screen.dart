@@ -3,7 +3,6 @@ import '../widgets/staff_shell.dart';
 import 'staff_attendance_screen.dart';
 import 'staff_patients_screen.dart';
 import 'staff_schedule_screen.dart';
-import 'staff_task_history_screen.dart';
 import 'staff_tasks_screen.dart';
 
 class StaffDashboardScreen extends StatefulWidget {
@@ -35,8 +34,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         return const StaffPatientsScreen();
       case StaffNavItem.tasks:
         return const StaffTasksScreen();
-      case StaffNavItem.taskHistory:
-        return const StaffTaskHistoryScreen();
       case StaffNavItem.attendance:
         return const StaffAttendanceScreen();
     }

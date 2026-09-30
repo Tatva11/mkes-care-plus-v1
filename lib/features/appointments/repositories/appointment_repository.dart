@@ -50,6 +50,23 @@ class AppointmentRepository {
         .toList();
   }
 
+  Future<List<AppointmentStaffCandidate>> fetchDepartmentStaffCandidates(
+    String departmentId,
+  ) async {
+    final response = await _supabase.rpc(
+      'get_active_department_staff_candidates',
+      params: {'p_department_id': departmentId},
+    );
+
+    return (response as List)
+        .map(
+          (row) => AppointmentStaffCandidate.fromJson(
+            Map<String, dynamic>.from(row as Map),
+          ),
+        )
+        .toList();
+  }
+
   /// Convenience method to fetch today's appointments.
   Future<List<AppointmentModel>> fetchTodayAppointments({
     String? doctorId,
@@ -77,7 +94,8 @@ class AppointmentRepository {
   }
 
   /// Create a new appointment.
-  Future<AppointmentModel> createAppointment(AppointmentModel appointment) async {
+  Future<AppointmentModel> createAppointment(
+      AppointmentModel appointment) async {
     final response = await _supabase
         .from('appointments')
         .insert(appointment.toInsertJson())

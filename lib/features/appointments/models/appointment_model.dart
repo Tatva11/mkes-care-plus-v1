@@ -2,6 +2,23 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../patients/models/patient_model.dart';
 
+class AppointmentStaffCandidate {
+  const AppointmentStaffCandidate({
+    required this.id,
+    required this.fullName,
+  });
+
+  final String id;
+  final String fullName;
+
+  factory AppointmentStaffCandidate.fromJson(Map<String, dynamic> json) {
+    return AppointmentStaffCandidate(
+      id: json['id'] as String,
+      fullName: json['full_name'] as String,
+    );
+  }
+}
+
 class AppointmentModel {
   final String id;
   final String? patientId;

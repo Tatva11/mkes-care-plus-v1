@@ -75,6 +75,13 @@ final appointmentsNotifierProvider = StateNotifierProvider<AppointmentsNotifier,
   return AppointmentsNotifier(repository);
 });
 
+final appointmentStaffCandidatesProvider =
+    FutureProvider.family<List<AppointmentStaffCandidate>, String>(
+        (ref, departmentId) {
+  final repository = ref.watch(appointmentRepositoryProvider);
+  return repository.fetchDepartmentStaffCandidates(departmentId);
+});
+
 class AppointmentsNotifier
     extends StateNotifier<AsyncValue<List<AppointmentModel>>> {
   final AppointmentRepository _repository;

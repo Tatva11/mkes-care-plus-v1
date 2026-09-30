@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_provider.dart';
 import '../models/task_item.dart';
-import '../models/task_history_entry.dart';
 
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   return TaskRepository(ref.watch(supabaseProvider));
@@ -20,7 +19,7 @@ class TaskRepository {
         .select()
         .eq('assigned_to', staffId)
         .order('due_date', ascending: true);
-        
+
     return (response as List).map((json) => TaskItem.fromJson(json)).toList();
   }
 
@@ -29,18 +28,8 @@ class TaskRepository {
         .from('tasks')
         .select()
         .order('created_at', ascending: false);
-        
-    return (response as List).map((json) => TaskItem.fromJson(json)).toList();
-  }
 
-  Future<List<TaskHistoryEntry>> fetchTaskHistory(String taskId) async {
-    final response = await _supabase
-        .from('task_history')
-        .select()
-        .eq('task_id', taskId)
-        .order('created_at', ascending: false);
-        
-    return (response as List).map((json) => TaskHistoryEntry.fromJson(json)).toList();
+    return (response as List).map((json) => TaskItem.fromJson(json)).toList();
   }
 
   Future<void> createTask({
@@ -51,16 +40,20 @@ class TaskRepository {
     DateTime? dueDate,
     String priority = 'medium',
   }) async {
-    final response = await _supabase.from('tasks').insert({
-      'title': title,
-      'description': description,
-      'assigned_to': assignedTo,
-      'assigned_by': assignedBy,
-      'due_date': dueDate?.toIso8601String(),
-      'priority': priority,
-      'status': 'pending',
-    }).select().single();
-    
+    final response = await _supabase
+        .from('tasks')
+        .insert({
+          'title': title,
+          'description': description,
+          'assigned_to': assignedTo,
+          'assigned_by': assignedBy,
+          'due_date': dueDate?.toIso8601String(),
+          'priority': priority,
+          'status': 'pending',
+        })
+        .select()
+        .single();
+
     // Add history entry
     await _supabase.from('task_history').insert({
       'task_id': response['id'],
@@ -71,7 +64,9 @@ class TaskRepository {
     });
   }
 
-  Future<void> updateTaskStatus(String taskId, String newStatus, String changedBy, String oldStatus, {String? note}) async {
+  Future<void> updateTaskStatus(
+      String taskId, String newStatus, String changedBy, String oldStatus,
+      {String? note}) async {
     final Map<String, dynamic> updates = {
       'status': newStatus,
       'updated_at': DateTime.now().toIso8601String(),
@@ -80,7 +75,7 @@ class TaskRepository {
       updates['completed_at'] = DateTime.now().toIso8601String();
     } else if (oldStatus == 'completed') {
       // Reopening task
-      updates['completed_at'] = null; 
+      updates['completed_at'] = null;
     }
 
     await _supabase.from('tasks').update(updates).eq('id', taskId);

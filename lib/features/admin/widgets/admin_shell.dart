@@ -31,12 +31,28 @@ class AdminShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Role-based access check
     final roleAsync = ref.watch(currentUserRoleProvider);
-    
+    debugPrint(
+      '[LOGOUT] AdminShell built; roleState='
+      '${roleAsync.hasError ? 'error' : roleAsync.isLoading ? 'loading' : 'data'}; '
+      'sessionPresent=${Supabase.instance.client.auth.currentSession != null}',
+    );
+
     return roleAsync.when(
       data: (role) {
+        if (Supabase.instance.client.auth.currentSession == null) {
+          debugPrint('[LOGOUT] AdminShell session is cleared; showing loader');
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
         if (role != 'admin') {
+          debugPrint(
+            '[LOGOUT] AdminShell rejecting active session with role=$role',
+          );
           // Redirect to login if not admin
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (Supabase.instance.client.auth.currentSession == null) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Access denied. Admin privileges required.'),
@@ -75,6 +91,7 @@ class AdminShell extends ConsumerWidget {
         // SECURITY: On error, do NOT allow access. Sign out and show error.
         debugPrint('Role check error in AdminShell: $e');
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (Supabase.instance.client.auth.currentSession == null) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Session verification failed. Please sign in again.'),

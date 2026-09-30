@@ -48,10 +48,27 @@ class UserProfileMenu extends StatelessWidget {
           ),
         ),
       ),
-      onSelected: (value) {
+      onSelected: (value) async {
         if (value == 'logout') {
-          Supabase.instance.client.auth.signOut();
-          // Let AuthWrapper handle navigation on auth state change.
+          debugPrint('[LOGOUT] menu callback entered');
+          try {
+            debugPrint('[LOGOUT] starting Supabase signOut');
+            await Supabase.instance.client.auth.signOut();
+            debugPrint(
+              '[LOGOUT] signOut completed; sessionPresent='
+              '${Supabase.instance.client.auth.currentSession != null}',
+            );
+            debugPrint(
+              '[LOGOUT] waiting for the root AuthWrapper auth-state route',
+            );
+          } catch (error, stackTrace) {
+            debugPrint('[LOGOUT] signOut failed: $error\n$stackTrace');
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Could not log out: $error')),
+              );
+            }
+          }
         } else if (value == 'My Profile') {
           Navigator.of(context).push(
             MaterialPageRoute(

@@ -34,10 +34,8 @@ class ProfileModel {
       phoneNumber: json['phone_number'] as String?,
       departmentId: json['department_id'] as String?,
       departmentName:
-          (json['department'] as Map<String, dynamic>?)?['name'] as String? ??
-              json['department_name'] as String?,
-      department: json['legacy_department'] as String? ??
-          (json['department'] is String ? json['department'] as String : null),
+          (json['department'] as Map<String, dynamic>?)?['name'] as String?,
+      department: null,
       designation: json['designation'] as String?,
       role: json['role'] as String,
       isActive: json['is_active'] as bool? ?? true,

@@ -18,7 +18,7 @@ class ProfileRepository {
   /// Returns null if the profile does not exist.
   Future<ProfileModel?> fetchProfile(String userId) async {
     try {
-        final response = await _supabase
+      final response = await _supabase
           .from('profiles')
           .select('*, department:departments(name)')
           .eq('id', userId)
@@ -30,20 +30,5 @@ class ProfileRepository {
       debugPrint('ProfileRepository.fetchProfile error: $e');
       rethrow;
     }
-  }
-
-  /// Updates the current user's own profile fields.
-  Future<void> updateOwnProfile({
-    required String userId,
-    String? fullName,
-    String? phoneNumber,
-  }) async {
-    final updates = <String, dynamic>{};
-    if (fullName != null) updates['full_name'] = fullName;
-    if (phoneNumber != null) updates['phone_number'] = phoneNumber;
-
-    if (updates.isEmpty) return;
-
-    await _supabase.from('profiles').update(updates).eq('id', userId);
   }
 }

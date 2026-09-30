@@ -6,9 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/mkes_primary_button.dart';
 import '../../../shared/widgets/mkes_text_field.dart';
-import '../../admin/models/user_profile.dart';
-import '../../admin/providers/users_provider.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../department/providers/departments_provider.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/repositories/patient_repository.dart';
 import '../../patients/widgets/patient_form_dialog.dart';
@@ -47,6 +45,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
   String _searchQuery = '';
   List<PatientModel> _searchResults = [];
   bool _isSearching = false;
+  String? _searchError;
+  int _searchRequestId = 0;
 
   // ── department / type ──
   String _selectedDepartment = 'eye';
@@ -68,10 +68,6 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
     _selectedPatientId = widget.initialPatientId;
     _selectedPatientName = widget.initialPatientName;
     _notesController = TextEditingController();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _runSearch('');
-    });
   }
 
   @override
@@ -83,24 +79,45 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
   // ── Dept-filtered patient search (server-side Supabase) ──
   Future<void> _runSearch(String query) async {
+    final requestId = ++_searchRequestId;
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isEmpty) {
+      setState(() {
+        _searchQuery = '';
+        _searchResults = [];
+        _searchError = null;
+        _isSearching = false;
+      });
+      return;
+    }
+
     setState(() {
       _isSearching = true;
-      _searchQuery = query;
+      _searchQuery = normalizedQuery;
+      _searchError = null;
     });
+    final department = _selectedDepartment;
     try {
       final repo = ref.read(patientRepositoryProvider);
       final results = await repo.fetchPatients(
-        department: _selectedDepartment,
-        searchQuery: query.trim().isEmpty ? null : query.trim(),
+        department: department,
+        searchQuery: normalizedQuery,
       );
-      if (mounted) {
+      if (mounted && requestId == _searchRequestId) {
         setState(() {
           _searchResults = results;
           _isSearching = false;
+          _searchError = null;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isSearching = false);
+    } catch (error) {
+      if (mounted && requestId == _searchRequestId) {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+          _searchError = error.toString();
+        });
+      }
     }
   }
 
@@ -120,8 +137,13 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
         }
       }
       _selectedDepartment = newDept;
+      _selectedDoctorId = null;
+      _selectedDoctorName = null;
+      _selectedDoctorSpecialty = null;
       _searchController.clear();
       _searchQuery = '';
+      _searchResults = [];
+      _searchError = null;
     });
     _runSearch('');
   }
@@ -136,6 +158,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       }
       _searchController.clear();
       _searchQuery = '';
+      _searchResults = [];
+      _searchError = null;
     });
   }
 
@@ -144,6 +168,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       _selectedPatientId = null;
       _selectedPatientName = null;
       _selectedPatientNumber = null;
+      _searchResults = [];
+      _searchError = null;
     });
   }
 
@@ -225,8 +251,22 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final usersAsync = ref.watch(usersProvider);
-    final profileAsync = ref.watch(currentProfileProvider);
+    final departmentsAsync = ref.watch(departmentsProvider);
+    final matchingDepartments = departmentsAsync.value
+            ?.where(
+              (department) =>
+                  department.isActive &&
+                  department.name.toLowerCase().contains(_selectedDepartment),
+            )
+            .toList() ??
+        [];
+    final selectedDepartmentId =
+        matchingDepartments.length == 1 ? matchingDepartments.single.id : null;
+    final candidatesAsync = selectedDepartmentId == null
+        ? null
+        : ref.watch(
+            appointmentStaffCandidatesProvider(selectedDepartmentId),
+          );
     final screenWidth = MediaQuery.sizeOf(context).width;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final viewInsets = MediaQuery.viewInsetsOf(context);
@@ -448,8 +488,9 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                               }
                               _searchController.clear();
                               _searchQuery = '';
+                              _searchResults = [];
+                              _searchError = null;
                             });
-                            _runSearch('');
                           },
                           icon: const Icon(Icons.person_add_alt_1),
                           label: const Text('+ New Patient'),
@@ -458,129 +499,91 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
                       const SizedBox(height: AppSpacing.md),
 
-                      // 3. Attending Doctor / Clinical Staff
+                      // 3. Attending Doctor
                       Text(
-                        'Clinical Staff Assignment',
+                        'Attending Doctor',
                         style: AppTypography.labelCaps
                             .copyWith(color: AppColors.primary),
                       ),
                       const SizedBox(height: AppSpacing.xs),
-                      usersAsync.when(
-                        loading: () => const LinearProgressIndicator(),
-                        error: (e, _) => Text('Error loading staff: $e'),
-                        data: (users) {
-                          final staffMembers =
-                              users.where((u) => u.isActive).toList();
-                          return DropdownButtonFormField<String?>(
-                            initialValue: _selectedDoctorId,
-                            decoration: InputDecoration(
-                              labelText: 'Attending Doctor / Specialist',
-                              prefixIcon: const Icon(Icons.person_pin_outlined),
-                              border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppSpacing.radiusMd),
+                      if (departmentsAsync.isLoading)
+                        const LinearProgressIndicator()
+                      else if (departmentsAsync.hasError)
+                        Text(
+                          'Error loading departments: '
+                          '${departmentsAsync.error}',
+                        )
+                      else if (matchingDepartments.isEmpty)
+                        Text(
+                          'No active ${_selectedDepartment == 'eye' ? 'Eye' : 'Dental'} department is configured.',
+                        )
+                      else if (matchingDepartments.length > 1)
+                        Text(
+                          'More than one active ${_selectedDepartment == 'eye' ? 'Eye' : 'Dental'} department was found.',
+                        )
+                      else
+                        candidatesAsync!.when(
+                          loading: () => const LinearProgressIndicator(),
+                          error: (error, _) => Text(
+                            'Error loading department staff: $error',
+                          ),
+                          data: (candidates) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              DropdownButtonFormField<String?>(
+                                initialValue: _selectedDoctorId,
+                                decoration: InputDecoration(
+                                  labelText: 'Attending Doctor',
+                                  prefixIcon:
+                                      const Icon(Icons.person_pin_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusMd,
+                                    ),
+                                  ),
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('Unassigned (General Queue)'),
+                                  ),
+                                  ...candidates.map(
+                                    (candidate) => DropdownMenuItem<String?>(
+                                      value: candidate.id,
+                                      child: Text(
+                                        candidate.fullName,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedDoctorId = value;
+                                    final match = candidates
+                                        .where(
+                                          (candidate) => candidate.id == value,
+                                        )
+                                        .firstOrNull;
+                                    _selectedDoctorName = match?.fullName;
+                                    _selectedDoctorSpecialty = null;
+                                  });
+                                },
                               ),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text('Unassigned (General Queue)'),
-                              ),
-                              ...staffMembers.map(
-                                (UserProfile u) => DropdownMenuItem<String?>(
-                                  value: u.id,
+                              if (candidates.isEmpty)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.only(top: AppSpacing.xs),
                                   child: Text(
-                                    '${u.fullName} (${u.designation ?? u.role})',
-                                    overflow: TextOverflow.ellipsis,
+                                    'No active staff found in this department.',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                            onChanged: (val) {
-                              setState(() {
-                                _selectedDoctorId = val;
-                                final match = staffMembers
-                                    .where((u) => u.id == val)
-                                    .firstOrNull;
-                                if (match != null) {
-                                  _selectedDoctorName = match.fullName;
-                                  _selectedDoctorSpecialty = match.designation;
-                                } else {
-                                  _selectedDoctorName = null;
-                                  _selectedDoctorSpecialty = null;
-                                }
-                              });
-                            },
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: AppSpacing.md),
-
-                      // 4. Created By — auto-resolved from authenticated profile (read-only)
-                      Text(
-                        'Created By',
-                        style: AppTypography.labelCaps
-                            .copyWith(color: AppColors.primary),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      profileAsync.when(
-                        loading: () => _createdByContainer(
-                          child: const Row(
-                            children: [
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              SizedBox(width: 8),
-                              Text('Loading staff info...'),
                             ],
                           ),
                         ),
-                        error: (e, _) => _createdByContainer(
-                          isError: true,
-                          child: Text(
-                            'Could not resolve staff: $e',
-                            style: const TextStyle(color: AppColors.error),
-                          ),
-                        ),
-                        data: (profile) => _createdByContainer(
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.verified_user_outlined,
-                                color: AppColors.primary,
-                                size: 20,
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: Text(
-                                  profile?.fullName ?? 'Unknown Staff',
-                                  style: AppTypography.bodyMd,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryContainer
-                                      .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'Auto',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.primaryContainer,
-                                    fontSize: 9,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
 
                       const SizedBox(height: AppSpacing.md),
 
@@ -678,9 +681,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                 child: Row(
                   children: [
                     TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.of(context).pop(),
+                      onPressed:
+                          _isLoading ? null : () => Navigator.of(context).pop(),
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -726,8 +728,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
               children: [
                 Text(
                   _selectedPatientName ?? '',
-                  style:
-                      AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
+                  style: AppTypography.bodyMd
+                      .copyWith(fontWeight: FontWeight.w600),
                 ),
                 if (_selectedPatientNumber != null)
                   Text(
@@ -752,13 +754,23 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
   Widget _buildSearchResults() {
     if (_isSearching) return const SizedBox.shrink();
 
+    if (_searchQuery.isEmpty) return const SizedBox.shrink();
+
+    if (_searchError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: Text(
+          'Could not search patients: $_searchError',
+          style: AppTypography.bodySm.copyWith(color: AppColors.error),
+        ),
+      );
+    }
+
     if (_searchResults.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
         child: Text(
-          _searchQuery.isEmpty
-              ? 'No ${_selectedDepartment == "eye" ? "Eye" : "Dental"} patients found. Use "+ New Patient" to register one.'
-              : 'No ${_selectedDepartment == "eye" ? "Eye" : "Dental"} patients match "$_searchQuery".',
+          'No ${_selectedDepartment == "eye" ? "Eye" : "Dental"} patients match "$_searchQuery".',
           style:
               AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
         ),
@@ -811,8 +823,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                           Text(
                             '${visible[i].patientNumber}'
                             '${visible[i].mobile != null ? " \u00b7 ${visible[i].mobile}" : ""}',
-                            style: AppTypography.bodySm.copyWith(
-                                color: AppColors.onSurfaceVariant),
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -838,28 +850,6 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _createdByContainer({
-    required Widget child,
-    bool isError = false,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: isError
-            ? AppColors.errorContainer.withValues(alpha: 0.2)
-            : AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(
-          color: isError
-              ? AppColors.error.withValues(alpha: 0.3)
-              : AppColors.outlineVariant,
-        ),
-      ),
-      child: child,
     );
   }
 }

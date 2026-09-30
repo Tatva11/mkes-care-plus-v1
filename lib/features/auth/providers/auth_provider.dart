@@ -11,7 +11,13 @@ import '../repositories/profile_repository.dart';
 // ---------------------------------------------------------------------------
 final authStateProvider = StreamProvider<AuthState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
-  return authRepository.authStateChanges;
+  return authRepository.authStateChanges.map((authState) {
+    debugPrint(
+      '[LOGOUT] auth event=${authState.event} '
+      'sessionPresent=${authState.session != null}',
+    );
+    return authState;
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -48,12 +54,14 @@ final currentUserRoleProvider = FutureProvider<String?>((ref) async {
   if (user == null) return null;
 
   try {
+    debugPrint('[LOGOUT] role lookup starting for active session');
     final response = await Supabase.instance.client
         .from('profiles')
         .select('role, is_active')
         .eq('id', user.id)
         .maybeSingle();
 
+    debugPrint('[LOGOUT] role lookup completed');
     if (response == null) {
       debugPrint('currentUserRoleProvider: no profile for user ${user.id}');
       return null;
@@ -63,8 +71,8 @@ final currentUserRoleProvider = FutureProvider<String?>((ref) async {
     if (!isActive) return 'inactive';
 
     return response['role'] as String?;
-  } catch (e) {
-    debugPrint('currentUserRoleProvider error: $e');
+  } catch (e, stackTrace) {
+    debugPrint('[LOGOUT] role lookup failed: $e\n$stackTrace');
     rethrow;
   }
 });

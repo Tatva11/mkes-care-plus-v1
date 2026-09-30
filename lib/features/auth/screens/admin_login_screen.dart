@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../admin/screens/admin_dashboard_screen.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -9,7 +8,6 @@ import '../../../shared/widgets/mkes_primary_button.dart';
 import '../../../shared/widgets/mkes_text_field.dart';
 import '../providers/auth_provider.dart';
 import '../repositories/auth_repository.dart';
-
 
 /// Admin-specific login screen.
 /// After Supabase authentication, enforces role == 'admin' and is_active == true.
@@ -48,19 +46,16 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
         ref: ref,
       );
 
-     if (result is LoginSuccess) {
-  if (!mounted) return;
-  // Navigate directly to the dashboard and clear the entire nav stack
-  // (role selection + login screen) so back-navigation can't return here.
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-    (route) => false,
-  );
-} else if (result is LoginFailure) {
-  _showError(result.message);
-}
+      if (!mounted) return;
 
-      
+      if (result is LoginSuccess) {
+        debugPrint(
+          '[AUTH] Admin login succeeded; returning to root AuthWrapper.',
+        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else if (result is LoginFailure) {
+        _showError(result.message);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -9,7 +9,7 @@ import '../../../shared/widgets/notification_center_modal.dart';
 import '../../../shared/widgets/user_profile_menu.dart';
 import '../../auth/providers/auth_provider.dart';
 
-enum StaffNavItem { schedule, patients, tasks, taskHistory, attendance }
+enum StaffNavItem { schedule, patients, tasks, attendance }
 
 class StaffShell extends ConsumerWidget {
   const StaffShell({
@@ -27,7 +27,7 @@ class StaffShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Role-based access check
     final roleAsync = ref.watch(currentUserRoleProvider);
-    
+
     return roleAsync.when(
       data: (role) {
         if (role != 'staff') {
@@ -41,7 +41,8 @@ class StaffShell extends ConsumerWidget {
             );
             Supabase.instance.client.auth.signOut();
           });
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
 
         final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
@@ -66,14 +67,16 @@ class StaffShell extends ConsumerWidget {
                 ),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, st) {
         // SECURITY: On error, do NOT allow access. Sign out and show error.
         debugPrint('Role check error in StaffShell: $e');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Session verification failed. Please sign in again.'),
+              content:
+                  Text('Session verification failed. Please sign in again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -232,13 +235,6 @@ class _DesktopNavCluster extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.md),
         _DesktopNavLink(
-          label: 'History',
-          icon: Icons.history,
-          selected: selectedItem == StaffNavItem.taskHistory,
-          onTap: () => onNavItemSelected?.call(StaffNavItem.taskHistory),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        _DesktopNavLink(
           label: 'Attendance',
           icon: Icons.access_time_outlined,
           selected: selectedItem == StaffNavItem.attendance,
@@ -265,9 +261,8 @@ class _DesktopNavLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = selected ? AppColors.onSurface : AppColors.onSurfaceVariant;
-    final bgColor = selected
-        ? AppColors.surfaceContainerLow
-        : Colors.transparent;
+    final bgColor =
+        selected ? AppColors.surfaceContainerLow : Colors.transparent;
 
     return InkWell(
       onTap: onTap,
@@ -342,12 +337,6 @@ class _StaffBottomNavBar extends StatelessWidget {
                 icon: Icons.task_alt_outlined,
                 selected: selectedItem == StaffNavItem.tasks,
                 onTap: () => onNavItemSelected?.call(StaffNavItem.tasks),
-              ),
-              _BottomNavItem(
-                label: 'History',
-                icon: Icons.history,
-                selected: selectedItem == StaffNavItem.taskHistory,
-                onTap: () => onNavItemSelected?.call(StaffNavItem.taskHistory),
               ),
               _BottomNavItem(
                 label: 'Attendance',
