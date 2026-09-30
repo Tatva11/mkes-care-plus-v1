@@ -4,50 +4,67 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/app_footer.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../admin/widgets/admin_shell.dart';
 import '../../admin/screens/administration_screen.dart';
+import '../../inventory/screens/inventory_screen.dart';
 import '../../patients/screens/patient_list_screen.dart';
 import '../../staff/screens/staff_management_screen.dart';
 import '../models/department.dart';
 import '../providers/departments_provider.dart';
 
-class DepartmentManagementScreen extends StatelessWidget {
+class DepartmentManagementScreen extends ConsumerWidget {
   const DepartmentManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return AdminShell(
-      selectedItem: AdminNavItem.operations,
-      onNavItemSelected: (item) {
-        if (item == AdminNavItem.dashboard) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-          return;
-        }
-        if (item == AdminNavItem.patients) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const PatientListScreen(),
-            ),
-          );
-          return;
-        }
-        if (item == AdminNavItem.staff) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const StaffManagementScreen(),
-            ),
-          );
-          return;
-        }
-        if (item == AdminNavItem.administration) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const AdministrationScreen(),
-            ),
-          );
-          return;
-        }
-      },
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(currentUserRoleProvider).valueOrNull;
+
+    if (role == 'admin') {
+      return AdminShell(
+        selectedItem: AdminNavItem.operations,
+        onNavItemSelected: (item) {
+          if (item == AdminNavItem.dashboard) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            return;
+          }
+          if (item == AdminNavItem.patients) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => const PatientListScreen(),
+              ),
+            );
+            return;
+          }
+          if (item == AdminNavItem.staff) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => const StaffManagementScreen(),
+              ),
+            );
+            return;
+          }
+          if (item == AdminNavItem.administration) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => const AdministrationScreen(),
+              ),
+            );
+            return;
+          }
+        },
+        body: const DepartmentManagementContent(),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.surfaceContainerLowest,
+      appBar: AppBar(
+        title: const Text('Department Management'),
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.onSurface,
+        elevation: 0,
+      ),
       body: const DepartmentManagementContent(),
     );
   }
@@ -142,6 +159,18 @@ class _DepartmentManagementContentState
             children: [
               Expanded(child: _buildHeaderTexts()),
               const SizedBox(width: AppSpacing.md),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const InventoryManagementScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                label: const Text('Inventory'),
+              ),
+              const SizedBox(width: AppSpacing.sm),
               FilledButton.icon(
                 onPressed: () => _openDepartmentDialog(),
                 icon: const Icon(Icons.add),

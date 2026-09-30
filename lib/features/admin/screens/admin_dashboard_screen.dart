@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_footer.dart';
-import '../../department/screens/department_management_screen.dart';
 import '../../patients/screens/patient_list_screen.dart';
 import '../../staff/screens/staff_management_screen.dart';
 import 'administration_screen.dart';
 import '../widgets/admin_shell.dart';
 import '../widgets/copilot_insights_card.dart';
 import '../widgets/inventory_alerts_card.dart';
+import '../widgets/operations_tab_content.dart';
 import '../widgets/revenue_growth_card.dart';
 import '../widgets/staff_attendance_card.dart';
 
@@ -52,7 +52,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case AdminNavItem.patients:
         return const PatientListContent();
       case AdminNavItem.operations:
-        return const DepartmentManagementContent();
+        return const OperationsTabContent();
       case AdminNavItem.administration:
         return const AdministrationContent();
     }

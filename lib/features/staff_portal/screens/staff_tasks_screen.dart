@@ -6,18 +6,40 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../inventory/screens/inventory_screen.dart';
+import '../../inventory/screens/purchase_order_list_screen.dart';
 import '../../staff/providers/task_provider.dart';
+import '../../vendors/screens/vendor_management_screen.dart';
 import 'staff_task_history_screen.dart';
 
+enum StaffTaskTab {
+  tasks,
+  inventory,
+  vendors,
+  purchaseOrders,
+}
+
 class StaffTasksScreen extends ConsumerStatefulWidget {
-  const StaffTasksScreen({super.key});
+  const StaffTasksScreen({
+    super.key,
+    this.initialTab = StaffTaskTab.tasks,
+  });
+
+  final StaffTaskTab initialTab;
 
   @override
   ConsumerState<StaffTasksScreen> createState() => _StaffTasksScreenState();
 }
 
 class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
+  late StaffTaskTab _selectedTab;
   int _filterIndex = 0; // 0: All, 1: Pending, 2: Completed
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTab = widget.initialTab;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +47,84 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
     final currentUser = ref.watch(currentUserProvider);
     if (currentUser == null) return const Center(child: CircularProgressIndicator());
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Sub-navigation bar under the Task section: Tasks | Inventory
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            border: Border(
+              bottom: BorderSide(color: AppColors.outlineVariant),
+            ),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                SegmentedButton<StaffTaskTab>(
+                  segments: const [
+                    ButtonSegment<StaffTaskTab>(
+                      value: StaffTaskTab.tasks,
+                      label: Text('Shift Tasks'),
+                      icon: Icon(Icons.task_alt_outlined, size: 16),
+                    ),
+                    ButtonSegment<StaffTaskTab>(
+                      value: StaffTaskTab.inventory,
+                      label: Text('Inventory'),
+                      icon: Icon(Icons.inventory_2_outlined, size: 16),
+                    ),
+                    ButtonSegment<StaffTaskTab>(
+                      value: StaffTaskTab.vendors,
+                      label: Text('Vendors'),
+                      icon: Icon(Icons.local_shipping_outlined, size: 16),
+                    ),
+                    ButtonSegment<StaffTaskTab>(
+                      value: StaffTaskTab.purchaseOrders,
+                      label: Text('Purchase Orders'),
+                      icon: Icon(Icons.receipt_long_outlined, size: 16),
+                    ),
+                  ],
+                  selected: {_selectedTab},
+                  onSelectionChanged: (newSelection) {
+                    setState(() => _selectedTab = newSelection.first);
+                  },
+                  style: SegmentedButton.styleFrom(
+                    selectedBackgroundColor:
+                        AppColors.primaryContainer.withValues(alpha: 0.2),
+                    selectedForegroundColor: AppColors.primary,
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Body content based on selected tab:
+        // Tasks -> Shift checklist, Inventory -> InventoryManagementContent, Vendors -> VendorManagementContent, Purchase Orders -> PurchaseOrderManagementContent
+        Expanded(
+          child: _selectedTab == StaffTaskTab.tasks
+              ? _buildTasksView(isDesktop, currentUser)
+              : _selectedTab == StaffTaskTab.inventory
+                  ? const InventoryManagementContent()
+                  : _selectedTab == StaffTaskTab.vendors
+                      ? const VendorManagementContent()
+                      : const PurchaseOrderManagementContent(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTasksView(bool isDesktop, dynamic currentUser) {
     final tasksAsync = ref.watch(staffTasksProvider(currentUser.id));
 
     return RefreshIndicator(
@@ -55,6 +155,33 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                         icon: const Icon(Icons.refresh),
                         tooltip: 'Refresh tasks',
                         onPressed: () => ref.read(staffTasksProvider(currentUser.id).notifier).fetchTasks(),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _selectedTab = StaffTaskTab.inventory),
+                        icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                        label: const Text('Inventory'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _selectedTab = StaffTaskTab.vendors),
+                        icon: const Icon(Icons.local_shipping_outlined, size: 18),
+                        label: const Text('Vendors'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _selectedTab = StaffTaskTab.purchaseOrders),
+                        icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                        label: const Text('Purchase Orders'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        ),
                       ),
                       const SizedBox(width: AppSpacing.xs),
                       OutlinedButton.icon(
@@ -96,6 +223,33 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                         tooltip: 'Refresh tasks',
                         onPressed: () => ref.read(staffTasksProvider(currentUser.id).notifier).fetchTasks(),
                       ),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _selectedTab = StaffTaskTab.inventory),
+                        icon: const Icon(Icons.inventory_2_outlined, size: 16),
+                        label: const Text('Inventory'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _selectedTab = StaffTaskTab.vendors),
+                        icon: const Icon(Icons.local_shipping_outlined, size: 16),
+                        label: const Text('Vendors'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => _selectedTab = StaffTaskTab.purchaseOrders),
+                        icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                        label: const Text('PO'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
                       OutlinedButton.icon(
                         onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute(

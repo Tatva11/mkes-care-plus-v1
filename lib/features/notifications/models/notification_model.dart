@@ -89,6 +89,10 @@ class NotificationModel {
         return Icons.warning_amber_outlined;
       case 'appointment':
         return Icons.calendar_today_outlined;
+      case 'low_stock':
+        return Icons.warning_amber_rounded;
+      case 'expiry':
+        return Icons.event_busy_outlined;
       case 'system':
         return Icons.info_outline;
       default:
@@ -114,6 +118,10 @@ class NotificationModel {
         return AppColors.error;
       case 'appointment':
         return AppColors.tertiary;
+      case 'low_stock':
+        return AppColors.error;
+      case 'expiry':
+        return const Color(0xFFE65100);
       case 'system':
         return AppColors.onSurfaceVariant;
       default:

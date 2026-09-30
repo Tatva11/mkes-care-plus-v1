@@ -1,0 +1,110 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../department/screens/department_management_screen.dart';
+import '../../inventory/screens/inventory_screen.dart';
+import '../../inventory/screens/purchase_order_list_screen.dart';
+import '../../vendors/screens/vendor_management_screen.dart';
+
+/// Combined operations content providing tab switching between Inventory, Departments, Vendors, and Purchase Orders.
+class OperationsTabContent extends StatefulWidget {
+  const OperationsTabContent({
+    super.key,
+    this.initialTab = 0,
+  });
+
+  /// 0 = Inventory (default), 1 = Departments, 2 = Vendors, 3 = Purchase Orders
+  final int initialTab;
+
+  @override
+  State<OperationsTabContent> createState() => _OperationsTabContentState();
+}
+
+class _OperationsTabContentState extends State<OperationsTabContent> {
+  late int _selectedTab;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTab = widget.initialTab;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Sub-navigation bar
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            border: Border(
+              bottom: BorderSide(color: AppColors.outlineVariant),
+            ),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment<int>(
+                      value: 0,
+                      label: Text('Inventory'),
+                      icon: Icon(Icons.inventory_2_outlined, size: 16),
+                    ),
+                    ButtonSegment<int>(
+                      value: 1,
+                      label: Text('Departments'),
+                      icon: Icon(Icons.business_outlined, size: 16),
+                    ),
+                    ButtonSegment<int>(
+                      value: 2,
+                      label: Text('Vendors'),
+                      icon: Icon(Icons.local_shipping_outlined, size: 16),
+                    ),
+                    ButtonSegment<int>(
+                      value: 3,
+                      label: Text('Purchase Orders'),
+                      icon: Icon(Icons.receipt_long_outlined, size: 16),
+                    ),
+                  ],
+                  selected: {_selectedTab},
+                  onSelectionChanged: (newSelection) {
+                    setState(() => _selectedTab = newSelection.first);
+                  },
+                  style: SegmentedButton.styleFrom(
+                    selectedBackgroundColor:
+                        AppColors.primaryContainer.withValues(alpha: 0.2),
+                    selectedForegroundColor: AppColors.primary,
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Body content based on selected tab
+        Expanded(
+          child: _selectedTab == 0
+              ? const InventoryManagementContent()
+              : _selectedTab == 1
+                  ? const DepartmentManagementContent()
+                  : _selectedTab == 2
+                      ? const VendorManagementContent()
+                      : const PurchaseOrderManagementContent(),
+        ),
+      ],
+    );
+  }
+}
