@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,9 +54,13 @@ class PurchaseOrderFormDialog extends ConsumerStatefulWidget {
   const PurchaseOrderFormDialog({
     super.key,
     this.order,
+    this.preselectedInventoryItem,
+    this.preselectedVendorId,
   });
 
   final PurchaseOrder? order;
+  final InventoryItem? preselectedInventoryItem;
+  final String? preselectedVendorId;
 
   @override
   ConsumerState<PurchaseOrderFormDialog> createState() =>
@@ -86,15 +89,14 @@ class _PurchaseOrderFormDialogState
     super.initState();
     final po = widget.order;
 
-    final autoNumber =
-        'PO-${DateFormat('yyyyMMdd').format(DateTime.now())}-${(100 + Random().nextInt(900))}';
-
     _poNumberController = TextEditingController(
-      text: po?.purchaseOrderNumber ?? autoNumber,
+      text: po?.purchaseOrderNumber ?? '',
     );
     _notesController = TextEditingController(text: po?.notes ?? '');
 
-    _selectedVendorId = po?.vendorId;
+    _selectedVendorId = po?.vendorId ??
+        widget.preselectedVendorId ??
+        widget.preselectedInventoryItem?.vendorId;
     _orderDate = po?.orderDate ?? DateTime.now();
     _expectedDeliveryDate = po?.expectedDeliveryDate;
 
@@ -110,6 +112,16 @@ class _PurchaseOrderFormDialogState
           initialPrice: item.unitPrice,
         ));
       }
+    } else if (widget.preselectedInventoryItem != null) {
+      final item = widget.preselectedInventoryItem!;
+      _items.add(_EditablePOLineItem(
+        inventoryId: item.id,
+        inventoryName: item.name,
+        inventoryUnit: item.unit,
+        inventorySku: item.sku,
+        initialQty: 1.0,
+        initialPrice: item.price ?? 0.0,
+      ));
     } else {
       // Add one blank line item by default
       _items.add(_EditablePOLineItem());
@@ -213,7 +225,7 @@ class _PurchaseOrderFormDialogState
 
       final poOrder = PurchaseOrder(
         id: widget.order?.id ?? '',
-        purchaseOrderNumber: _poNumberController.text.trim(),
+        purchaseOrderNumber: _isEditing ? widget.order!.purchaseOrderNumber : '',
         vendorId: _selectedVendorId!,
         orderDate: _orderDate,
         expectedDeliveryDate: _expectedDeliveryDate,
@@ -307,25 +319,45 @@ class _PurchaseOrderFormDialogState
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'PO NUMBER *',
+                                  _isEditing ? 'PO NUMBER (READ-ONLY)' : 'PO NUMBER (AUTO-GENERATED)',
                                   style: AppTypography.labelCaps.copyWith(
                                     color: AppColors.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(height: AppSpacing.xs),
-                                TextFormField(
-                                  controller: _poNumberController,
-                                  decoration: InputDecoration(
-                                    prefixIcon: const Icon(
-                                      Icons.tag,
-                                      size: 20,
-                                      color: AppColors.onSurfaceVariant,
-                                    ),
-                                    fillColor: AppColors.surfaceContainerLow,
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.md,
+                                    vertical: 14,
                                   ),
-                                  validator: (v) => (v == null || v.trim().isEmpty)
-                                      ? 'PO number is required'
-                                      : null,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                    border: Border.all(color: AppColors.outlineVariant),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.tag,
+                                        size: 18,
+                                        color: AppColors.primary,
+                                      ),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Expanded(
+                                        child: Text(
+                                          _isEditing
+                                              ? widget.order!.purchaseOrderNumber
+                                              : 'Auto: PO-${DateFormat('ddMMyyyy').format(DateTime.now())}-XXXX',
+                                          style: AppTypography.bodyMd.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.onSurface,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -344,8 +376,10 @@ class _PurchaseOrderFormDialogState
                                 ),
                                 const SizedBox(height: AppSpacing.xs),
                                 DropdownButtonFormField<String>(
+                                  key: const Key('po_vendor_dropdown'),
                                   isExpanded: true,
                                   initialValue: _selectedVendorId,
+                                  hint: const Text('Select Supplier *'),
                                   decoration: InputDecoration(
                                     prefixIcon: const Icon(
                                       Icons.local_shipping_outlined,
@@ -353,7 +387,7 @@ class _PurchaseOrderFormDialogState
                                       color: AppColors.onSurfaceVariant,
                                     ),
                                     fillColor: AppColors.surfaceContainerLow,
-                                    hintText: 'Select supplier / vendor',
+                                    hintText: 'Select Supplier *',
                                   ),
                                   items: allVendors.map((v) {
                                     return DropdownMenuItem<String>(

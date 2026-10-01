@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show User;
 
 import 'package:mkes_care/features/auth/providers/auth_provider.dart';
+import 'package:mkes_care/features/inventory/models/inventory_batch.dart';
 import 'package:mkes_care/features/inventory/models/inventory_item.dart';
 import 'package:mkes_care/features/inventory/models/inventory_transaction.dart';
 import 'package:mkes_care/features/inventory/repositories/inventory_repository.dart';
@@ -228,6 +229,12 @@ class FakeInventoryRepository implements InventoryRepository {
     }
     return list.take(limit).toList();
   }
+
+  @override
+  Future<List<InventoryBatch>> getInventoryBatches(String inventoryId) async => [];
+
+  @override
+  Future<List<InventoryBatch>> getBatchesForPO(String purchaseOrderId) async => [];
 }
 
 void main() {

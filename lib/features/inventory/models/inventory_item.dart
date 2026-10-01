@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import 'inventory_batch.dart';
 
 /// Expiry status calculation based on current date.
 enum ExpiryStatus {
@@ -60,6 +61,7 @@ class InventoryItem {
   final String? vendorPhone;
   final double? lastQuantitySupplied;
   final double? lastTotalAmount;
+  final List<InventoryBatch>? batches;
   final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -82,6 +84,7 @@ class InventoryItem {
     this.vendorPhone,
     this.lastQuantitySupplied,
     this.lastTotalAmount,
+    this.batches,
     this.isActive = true,
     this.createdAt,
     this.updatedAt,
@@ -140,12 +143,28 @@ class InventoryItem {
     return '$minStr $unit';
   }
 
-  /// Calculates expiry status relative to today.
+  /// Returns the effective earliest expiry date among active batches,
+  /// falling back to [expiryDate] if no active batches with expiry exist.
+  DateTime? get effectiveExpiryDate {
+    if (batches != null && batches!.isNotEmpty) {
+      final activeWithExpiry = batches!
+          .where((b) => b.remainingQuantity > 0 && b.expiryDate != null)
+          .toList();
+      if (activeWithExpiry.isNotEmpty) {
+        activeWithExpiry.sort((a, b) => a.expiryDate!.compareTo(b.expiryDate!));
+        return activeWithExpiry.first.expiryDate;
+      }
+    }
+    return expiryDate;
+  }
+
+  /// Calculates expiry status relative to today based on batches (or expiryDate).
   ExpiryStatus get expiryStatus {
-    if (expiryDate == null) return ExpiryStatus.none;
+    final expDate = effectiveExpiryDate;
+    if (expDate == null) return ExpiryStatus.none;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final exp = DateTime(expiryDate!.year, expiryDate!.month, expiryDate!.day);
+    final exp = DateTime(expDate.year, expDate.month, expDate.day);
     final diffInDays = exp.difference(today).inDays;
     if (diffInDays < 0) return ExpiryStatus.expired;
     if (diffInDays <= 30) return ExpiryStatus.expiringSoon;
@@ -154,10 +173,11 @@ class InventoryItem {
 
   /// Number of days remaining until expiry (negative if already expired).
   int? get daysUntilExpiry {
-    if (expiryDate == null) return null;
+    final expDate = effectiveExpiryDate;
+    if (expDate == null) return null;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final exp = DateTime(expiryDate!.year, expiryDate!.month, expiryDate!.day);
+    final exp = DateTime(expDate.year, expDate.month, expDate.day);
     return exp.difference(today).inDays;
   }
 
@@ -268,6 +288,15 @@ class InventoryItem {
       vPhone ??= vMap['phone']?.toString();
     }
 
+    // Inventory batches deserialization if joined or provided
+    final rawBatches = json['inventory_batches'] ?? json['batches'];
+    List<InventoryBatch>? parsedBatches;
+    if (rawBatches is List) {
+      parsedBatches = rawBatches
+          .map((b) => InventoryBatch.fromJson(b as Map<String, dynamic>))
+          .toList();
+    }
+
     return InventoryItem(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
@@ -288,6 +317,7 @@ class InventoryItem {
       vendorPhone: vPhone,
       lastQuantitySupplied: lastQtyVal,
       lastTotalAmount: lastTotalVal,
+      batches: parsedBatches,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: parseDate(json['created_at']),
       updatedAt: parseDate(json['updated_at']),
@@ -360,6 +390,7 @@ class InventoryItem {
     String? vendorPhone,
     double? lastQuantitySupplied,
     double? lastTotalAmount,
+    List<InventoryBatch>? batches,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -382,6 +413,7 @@ class InventoryItem {
       vendorPhone: vendorPhone ?? this.vendorPhone,
       lastQuantitySupplied: lastQuantitySupplied ?? this.lastQuantitySupplied,
       lastTotalAmount: lastTotalAmount ?? this.lastTotalAmount,
+      batches: batches ?? this.batches,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

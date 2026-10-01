@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_provider.dart';
+import '../models/inventory_batch.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_transaction.dart';
 
@@ -285,4 +286,48 @@ class InventoryRepository {
       rethrow;
     }
   }
+
+  /// Fetches all active inventory batches for a specific product [inventoryId].
+  Future<List<InventoryBatch>> getInventoryBatches(String inventoryId) async {
+    try {
+      final response = await _supabase
+          .from('inventory_batches')
+          .select('*, vendors(name), purchase_orders(purchase_order_number)')
+          .eq('inventory_id', inventoryId)
+          .order('expiry_date', ascending: true)
+          .order('received_date', ascending: false);
+
+      return (response as List)
+          .map((json) => InventoryBatch.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on PostgrestException catch (e) {
+      debugPrint('InventoryRepository.getInventoryBatches PostgrestException: ${e.message}');
+      throw Exception('Database error loading inventory batches: ${e.message}');
+    } catch (e) {
+      debugPrint('InventoryRepository.getInventoryBatches error: $e');
+      rethrow;
+    }
+  }
+
+  /// Fetches all received batches associated with a [purchaseOrderId].
+  Future<List<InventoryBatch>> getBatchesForPO(String purchaseOrderId) async {
+    try {
+      final response = await _supabase
+          .from('inventory_batches')
+          .select('*, inventory(name, unit, sku), vendors(name)')
+          .eq('purchase_order_id', purchaseOrderId)
+          .order('received_date', ascending: false);
+
+      return (response as List)
+          .map((json) => InventoryBatch.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on PostgrestException catch (e) {
+      debugPrint('InventoryRepository.getBatchesForPO PostgrestException: ${e.message}');
+      throw Exception('Database error loading PO batches: ${e.message}');
+    } catch (e) {
+      debugPrint('InventoryRepository.getBatchesForPO error: $e');
+      rethrow;
+    }
+  }
 }
+

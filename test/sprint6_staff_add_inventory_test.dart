@@ -7,6 +7,7 @@ import 'package:mkes_care/features/auth/providers/auth_provider.dart';
 import 'package:mkes_care/features/department/models/department.dart';
 import 'package:mkes_care/features/department/repositories/department_repository.dart';
 import 'package:mkes_care/features/department/screens/department_management_screen.dart';
+import 'package:mkes_care/features/inventory/models/inventory_batch.dart';
 import 'package:mkes_care/features/inventory/models/inventory_item.dart';
 import 'package:mkes_care/features/inventory/models/inventory_transaction.dart';
 import 'package:mkes_care/features/inventory/repositories/inventory_repository.dart';
@@ -202,6 +203,12 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
     }
     return result.take(limit).toList();
   }
+
+  @override
+  Future<List<InventoryBatch>> getInventoryBatches(String inventoryId) async => [];
+
+  @override
+  Future<List<InventoryBatch>> getBatchesForPO(String purchaseOrderId) async => [];
 }
 
 /// In-memory FakeDepartmentRepository for department operations.

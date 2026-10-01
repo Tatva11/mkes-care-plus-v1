@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/inventory_batch.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_transaction.dart';
 import '../repositories/inventory_repository.dart';
@@ -208,3 +209,18 @@ final itemTransactionsProvider =
   final repository = ref.watch(inventoryRepositoryProvider);
   return repository.getTransactionHistory(id);
 });
+
+/// Provider for fetching active inventory batches for a specific product.
+final itemBatchesProvider =
+    FutureProvider.family<List<InventoryBatch>, String>((ref, id) async {
+  final repository = ref.watch(inventoryRepositoryProvider);
+  return repository.getInventoryBatches(id);
+});
+
+/// Provider for fetching inventory batches received under a specific Purchase Order.
+final poBatchesProvider =
+    FutureProvider.family<List<InventoryBatch>, String>((ref, poId) async {
+  final repository = ref.watch(inventoryRepositoryProvider);
+  return repository.getBatchesForPO(poId);
+});
+

@@ -271,6 +271,36 @@ class PurchaseOrder {
   bool get isReceived => status == PurchaseOrderStatus.received;
   bool get isCancelled => status == PurchaseOrderStatus.cancelled;
 
+  /// Formats a standardized PO number: PO-DDMMYYYY-0001 based on actual creation date.
+  static String formatPoNumber(DateTime creationDate, int sequence) {
+    final dd = creationDate.day.toString().padLeft(2, '0');
+    final mm = creationDate.month.toString().padLeft(2, '0');
+    final yyyy = creationDate.year.toString();
+    final seqStr = sequence.toString().padLeft(4, '0');
+    return 'PO-$dd$mm$yyyy-$seqStr';
+  }
+
+  /// Parses date components from a PO number string (PO-DDMMYYYY-0001).
+  /// Returns null if format does not match.
+  static DateTime? parsePoNumberDate(String poNumber) {
+    final regex = RegExp(r'^PO-(\d{2})(\d{2})(\d{4})-(\d{4})$');
+    final match = regex.firstMatch(poNumber.trim());
+    if (match == null) return null;
+    final day = int.tryParse(match.group(1)!);
+    final month = int.tryParse(match.group(2)!);
+    final year = int.tryParse(match.group(3)!);
+    if (day == null || month == null || year == null) return null;
+    return DateTime(year, month, day);
+  }
+
+  /// Extracts the sequence number from a PO number string (PO-DDMMYYYY-0001).
+  static int? parsePoNumberSequence(String poNumber) {
+    final regex = RegExp(r'^PO-\d{8}-(\d{4})$');
+    final match = regex.firstMatch(poNumber.trim());
+    if (match == null) return null;
+    return int.tryParse(match.group(1)!);
+  }
+
   /// Returns true if expected delivery date is null or on/after order date (date-only comparison).
   bool get hasValidDates {
     if (expectedDeliveryDate == null) return true;

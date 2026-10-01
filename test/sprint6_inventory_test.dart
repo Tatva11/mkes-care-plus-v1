@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mkes_care/features/auth/providers/auth_provider.dart';
+import 'package:mkes_care/features/inventory/models/inventory_batch.dart';
 import 'package:mkes_care/features/inventory/models/inventory_item.dart';
 import 'package:mkes_care/features/inventory/models/inventory_transaction.dart';
 import 'package:mkes_care/features/inventory/providers/inventory_provider.dart';
@@ -217,6 +218,12 @@ class FakeInventoryRepository implements InventoryRepository {
     }
     return result.take(limit).toList();
   }
+
+  @override
+  Future<List<InventoryBatch>> getInventoryBatches(String inventoryId) async => [];
+
+  @override
+  Future<List<InventoryBatch>> getBatchesForPO(String purchaseOrderId) async => [];
 }
 
 class FakePatientsNotifier extends StateNotifier<AsyncValue<List<PatientModel>>>

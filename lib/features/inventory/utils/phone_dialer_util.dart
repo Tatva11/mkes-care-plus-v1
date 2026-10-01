@@ -59,4 +59,8 @@ class PhoneDialerUtil {
       return false;
     }
   }
+
+  /// Alias for [openDialer] for backward compatibility.
+  static Future<bool> launchDialer(BuildContext context, String? phoneNumber) =>
+      openDialer(context, phoneNumber);
 }

@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/purchase_order.dart';
+import '../providers/inventory_provider.dart';
 import '../providers/purchase_order_provider.dart';
 
-/// Line item state for the Receive Purchase Order dialog.
+/// Line item state for the Receive Purchase Order dialog with batch expiry date.
 class _ReceiveLineState {
   _ReceiveLineState({
     required this.item,
+    this.requiresExpiry = false,
   }) {
-    // Default to receiving all remaining items for quick full receiving
     controller = TextEditingController(
       text: item.remainingQuantity % 1 == 0
           ? item.remainingQuantity.toInt().toString()
@@ -22,7 +24,9 @@ class _ReceiveLineState {
   }
 
   final PurchaseOrderItem item;
+  final bool requiresExpiry;
   late TextEditingController controller;
+  DateTime? expiryDate;
 
   double get receiveQuantity => double.tryParse(controller.text.trim()) ?? 0.0;
   double get batchAmount => receiveQuantity * item.unitPrice;
@@ -57,9 +61,21 @@ class _ReceivePurchaseOrderDialogState
   @override
   void initState() {
     super.initState();
+    final allInventory = ref.read(inventoryProvider).value ?? [];
     _lines = widget.order.items
         .where((i) => i.remainingQuantity > 0)
-        .map((i) => _ReceiveLineState(item: i))
+        .map((i) {
+          final invItem = allInventory.where((inv) => inv.id == i.inventoryId).firstOrNull;
+          final requiresExpiry = invItem != null && (
+            invItem.expiryDate != null ||
+            ['pharmaceuticals', 'clinical supplies', 'dental materials', 'lab & diagnostics']
+                .contains(invItem.category.toLowerCase())
+          );
+          return _ReceiveLineState(
+            item: i,
+            requiresExpiry: requiresExpiry,
+          );
+        })
         .toList();
   }
 
@@ -105,6 +121,9 @@ class _ReceivePurchaseOrderDialogState
       return;
     }
 
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
     for (final line in _lines) {
       final qty = line.receiveQuantity;
       if (qty < 0) {
@@ -116,6 +135,25 @@ class _ReceivePurchaseOrderDialogState
             'Cannot receive more than remaining quantity (${line.item.formattedRemainingQuantity}) for "${line.item.inventoryName}".');
         return;
       }
+      if (qty > 0) {
+        if (line.requiresExpiry && line.expiryDate == null) {
+          setState(() => _errorMessage =
+              'Expiry date is mandatory for "${line.item.inventoryName}".');
+          return;
+        }
+        if (line.expiryDate != null) {
+          final expDateOnly = DateTime(
+            line.expiryDate!.year,
+            line.expiryDate!.month,
+            line.expiryDate!.day,
+          );
+          if (expDateOnly.isBefore(today)) {
+            setState(() => _errorMessage =
+                'Expiry date for "${line.item.inventoryName}" cannot be before the receiving date.');
+            return;
+          }
+        }
+      }
     }
 
     setState(() => _isLoading = true);
@@ -126,6 +164,8 @@ class _ReceivePurchaseOrderDialogState
           .map((l) => {
                 'item_id': l.item.id,
                 'receive_quantity': l.receiveQuantity,
+                if (l.expiryDate != null)
+                  'expiry_date': l.expiryDate!.toIso8601String().split('T').first,
               })
           .toList();
 
@@ -403,6 +443,7 @@ class _ReceivePurchaseOrderDialogState
 
   Widget _buildReceiveLineCard(_ReceiveLineState line) {
     final item = line.item;
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
@@ -411,66 +452,160 @@ class _ReceivePurchaseOrderDialogState
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(color: AppColors.outlineVariant),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Product name and quantities overview
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.inventoryName,
-                  style: AppTypography.bodyMd.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: 2,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Product name and quantities overview
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Ordered: ${item.formattedQuantity}',
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.onSurfaceVariant,
+                      item.inventoryName,
+                      style: AppTypography.bodyMd.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    Text(
-                      'Received: ${item.formattedReceivedQuantity}',
-                      style: AppTypography.bodySm.copyWith(
-                        color: Colors.green.shade700,
-                      ),
-                    ),
-                    Text(
-                      'Remaining: ${item.formattedRemainingQuantity}',
-                      style: AppTypography.bodySm.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFFE65100),
-                      ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: 2,
+                      children: [
+                        Text(
+                          'Ordered: ${item.formattedQuantity}',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          'Received: ${item.formattedReceivedQuantity}',
+                          style: AppTypography.bodySm.copyWith(
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                        Text(
+                          'Remaining: ${item.formattedRemainingQuantity}',
+                          style: AppTypography.bodySm.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFFE65100),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-
-          // Input for receive quantity
-          SizedBox(
-            width: 130,
-            child: TextFormField(
-              controller: line.controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-              ],
-              decoration: InputDecoration(
-                labelText: 'Receive (${item.inventoryUnit})',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               ),
-              onChanged: (_) => setState(() {}),
-            ),
+              const SizedBox(width: AppSpacing.sm),
+
+              // Input for receive quantity
+              SizedBox(
+                width: 120,
+                child: TextFormField(
+                  controller: line.controller,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Receive (${item.inventoryUnit})',
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          const Divider(height: 12, color: AppColors.outlineVariant),
+
+          // Expiry Date Selection Row
+          Row(
+            children: [
+              Icon(
+                Icons.event_available_outlined,
+                size: 16,
+                color: line.requiresExpiry ? AppColors.error : AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                line.requiresExpiry ? 'BATCH EXPIRY DATE *' : 'BATCH EXPIRY DATE (OPTIONAL)',
+                style: AppTypography.labelCaps.copyWith(
+                  color: line.requiresExpiry ? AppColors.error : AppColors.onSurfaceVariant,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () async {
+                  final initialTarget = line.expiryDate != null && !line.expiryDate!.isBefore(today)
+                      ? line.expiryDate!
+                      : today.add(const Duration(days: 365));
+
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initialTarget,
+                    firstDate: today, // Cannot be before receiving date
+                    lastDate: DateTime(2045),
+                    helpText: 'SELECT BATCH EXPIRY DATE',
+                  );
+
+                  if (picked != null) {
+                    setState(() => line.expiryDate = picked);
+                  }
+                },
+                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: line.expiryDate != null
+                        ? Colors.green.shade50
+                        : (line.requiresExpiry ? Colors.red.shade50 : AppColors.surfaceContainerHigh),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    border: Border.all(
+                      color: line.expiryDate != null
+                          ? Colors.green.shade400
+                          : (line.requiresExpiry ? Colors.red.shade300 : AppColors.outline),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.calendar_month_outlined,
+                        size: 14,
+                        color: line.expiryDate != null
+                            ? Colors.green.shade800
+                            : (line.requiresExpiry ? Colors.red.shade800 : AppColors.onSurfaceVariant),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        line.expiryDate != null
+                            ? DateFormat('dd/MM/yyyy').format(line.expiryDate!)
+                            : (line.requiresExpiry ? 'Select Expiry Date *' : 'Set Expiry Date'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: line.expiryDate != null
+                              ? Colors.green.shade800
+                              : (line.requiresExpiry ? Colors.red.shade800 : AppColors.onSurfaceVariant),
+                        ),
+                      ),
+                      if (line.expiryDate != null) ...[
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => setState(() => line.expiryDate = null),
+                          child: Icon(Icons.close, size: 14, color: Colors.green.shade800),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

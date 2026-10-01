@@ -110,6 +110,49 @@ class PurchaseOrderRepository {
         poData['created_by'] = currentUserId;
       }
 
+      // Concurrency-safe daily PO number generation: PO-DDMMYYYY-0001
+      String poNum = order.purchaseOrderNumber.trim();
+      if (poNum.isEmpty || poNum == 'AUTO' || poNum.startsWith('TEMP-')) {
+        try {
+          final res = await client.rpc('generate_po_number');
+          if (res != null && res.toString().isNotEmpty) {
+            poNum = res.toString();
+          }
+        } catch (_) {
+          // If RPC is not available in DB, generate compliant PO-DDMMYYYY-0001 using actual creation date
+          final today = DateTime.now();
+          final dayStr = today.day.toString().padLeft(2, '0');
+          final monthStr = today.month.toString().padLeft(2, '0');
+          final dateStr = '$dayStr$monthStr${today.year}';
+          final prefix = 'PO-$dateStr-';
+
+          int nextSeq = 1;
+          try {
+            final existing = await client
+                .from('purchase_orders')
+                .select('purchase_order_number')
+                .ilike('purchase_order_number', '$prefix%')
+                .order('purchase_order_number', ascending: false)
+                .limit(1);
+
+            if (existing.isNotEmpty) {
+              final last = existing.first['purchase_order_number'] as String?;
+              if (last != null) {
+                final parts = last.split('-');
+                if (parts.length >= 3) {
+                  final parsed = int.tryParse(parts[2]);
+                  if (parsed != null) nextSeq = parsed + 1;
+                }
+              }
+            }
+          } catch (_) {}
+
+          poNum = '$prefix${nextSeq.toString().padLeft(4, '0')}';
+        }
+      }
+
+      poData['purchase_order_number'] = poNum;
+
       final createdPoJson = await client
           .from('purchase_orders')
           .insert(poData)
@@ -136,6 +179,7 @@ class PurchaseOrderRepository {
   }
 
   /// Updates an existing draft or ordered purchase order and replaces its items.
+  /// Preserves the original purchase order number (strictly immutable).
   Future<PurchaseOrder> updatePurchaseOrder(
     PurchaseOrder order,
     List<PurchaseOrderItem> items,
@@ -153,6 +197,9 @@ class PurchaseOrderRepository {
       updateData['subtotal'] = total;
       updateData['total_amount'] = total;
       updateData['updated_at'] = DateTime.now().toUtc().toIso8601String();
+
+      // Ensure purchase_order_number is NEVER modified on update (guarantees immutability)
+      updateData.remove('purchase_order_number');
 
       await client
           .from('purchase_orders')

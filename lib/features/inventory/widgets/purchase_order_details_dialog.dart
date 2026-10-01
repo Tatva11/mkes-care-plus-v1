@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/purchase_order.dart';
+import '../providers/inventory_provider.dart';
 import '../providers/purchase_order_provider.dart';
 import 'purchase_order_form_dialog.dart';
 import 'receive_purchase_order_dialog.dart';
@@ -196,6 +197,10 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
 
                     // Products Line Items Table
                     _buildLineItemsSection(activeOrder),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // Received Batches & Expiry Dates Section
+                    _buildReceivedBatchesSection(context, ref, activeOrder, dateFormat),
                     const SizedBox(height: AppSpacing.md),
 
                     // Notes / Audit info
@@ -547,6 +552,157 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
                     ),
                   ],
                 ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReceivedBatchesSection(
+    BuildContext context,
+    WidgetRef ref,
+    PurchaseOrder po,
+    DateFormat dateFormat,
+  ) {
+    if (po.totalReceivedQuantity <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    final batchesAsync = ref.watch(poBatchesProvider(po.id));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'RECEIVED BATCHES & EXPIRY DATES',
+              style: AppTypography.labelCaps.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: AppColors.outlineVariant),
+          ),
+          child: batchesAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(AppSpacing.sm),
+              child: Center(
+                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Text('Unable to load batches: $e', style: AppTypography.bodySm.copyWith(color: AppColors.error)),
+            ),
+            data: (batches) {
+              if (batches.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  child: Text(
+                    'No individual batch records logged yet.',
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: batches.length,
+                separatorBuilder: (_, __) => const Divider(height: 12, color: AppColors.outlineVariant),
+                itemBuilder: (context, index) {
+                  final b = batches[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          ),
+                          child: const Icon(Icons.qr_code_2_outlined, size: 20, color: AppColors.primary),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    b.batchNumber,
+                                    style: AppTypography.bodyMd.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: b.expiryStatusColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: b.expiryStatusColor),
+                                    ),
+                                    child: Text(
+                                      b.expiryStatusLabel,
+                                      style: TextStyle(
+                                        color: b.expiryStatusColor,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${b.inventoryName ?? 'Product'} • Received: ${b.formattedReceivedQuantity} • Left: ${b.formattedRemainingQuantity}',
+                                style: AppTypography.bodySm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                'Received: ${b.formattedReceivedDate} • Expiry: ${b.formattedExpiryDate}',
+                                style: AppTypography.bodySm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          b.formattedUnitPrice,
+                          style: AppTypography.bodySm.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               );
             },
           ),
