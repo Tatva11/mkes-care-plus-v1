@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../dental/screens/dental_lab_screen.dart';
 import '../../inventory/screens/inventory_screen.dart';
 import '../../inventory/screens/purchase_order_list_screen.dart';
 import '../../staff/providers/task_provider.dart';
@@ -17,6 +18,7 @@ enum StaffTaskTab {
   inventory,
   vendors,
   purchaseOrders,
+  dentalLab,
 }
 
 class StaffTasksScreen extends ConsumerStatefulWidget {
@@ -88,6 +90,11 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                       label: Text('Purchase Orders'),
                       icon: Icon(Icons.receipt_long_outlined, size: 16),
                     ),
+                    ButtonSegment<StaffTaskTab>(
+                      value: StaffTaskTab.dentalLab,
+                      label: Text('Dental Lab'),
+                      icon: Icon(Icons.biotech_outlined, size: 16),
+                    ),
                   ],
                   selected: {_selectedTab},
                   onSelectionChanged: (newSelection) {
@@ -110,7 +117,7 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
         ),
 
         // Body content based on selected tab:
-        // Tasks -> Shift checklist, Inventory -> InventoryManagementContent, Vendors -> VendorManagementContent, Purchase Orders -> PurchaseOrderManagementContent
+        // Tasks -> Shift checklist, Inventory -> InventoryManagementContent, Vendors -> VendorManagementContent, Purchase Orders -> PurchaseOrderManagementContent, Dental Lab -> DentalLabContent
         Expanded(
           child: _selectedTab == StaffTaskTab.tasks
               ? _buildTasksView(isDesktop, currentUser)
@@ -118,7 +125,9 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                   ? const InventoryManagementContent()
                   : _selectedTab == StaffTaskTab.vendors
                       ? const VendorManagementContent()
-                      : const PurchaseOrderManagementContent(),
+                      : _selectedTab == StaffTaskTab.purchaseOrders
+                          ? const PurchaseOrderManagementContent()
+                          : const DentalLabContent(),
         ),
       ],
     );

@@ -10,6 +10,9 @@ import '../models/patient_model.dart';
 import '../providers/patient_attendance_provider.dart';
 import '../providers/patients_provider.dart';
 import '../widgets/patient_form_dialog.dart';
+import '../../dental/providers/dental_lab_provider.dart';
+import '../../dental/widgets/dental_lab_form_dialog.dart';
+import '../../dental/widgets/dental_lab_whatsapp_dialog.dart';
 
 /// Screen displaying complete details for a single patient, including
 /// personal/contact information and their attendance history.
@@ -80,6 +83,7 @@ class PatientDetailsScreen extends ConsumerWidget {
           onRefresh: () async {
             ref.invalidate(patientDetailsProvider(patientId));
             ref.invalidate(patientAttendanceHistoryProvider(patientId));
+            ref.invalidate(dentalLabListProvider);
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -91,6 +95,11 @@ class PatientDetailsScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.md),
                 _buildInfoCard(patient),
                 const SizedBox(height: AppSpacing.lg),
+                if (patient.department == 'dental' ||
+                    ref.watch(patientDentalLabCasesProvider(patient.id)).isNotEmpty) ...[
+                  _buildDentalLabSection(context, ref, patient),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
                 _buildAttendanceHistorySection(ref, historyAsync),
               ],
             ),
@@ -463,6 +472,185 @@ class PatientDetailsScreen extends ConsumerWidget {
             );
           },
         ),
+      ],
+    );
+  }
+
+  Widget _buildDentalLabSection(
+    BuildContext context,
+    WidgetRef ref,
+    PatientModel patient,
+  ) {
+    final labCases = ref.watch(patientDentalLabCasesProvider(patient.id));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'DENTAL LAB TRACKING',
+              style: AppTypography.labelCaps.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => DentalLabFormDialog(preselectedPatient: patient),
+                );
+              },
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('New Lab Case'),
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        if (labCases.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(color: AppColors.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.biotech_outlined,
+                  size: 28,
+                  color: AppColors.outline.withValues(alpha: 0.5),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'No dental lab orders recorded for this patient.',
+                    style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(color: AppColors.outlineVariant),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: labCases.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, color: AppColors.outlineVariant),
+              itemBuilder: (context, index) {
+                final item = labCases[index];
+                final sentFormatted = DateFormat('d MMM yyyy').format(item.sentDate);
+
+                Color badgeBg;
+                Color badgeFg;
+                if (item.isProcessing) {
+                  badgeBg = Colors.amber.shade100;
+                  badgeFg = Colors.amber.shade900;
+                } else if (item.isReady) {
+                  badgeBg = AppColors.secondaryContainer.withValues(alpha: 0.3);
+                  badgeFg = AppColors.secondary;
+                } else {
+                  badgeBg = Colors.green.shade100;
+                  badgeFg = Colors.green.shade800;
+                }
+
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
+                  ),
+                  leading: CircleAvatar(
+                    backgroundColor: badgeBg,
+                    radius: 20,
+                    child: Icon(
+                      item.isDelivered
+                          ? Icons.check_circle
+                          : item.isReady
+                              ? Icons.verified
+                              : Icons.hourglass_top,
+                      color: badgeFg,
+                      size: 20,
+                    ),
+                  ),
+                  title: Row(
+                    children: [
+                      Text(
+                        item.caseNumber,
+                        style: AppTypography.dataMono.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        item.caseType,
+                        style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  subtitle: Text(
+                    'Sent: $sentFormatted${item.readyDate != null ? " • Ready: ${DateFormat('d MMM').format(item.readyDate!)}" : ""}${item.deliveredDate != null ? " • Delivered: ${DateFormat('d MMM').format(item.deliveredDate!)}" : ""}',
+                    style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (item.isReady)
+                        IconButton(
+                          icon: const Icon(Icons.message, color: Color(0xFF25D366), size: 20),
+                          tooltip: 'WhatsApp Ready Notice',
+                          onPressed: () => DentalLabWhatsAppDialog.show(context, item),
+                        ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: badgeBg,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        ),
+                        child: Text(
+                          item.statusLabel.toUpperCase(),
+                          style: AppTypography.labelCaps.copyWith(
+                            color: badgeFg,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => DentalLabFormDialog(initialCase: item),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
       ],
     );
   }

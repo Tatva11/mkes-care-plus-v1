@@ -3,18 +3,19 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../department/screens/department_management_screen.dart';
+import '../../dental/screens/dental_lab_screen.dart';
 import '../../inventory/screens/inventory_screen.dart';
 import '../../inventory/screens/purchase_order_list_screen.dart';
 import '../../vendors/screens/vendor_management_screen.dart';
 
-/// Combined operations content providing tab switching between Inventory, Departments, Vendors, and Purchase Orders.
+/// Combined operations content providing tab switching between Inventory, Departments, Vendors, Purchase Orders, and Dental Lab.
 class OperationsTabContent extends StatefulWidget {
   const OperationsTabContent({
     super.key,
     this.initialTab = 0,
   });
 
-  /// 0 = Inventory (default), 1 = Departments, 2 = Vendors, 3 = Purchase Orders
+  /// 0 = Inventory (default), 1 = Departments, 2 = Vendors, 3 = Purchase Orders, 4 = Dental Lab
   final int initialTab;
 
   @override
@@ -73,6 +74,11 @@ class _OperationsTabContentState extends State<OperationsTabContent> {
                       label: Text('Purchase Orders'),
                       icon: Icon(Icons.receipt_long_outlined, size: 16),
                     ),
+                    ButtonSegment<int>(
+                      value: 4,
+                      label: Text('Dental Lab'),
+                      icon: Icon(Icons.biotech_outlined, size: 16),
+                    ),
                   ],
                   selected: {_selectedTab},
                   onSelectionChanged: (newSelection) {
@@ -102,7 +108,9 @@ class _OperationsTabContentState extends State<OperationsTabContent> {
                   ? const DepartmentManagementContent()
                   : _selectedTab == 2
                       ? const VendorManagementContent()
-                      : const PurchaseOrderManagementContent(),
+                      : _selectedTab == 3
+                          ? const PurchaseOrderManagementContent()
+                          : const DentalLabContent(),
         ),
       ],
     );
