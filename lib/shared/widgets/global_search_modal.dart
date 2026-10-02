@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../features/inventory/screens/inventory_screen.dart';
 import '../../../shared/widgets/mkes_text_field.dart';
 
 Future<void> showGlobalSearchModal(BuildContext context) {
@@ -94,7 +95,14 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
                       icon: Icons.inventory_2_outlined,
                       title: 'Progressive Lenses (CR-39)',
                       subtitle: 'Inventory • Low Stock',
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const InventoryManagementScreen(),
+                          ),
+                        );
+                      },
                     ),
                     _SearchGroupHeading('Suggested Actions'),
                     _SearchResultItem(

@@ -7,6 +7,13 @@ class TaskItem {
     'cancelled',
   ];
 
+  static const List<String> validPriorities = [
+    'low',
+    'medium',
+    'high',
+    'critical',
+  ];
+
   final String id;
   final String title;
   final String? description;
@@ -34,6 +41,36 @@ class TaskItem {
     required this.updatedAt,
     this.completedAt,
   });
+
+  TaskItem copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? assignedTo,
+    String? assignedBy,
+    String? staffName,
+    DateTime? dueDate,
+    String? priority,
+    String? status,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? completedAt,
+  }) {
+    return TaskItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      assignedTo: assignedTo ?? this.assignedTo,
+      assignedBy: assignedBy ?? this.assignedBy,
+      staffName: staffName ?? this.staffName,
+      dueDate: dueDate ?? this.dueDate,
+      priority: priority ?? this.priority,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      completedAt: completedAt ?? this.completedAt,
+    );
+  }
 
   factory TaskItem.fromJson(Map<String, dynamic> json) {
     final profiles = json['profiles'];

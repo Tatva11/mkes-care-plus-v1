@@ -10,6 +10,7 @@ import '../../staff/models/task_item.dart';
 import '../../staff/providers/task_provider.dart';
 import '../models/user_profile.dart';
 import '../providers/users_provider.dart';
+import '../widgets/task_form_dialog.dart';
 
 /// Screen displaying the complete admin task history and performance breakdown.
 ///
@@ -46,6 +47,16 @@ class _AdminTaskHistoryScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Task History & Performance'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: () {
+              ref.read(adminTasksProvider.notifier).fetchTasks();
+              ref.read(usersProvider.notifier).fetchUsers();
+            },
+          ),
+        ],
       ),
       body: tasksAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -439,6 +450,19 @@ class _AdminTaskHistoryScreenState
                       fontSize: 10,
                     ),
                   ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                  tooltip: 'Edit Task',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => TaskFormDialog(task: task),
+                    );
+                  },
                 ),
               ],
             ),

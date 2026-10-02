@@ -3,16 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/leave_request.dart';
 import '../repositories/leave_repository.dart';
 
-final staffLeaveRequestsProvider = StateNotifierProvider.family<StaffLeaveNotifier, AsyncValue<List<LeaveRequest>>, String>((ref, staffId) {
+// ---------------------------------------------------------------------------
+// Staff-facing: their own leave requests.
+// ---------------------------------------------------------------------------
+final staffLeaveRequestsProvider = StateNotifierProvider.family<
+    StaffLeaveNotifier,
+    AsyncValue<List<LeaveRequest>>,
+    String>((ref, staffId) {
   final repo = ref.watch(leaveRepositoryProvider);
   return StaffLeaveNotifier(repo, staffId);
 });
 
-class StaffLeaveNotifier extends StateNotifier<AsyncValue<List<LeaveRequest>>> {
+class StaffLeaveNotifier
+    extends StateNotifier<AsyncValue<List<LeaveRequest>>> {
   final LeaveRepository _repository;
   final String _staffId;
 
-  StaffLeaveNotifier(this._repository, this._staffId) : super(const AsyncValue.loading()) {
+  StaffLeaveNotifier(this._repository, this._staffId)
+      : super(const AsyncValue.loading()) {
     fetchRequests();
   }
 
@@ -46,15 +54,22 @@ class StaffLeaveNotifier extends StateNotifier<AsyncValue<List<LeaveRequest>>> {
   }
 }
 
-final pendingAdminLeaveRequestsProvider = StateNotifierProvider<AdminPendingLeaveNotifier, AsyncValue<List<LeaveRequest>>>((ref) {
+// ---------------------------------------------------------------------------
+// Admin-facing: pending-only (for quick approval action).
+// ---------------------------------------------------------------------------
+final pendingAdminLeaveRequestsProvider =
+    StateNotifierProvider<AdminPendingLeaveNotifier, AsyncValue<List<LeaveRequest>>>(
+        (ref) {
   final repo = ref.watch(leaveRepositoryProvider);
   return AdminPendingLeaveNotifier(repo);
 });
 
-class AdminPendingLeaveNotifier extends StateNotifier<AsyncValue<List<LeaveRequest>>> {
+class AdminPendingLeaveNotifier
+    extends StateNotifier<AsyncValue<List<LeaveRequest>>> {
   final LeaveRepository _repository;
 
-  AdminPendingLeaveNotifier(this._repository) : super(const AsyncValue.loading()) {
+  AdminPendingLeaveNotifier(this._repository)
+      : super(const AsyncValue.loading()) {
     fetchPending();
   }
 
@@ -76,5 +91,45 @@ class AdminPendingLeaveNotifier extends StateNotifier<AsyncValue<List<LeaveReque
   Future<void> rejectRequest(String id, String adminId, String reason) async {
     await _repository.rejectLeaveRequest(id, adminId, reason);
     await fetchPending();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Admin-facing: all leave requests (for leave history tab).
+// ---------------------------------------------------------------------------
+final adminAllLeaveRequestsProvider =
+    StateNotifierProvider<AdminAllLeaveNotifier, AsyncValue<List<LeaveRequest>>>(
+        (ref) {
+  final repo = ref.watch(leaveRepositoryProvider);
+  return AdminAllLeaveNotifier(repo);
+});
+
+class AdminAllLeaveNotifier
+    extends StateNotifier<AsyncValue<List<LeaveRequest>>> {
+  final LeaveRepository _repository;
+
+  AdminAllLeaveNotifier(this._repository)
+      : super(const AsyncValue.loading()) {
+    fetchAll();
+  }
+
+  Future<void> fetchAll() async {
+    state = const AsyncValue.loading();
+    try {
+      final requests = await _repository.fetchAllLeaveRequests();
+      state = AsyncValue.data(requests);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> approveRequest(String id, String adminId) async {
+    await _repository.approveLeaveRequest(id, adminId);
+    await fetchAll();
+  }
+
+  Future<void> rejectRequest(String id, String adminId, String reason) async {
+    await _repository.rejectLeaveRequest(id, adminId, reason);
+    await fetchAll();
   }
 }
