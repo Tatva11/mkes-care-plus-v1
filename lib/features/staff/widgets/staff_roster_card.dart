@@ -7,17 +7,35 @@ import '../../../core/theme/app_typography.dart';
 import '../../admin/providers/users_provider.dart';
 import 'staff_member_tile.dart';
 
-class StaffRosterCard extends ConsumerWidget {
+class StaffRosterCard extends ConsumerStatefulWidget {
   const StaffRosterCard({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StaffRosterCard> createState() => _StaffRosterCardState();
+}
+
+class _StaffRosterCardState extends ConsumerState<StaffRosterCard> {
+  final _searchController = TextEditingController();
+  String _statusFilter = 'all'; // 'all', 'active', 'inactive'
+  bool _showSearch = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final usersState = ref.watch(usersProvider);
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.6),
+        ),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0A000000),
@@ -57,32 +75,71 @@ class StaffRosterCard extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.filter_list),
+                    onPressed: () {
+                      setState(() {
+                        _showSearch = !_showSearch;
+                        if (!_showSearch) _searchController.clear();
+                      });
+                    },
+                    icon: Icon(_showSearch ? Icons.close : Icons.search),
                     color: AppColors.onSurfaceVariant,
                     iconSize: 22,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    style: IconButton.styleFrom(
-                      shape: const CircleBorder(),
-                    ),
+                    tooltip: _showSearch ? 'Close search' : 'Search staff',
                   ),
-                  const SizedBox(width: AppSpacing.xs),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.more_vert),
-                    color: AppColors.onSurfaceVariant,
-                    iconSize: 22,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    style: IconButton.styleFrom(
-                      shape: const CircleBorder(),
+                  PopupMenuButton<String>(
+                    icon: const Icon(
+                      Icons.filter_list,
+                      color: AppColors.onSurfaceVariant,
+                      size: 22,
                     ),
+                    tooltip: 'Filter status',
+                    initialValue: _statusFilter,
+                    onSelected: (val) => setState(() => _statusFilter = val),
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'all', child: Text('All Staff')),
+                      PopupMenuItem(value: 'active', child: Text('Active Only')),
+                      PopupMenuItem(
+                          value: 'inactive', child: Text('Inactive Only')),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
+
+          // Optional Search Bar
+          if (_showSearch)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.xs,
+              ),
+              child: TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search by name, email, department...',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () =>
+                              setState(() => _searchController.clear()),
+                        )
+                      : null,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+
           // Table header
           Padding(
             padding: const EdgeInsets.symmetric(
@@ -103,17 +160,19 @@ class StaffRosterCard extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  'Status / Shift',
+                  'Status / Contact',
                   style: AppTypography.labelCaps.copyWith(
                     color: AppColors.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(width: 28), // chevron width
               ],
             ),
           ),
           const Divider(height: 1, color: AppColors.outlineVariant),
+
           // Roster list
           Padding(
             padding: const EdgeInsets.symmetric(
@@ -134,15 +193,63 @@ class StaffRosterCard extends ConsumerWidget {
                 ),
               ),
               data: (users) {
-                final staff = users.where((user) => user.role == 'staff').toList();
+                var staff =
+                    users.where((user) => user.role == 'staff').toList();
+
+                // Status filtering
+                if (_statusFilter == 'active') {
+                  staff = staff.where((u) => u.isActive).toList();
+                } else if (_statusFilter == 'inactive') {
+                  staff = staff.where((u) => !u.isActive).toList();
+                }
+
+                // Search query filtering
+                final query = _searchController.text.trim().toLowerCase();
+                if (query.isNotEmpty) {
+                  staff = staff.where((u) {
+                    final nameMatch = u.fullName.toLowerCase().contains(query);
+                    final emailMatch = u.email.toLowerCase().contains(query);
+                    final deptMatch = (u.departmentName ?? u.department ?? '')
+                        .toLowerCase()
+                        .contains(query);
+                    final desigMatch =
+                        (u.designation ?? '').toLowerCase().contains(query);
+                    return nameMatch || emailMatch || deptMatch || desigMatch;
+                  }).toList();
+                }
+
                 if (staff.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Padding(
-                      padding: EdgeInsets.all(AppSpacing.md),
-                      child: Text('No staff found.'),
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.people_outline,
+                              size: 40, color: AppColors.outline),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            query.isNotEmpty
+                                ? 'No staff matching "$query"'
+                                : 'No staff found.',
+                            style: AppTypography.bodyMd.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                          if (query.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            TextButton(
+                              onPressed: () =>
+                                  setState(() => _searchController.clear()),
+                              child: const Text('Clear search'),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   );
                 }
+
                 return Column(
                   children: [
                     for (var i = 0; i < staff.length; i++)

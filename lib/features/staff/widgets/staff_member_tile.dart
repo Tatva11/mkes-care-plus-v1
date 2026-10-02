@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 
 import '../../admin/models/user_profile.dart';
+import '../screens/staff_profile_detail_screen.dart';
 
 enum StaffStatus { present, onLeave, offDuty }
 
@@ -101,107 +102,123 @@ class StaffMemberTile extends StatelessWidget {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.xs,
-            horizontal: AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              // Avatar
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: _avatarBg,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    initials,
-                    style: AppTypography.labelCaps.copyWith(
-                      color: _avatarTextColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+        InkWell(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StaffProfileDetailScreen(user: user),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              // Name + role
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.fullName,
-                      style: AppTypography.bodyMd.copyWith(
-                        fontWeight: FontWeight.w600,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.sm,
+              horizontal: AppSpacing.xs,
+            ),
+            child: Row(
+              children: [
+                // Avatar
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _avatarBg,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      initials,
+                      style: AppTypography.labelCaps.copyWith(
+                        color: _avatarTextColor,
+                        fontWeight: FontWeight.w700,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                // Name + role
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.fullName,
+                        style: AppTypography.bodyMd.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      Text(
+                        '${user.designation ?? user.role.toUpperCase()} • ${user.departmentName ?? user.department ?? '-'}',
+                        style: AppTypography.bodySm,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                // Shift & Contact & Salary
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Status badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: AppSpacing.base,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _statusBg,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: _statusDotColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.base),
+                          Text(
+                            _statusLabel,
+                            style: AppTypography.labelCaps.copyWith(
+                              color: _statusTextColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.base),
+                    Text(
+                      '${user.email} • ${user.phoneNumber ?? 'No phone'}',
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 12,
+                      ),
                     ),
                     Text(
-                      '${user.designation ?? user.role.toUpperCase()} • ${user.departmentName ?? user.department ?? '-'}',
-                      style: AppTypography.bodySm,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                      'Joined: ${user.joiningDate?.toIso8601String().split('T').first ?? '—'} • Salary: ${user.salary != null ? '₹${user.salary!.toStringAsFixed(0)}' : '—'}',
+                      style: AppTypography.bodySm.copyWith(fontSize: 11),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              // Shift
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Status badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                      vertical: AppSpacing.base,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusBg,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: _statusDotColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.base),
-                        Text(
-                          _statusLabel,
-                          style: AppTypography.labelCaps.copyWith(
-                            color: _statusTextColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.base),
-                  Text(
-                    '${user.email} • ${user.phoneNumber ?? 'No phone'}',
-                    style: AppTypography.bodySm.copyWith(
-                      fontSize: 12,
-                    ),
-                  ),
-                  Text(
-                    'Joined: ${user.joiningDate?.toIso8601String().split('T').first ?? '—'} • Salary: ${user.salary?.toStringAsFixed(2) ?? '—'}',
-                    style: AppTypography.bodySm.copyWith(fontSize: 11),
-                  ),
-                ],
-              ),
-            ],
+                const SizedBox(width: AppSpacing.xs),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: AppColors.outline,
+                ),
+              ],
+            ),
           ),
         ),
         if (showDivider)

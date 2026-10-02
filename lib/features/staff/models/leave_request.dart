@@ -1,6 +1,7 @@
 class LeaveRequest {
   final String id;
   final String staffId;
+  final String? staffName; // Populated when fetched with a profile join
   final DateTime startDate;
   final DateTime endDate;
   final double leaveDays;
@@ -14,6 +15,7 @@ class LeaveRequest {
   LeaveRequest({
     required this.id,
     required this.staffId,
+    this.staffName,
     required this.startDate,
     required this.endDate,
     required this.leaveDays,
@@ -26,16 +28,25 @@ class LeaveRequest {
   });
 
   factory LeaveRequest.fromJson(Map<String, dynamic> json) {
+    // The join key may be returned as 'profiles' when using
+    // .select('*, profiles!leave_requests_staff_id_fkey(full_name)')
+    final profileMap = json['profiles'] is Map
+        ? json['profiles'] as Map<String, dynamic>
+        : null;
+
     return LeaveRequest(
       id: json['id'] as String,
       staffId: json['staff_id'] as String,
+      staffName: profileMap?['full_name'] as String?,
       startDate: DateTime.parse(json['start_date'] as String),
       endDate: DateTime.parse(json['end_date'] as String),
       leaveDays: (json['leave_days'] as num).toDouble(),
       reason: json['reason'] as String,
       status: json['status'] as String,
       approvedBy: json['approved_by'] as String?,
-      approvedAt: json['approved_at'] != null ? DateTime.parse(json['approved_at'] as String) : null,
+      approvedAt: json['approved_at'] != null
+          ? DateTime.parse(json['approved_at'] as String)
+          : null,
       rejectionReason: json['rejection_reason'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );

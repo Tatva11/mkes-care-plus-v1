@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../inventory/screens/inventory_screen.dart';
 
 class InventoryItem {
   final String name;
@@ -119,7 +120,13 @@ class OpticalInventoryCard extends StatelessWidget {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const InventoryManagementScreen(),
+                    ),
+                  );
+                },
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.secondary,
                   textStyle: AppTypography.labelCaps,

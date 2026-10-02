@@ -10,6 +10,8 @@ class ProfileModel {
   final String? designation;
   final String role; // 'admin' | 'staff'
   final bool isActive;
+  final double? salary;
+  final DateTime? joiningDate;
   final DateTime createdAt;
 
   const ProfileModel({
@@ -23,6 +25,8 @@ class ProfileModel {
     this.designation,
     required this.role,
     required this.isActive,
+    this.salary,
+    this.joiningDate,
     required this.createdAt,
   });
 
@@ -39,6 +43,10 @@ class ProfileModel {
       designation: json['designation'] as String?,
       role: json['role'] as String,
       isActive: json['is_active'] as bool? ?? true,
+      salary: json['salary'] != null ? (json['salary'] as num).toDouble() : null,
+      joiningDate: json['joining_date'] != null
+          ? DateTime.tryParse(json['joining_date'] as String)
+          : null,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }

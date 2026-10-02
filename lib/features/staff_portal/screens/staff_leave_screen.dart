@@ -6,7 +6,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../staff/models/salary_deduction_config.dart';
 import '../../staff/providers/leave_provider.dart';
+import '../../staff/repositories/leave_repository.dart';
 
 class StaffLeaveScreen extends ConsumerStatefulWidget {
   const StaffLeaveScreen({super.key});
@@ -28,20 +30,35 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
   }
 
   Future<void> _submitRequest(String staffId) async {
-    if (_startDate == null || _endDate == null || _reasonController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+    if (_startDate == null ||
+        _endDate == null ||
+        _reasonController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
       return;
     }
-    
+
+    if (_endDate!.isBefore(_startDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('End date cannot be before start date')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(staffLeaveRequestsProvider(staffId).notifier).createRequest(
-        startDate: _startDate!,
-        endDate: _endDate!,
-        reason: _reasonController.text.trim(),
-      );
+      await ref
+          .read(staffLeaveRequestsProvider(staffId).notifier)
+          .createRequest(
+            startDate: _startDate!,
+            endDate: _endDate!,
+            reason: _reasonController.text.trim(),
+          );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Leave request submitted')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Leave request submitted successfully')),
+      );
       _reasonController.clear();
       setState(() {
         _startDate = null;
@@ -49,7 +66,9 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -58,10 +77,24 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    if (currentUser == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (currentUser == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     final leaveAsync = ref.watch(staffLeaveRequestsProvider(currentUser.id));
     final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
+
+    final profileAsync = ref.watch(currentProfileProvider);
+    final profile = profileAsync.valueOrNull;
+
+    final workingDays = (_startDate != null && _endDate != null)
+        ? LeaveRepository.calculateLeaveDays(_startDate!, _endDate!)
+        : 0.0;
+
+    final salary = profile?.salary;
+    final dailyRate = salary != null && salary > 0 ? salary / 30.0 : 0.0;
+    final estimatedDeduction =
+        SalaryDeductionConfig(dailyRate: dailyRate).calculateDeduction(workingDays);
 
     return Scaffold(
       appBar: AppBar(
@@ -70,7 +103,9 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
       ),
       backgroundColor: AppColors.background,
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
+        padding: EdgeInsets.all(
+          isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -93,39 +128,112 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                           onPressed: () async {
                             final date = await showDatePicker(
                               context: context,
-                              initialDate: DateTime.now(),
+                              initialDate: _startDate ?? DateTime.now(),
                               firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                              lastDate:
+                                  DateTime.now().add(const Duration(days: 365)),
                             );
-                            if (date != null) setState(() => _startDate = date);
+                            if (date != null) {
+                              setState(() {
+                                _startDate = date;
+                                if (_endDate != null && _endDate!.isBefore(date)) {
+                                  _endDate = date;
+                                }
+                              });
+                            }
                           },
                           icon: const Icon(Icons.calendar_today),
-                          label: Text(_startDate != null ? DateFormat('MMM d, yyyy').format(_startDate!) : 'Start Date'),
+                          label: Text(
+                            _startDate != null
+                                ? DateFormat('MMM d, yyyy').format(_startDate!)
+                                : 'Start Date',
+                          ),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
+                            final initial = _endDate ?? _startDate ?? DateTime.now();
                             final date = await showDatePicker(
                               context: context,
-                              initialDate: _startDate ?? DateTime.now(),
+                              initialDate: initial,
                               firstDate: _startDate ?? DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                              lastDate:
+                                  DateTime.now().add(const Duration(days: 365)),
                             );
                             if (date != null) setState(() => _endDate = date);
                           },
                           icon: const Icon(Icons.calendar_today),
-                          label: Text(_endDate != null ? DateFormat('MMM d, yyyy').format(_endDate!) : 'End Date'),
+                          label: Text(
+                            _endDate != null
+                                ? DateFormat('MMM d, yyyy').format(_endDate!)
+                                : 'End Date',
+                          ),
                         ),
                       ),
                     ],
                   ),
+
+                  // Live Leave Days & Salary Deduction preview
+                  if (_startDate != null && _endDate != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusMd),
+                        border: Border.all(color: AppColors.outlineVariant),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.event_note,
+                                  size: 16, color: AppColors.primaryContainer),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${workingDays.toStringAsFixed(0)} working day(s) requested (Sundays excluded)',
+                                style: AppTypography.bodySm.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryContainer,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (estimatedDeduction > 0) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.payments_outlined,
+                                    size: 16, color: AppColors.error),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Est. salary deduction if unpaid: ₹${estimatedDeduction.toStringAsFixed(2)} (@ ₹${dailyRate.toStringAsFixed(2)}/day)',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.error,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: AppSpacing.md),
                   TextField(
                     controller: _reasonController,
                     decoration: const InputDecoration(
-                      labelText: 'Reason for Leave',
+                      labelText: 'Reason for Leave *',
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 2,
@@ -134,8 +242,19 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _isSubmitting ? null : () => _submitRequest(currentUser.id),
-                      child: _isSubmitting ? const CircularProgressIndicator() : const Text('Submit Request'),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => _submitRequest(currentUser.id),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Submit Request'),
                     ),
                   ),
                 ],
@@ -155,30 +274,106 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                   itemCount: requests.length,
                   itemBuilder: (context, index) {
                     final req = requests[index];
+                    final isApproved = req.status == 'approved';
+                    final deduction =
+                        SalaryDeductionConfig(dailyRate: dailyRate)
+                            .calculateDeduction(req.leaveDays);
+
+                    Color statusColor;
+                    switch (req.status) {
+                      case 'approved':
+                        statusColor = AppColors.primaryContainer;
+                        break;
+                      case 'rejected':
+                        statusColor = AppColors.error;
+                        break;
+                      default:
+                        statusColor = AppColors.secondary;
+                    }
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                       color: AppColors.surfaceContainerLowest,
                       child: ListTile(
-                        title: Text('${DateFormat('MMM d, yyyy').format(req.startDate)} - ${DateFormat('MMM d, yyyy').format(req.endDate)}'),
-                        subtitle: Text(req.reason),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              req.status.toUpperCase(),
-                              style: AppTypography.labelCaps.copyWith(
-                                color: req.status == 'approved' ? Colors.green : (req.status == 'rejected' ? Colors.red : Colors.orange),
+                              '${DateFormat('MMM d, yyyy').format(req.startDate)} — ${DateFormat('MMM d, yyyy').format(req.endDate)}',
+                              style: AppTypography.bodyMd
+                                  .copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.12),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusSm),
+                              ),
+                              child: Text(
+                                req.status.toUpperCase(),
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: statusColor,
+                                  fontSize: 10,
+                                ),
                               ),
                             ),
-                            if (req.status == 'pending')
-                              IconButton(
-                                icon: const Icon(Icons.cancel, color: Colors.red),
-                                onPressed: () {
-                                  ref.read(staffLeaveRequestsProvider(currentUser.id).notifier).cancelRequest(req.id);
-                                },
-                              )
                           ],
                         ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${req.leaveDays.toStringAsFixed(0)} working day(s)  •  ${req.reason}',
+                                style: AppTypography.bodySm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              if (isApproved && deduction > 0) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Salary deduction: ₹${deduction.toStringAsFixed(2)}',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.error,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                              if (req.status == 'rejected' &&
+                                  req.rejectionReason != null &&
+                                  req.rejectionReason!.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Reason: ${req.rejectionReason}',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.error,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        trailing: req.status == 'pending'
+                            ? IconButton(
+                                icon: const Icon(Icons.cancel,
+                                    color: AppColors.error),
+                                tooltip: 'Cancel request',
+                                onPressed: () {
+                                  ref
+                                      .read(staffLeaveRequestsProvider(
+                                              currentUser.id)
+                                          .notifier)
+                                      .cancelRequest(req.id);
+                                },
+                              )
+                            : null,
                       ),
                     );
                   },
