@@ -232,6 +232,9 @@ class PurchaseOrder {
     this.notes,
     this.createdBy,
     this.createdByName,
+    this.orderedBy,
+    this.orderedByName,
+    this.orderedAt,
     this.items = const [],
     this.createdAt,
     this.updatedAt,
@@ -251,6 +254,9 @@ class PurchaseOrder {
   final String? notes;
   final String? createdBy;
   final String? createdByName;
+  final String? orderedBy;
+  final String? orderedByName;
+  final DateTime? orderedAt;
   final List<PurchaseOrderItem> items;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -270,6 +276,31 @@ class PurchaseOrder {
   bool get isPartiallyReceived => status == PurchaseOrderStatus.partiallyReceived;
   bool get isReceived => status == PurchaseOrderStatus.received;
   bool get isCancelled => status == PurchaseOrderStatus.cancelled;
+
+  /// User who placed the order display label
+  String get orderPlacedByDisplay {
+    if (isDraft) return 'Not placed yet';
+    if (orderedByName != null && orderedByName!.trim().isNotEmpty) {
+      return orderedByName!.trim();
+    }
+    if (orderedBy != null && orderedBy!.trim().isNotEmpty) {
+      return orderedBy!.trim();
+    }
+    return 'Not recorded';
+  }
+
+  /// Whether the order placement has been recorded
+  bool get isOrderPlaced => orderedBy != null || orderedAt != null;
+
+  /// Timestamp when order was placed display label
+  String get orderPlacedAtDisplay {
+    if (isDraft) return 'Not placed yet';
+    if (orderedAt != null) {
+      final d = orderedAt!;
+      return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    }
+    return 'Not recorded';
+  }
 
   /// Formats a standardized PO number: PO-DDMMYYYY-0001 based on actual creation date.
   static String formatPoNumber(DateTime creationDate, int sequence) {
@@ -339,6 +370,9 @@ class PurchaseOrder {
     String? notes,
     String? createdBy,
     String? createdByName,
+    String? orderedBy,
+    String? orderedByName,
+    DateTime? orderedAt,
     List<PurchaseOrderItem>? items,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -358,6 +392,9 @@ class PurchaseOrder {
       notes: notes ?? this.notes,
       createdBy: createdBy ?? this.createdBy,
       createdByName: createdByName ?? this.createdByName,
+      orderedBy: orderedBy ?? this.orderedBy,
+      orderedByName: orderedByName ?? this.orderedByName,
+      orderedAt: orderedAt ?? this.orderedAt,
       items: items ?? this.items,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -366,7 +403,16 @@ class PurchaseOrder {
 
   factory PurchaseOrder.fromJson(Map<String, dynamic> json) {
     final vendorData = json['vendors'] as Map<String, dynamic>?;
-    final profileData = json['profiles'] as Map<String, dynamic>?;
+    final creatorData = (json['created_by_profile'] ??
+        json['profiles!purchase_orders_created_by_fkey'] ??
+        json['profiles!created_by'] ??
+        json['creator'] ??
+        json['profiles']) as Map<String, dynamic>?;
+    final ordererData = (json['ordered_by_profile'] ??
+        json['profiles!purchase_orders_ordered_by_fkey'] ??
+        json['profiles!ordered_by'] ??
+        json['orderer']) as Map<String, dynamic>?;
+
     final itemsList = (json['purchase_order_items'] as List<dynamic>?)
             ?.map((e) => PurchaseOrderItem.fromJson(e as Map<String, dynamic>))
             .toList() ??
@@ -395,8 +441,14 @@ class PurchaseOrder {
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
       notes: json['notes'] as String?,
       createdBy: json['created_by'] as String?,
-      createdByName: profileData?['full_name'] as String? ??
+      createdByName: creatorData?['full_name'] as String? ??
           json['created_by_name'] as String?,
+      orderedBy: json['ordered_by'] as String?,
+      orderedByName: ordererData?['full_name'] as String? ??
+          json['ordered_by_name'] as String?,
+      orderedAt: json['ordered_at'] != null
+          ? DateTime.tryParse(json['ordered_at'] as String)
+          : null,
       items: itemsList,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
@@ -426,6 +478,12 @@ class PurchaseOrder {
     }
     if (createdBy != null && createdBy!.isNotEmpty) {
       map['created_by'] = createdBy;
+    }
+    if (orderedBy != null && orderedBy!.isNotEmpty) {
+      map['ordered_by'] = orderedBy;
+    }
+    if (orderedAt != null) {
+      map['ordered_at'] = orderedAt!.toIso8601String();
     }
     return map;
   }

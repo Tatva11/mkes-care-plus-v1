@@ -108,6 +108,48 @@ ALTER TABLE public.purchase_orders
   ADD CONSTRAINT purchase_orders_expected_delivery_date_check
   CHECK (expected_delivery_date IS NULL OR expected_delivery_date >= order_date);
 
+-- Ensure vendors products_supplied column exists
+ALTER TABLE public.vendors
+  ADD COLUMN IF NOT EXISTS products_supplied TEXT[] DEFAULT '{}'::TEXT[];
+
+-- Ensure ordered_by and ordered_at exist for tracking PO placement audit
+ALTER TABLE public.purchase_orders
+  ADD COLUMN IF NOT EXISTS ordered_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS ordered_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_ordered_by
+  ON public.purchase_orders(ordered_by);
+
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_ordered_at
+  ON public.purchase_orders(ordered_at);
+
+-- Trigger to automatically capture ordered_by and ordered_at server-side upon placement
+CREATE OR REPLACE FUNCTION public.handle_purchase_order_placement()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF (TG_OP = 'INSERT' AND NEW.status = 'ordered') OR
+     (TG_OP = 'UPDATE' AND (OLD.status IS NULL OR OLD.status = 'draft') AND NEW.status = 'ordered') THEN
+    IF NEW.ordered_by IS NULL THEN
+      NEW.ordered_by := auth.uid();
+    END IF;
+    IF NEW.ordered_at IS NULL THEN
+      NEW.ordered_at := now();
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_purchase_order_placement ON public.purchase_orders;
+CREATE TRIGGER trg_purchase_order_placement
+BEFORE INSERT OR UPDATE ON public.purchase_orders
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_purchase_order_placement();
+
 -- ============================================================================
 -- 3. NOTIFY ALL ACTIVE STAFF + ADMIN WHEN PO IS PLACED
 -- ============================================================================
@@ -528,13 +570,19 @@ GRANT EXECUTE ON FUNCTION public.receive_purchase_order(UUID, JSONB) TO authenti
 -- 6. PERFORM STOCK OPERATION RPC WITH FEFO (FIRST EXPIRY FIRST OUT)
 -- ============================================================================
 
+DROP FUNCTION IF EXISTS public.perform_stock_operation(UUID, TEXT, NUMERIC, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.perform_stock_operation(UUID, TEXT, NUMERIC, TEXT, TEXT, UUID);
+DROP FUNCTION IF EXISTS public.perform_stock_operation(UUID, TEXT, NUMERIC, TEXT, TEXT, UUID, NUMERIC, UUID);
+
 CREATE OR REPLACE FUNCTION public.perform_stock_operation(
   p_inventory_id      UUID,
   p_transaction_type  TEXT,
   p_quantity          NUMERIC,
-  p_reason            TEXT,
+  p_reason            TEXT DEFAULT NULL,
   p_remarks           TEXT DEFAULT NULL,
-  p_patient_id        UUID DEFAULT NULL
+  p_patient_id        UUID DEFAULT NULL,
+  p_total_amount      NUMERIC DEFAULT NULL,
+  p_vendor_id         UUID DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -556,6 +604,7 @@ DECLARE
   v_final_patient_id   UUID := NULL;
   v_patient_name       TEXT := NULL;
   v_patient_number     TEXT := NULL;
+  v_unit_price         NUMERIC(12,2) := NULL;
   -- FEFO variables
   v_batch              RECORD;
   v_remaining_deduct   NUMERIC(12,2);
@@ -580,7 +629,14 @@ BEGIN
     RAISE EXCEPTION 'Invalid transaction type: %. Must be stock_in or stock_out.', p_transaction_type;
   END IF;
 
-  -- 4. Validate patient selection strictly for "Dispensed to Patient"
+  -- 4. Calculate unit price if total amount paid is provided for Stock In
+  IF p_transaction_type = 'stock_in' AND p_total_amount IS NOT NULL AND p_total_amount >= 0 THEN
+    IF p_quantity > 0 THEN
+      v_unit_price := ROUND((p_total_amount / p_quantity), 2);
+    END IF;
+  END IF;
+
+  -- 5. Validate patient selection strictly for "Dispensed to Patient"
   IF p_transaction_type = 'stock_out' AND p_reason = 'Dispensed to Patient' THEN
     IF p_patient_id IS NULL THEN
       RAISE EXCEPTION 'Please select a patient.';
@@ -597,7 +653,7 @@ BEGIN
     v_final_patient_id := NULL;
   END IF;
 
-  -- 5. Lock row with SELECT FOR UPDATE to prevent race conditions
+  -- 6. Lock row with SELECT FOR UPDATE to prevent race conditions
   SELECT quantity, minimum_stock, name, unit
     INTO v_current_stock, v_min_stock, v_item_name, v_unit
     FROM public.inventory
@@ -608,7 +664,7 @@ BEGIN
     RAISE EXCEPTION 'Inventory item not found.';
   END IF;
 
-  -- 6. Calculate new stock atomically
+  -- 7. Calculate new stock atomically
   IF p_transaction_type = 'stock_in' THEN
     v_new_stock := v_current_stock + p_quantity;
 
@@ -676,7 +732,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- 7. Compute next earliest expiry date from remaining active batches
+  -- 8. Compute next earliest expiry date from remaining active batches
   SELECT MIN(expiry_date)
   INTO v_next_expiry
   FROM public.inventory_batches
@@ -684,14 +740,28 @@ BEGIN
     AND remaining_quantity > 0
     AND expiry_date IS NOT NULL;
 
-  -- 8. Update inventory quantity & effective earliest expiry
+  -- 9. Update inventory quantity, effective earliest expiry, and restock info
   UPDATE public.inventory
     SET quantity = v_new_stock,
         expiry_date = COALESCE(v_next_expiry, inventory.expiry_date),
+        vendor_id = COALESCE(p_vendor_id, inventory.vendor_id),
+        last_quantity_supplied = CASE WHEN p_transaction_type = 'stock_in' THEN p_quantity ELSE inventory.last_quantity_supplied END,
+        last_total_amount = CASE WHEN p_transaction_type = 'stock_in' AND p_total_amount IS NOT NULL THEN p_total_amount ELSE inventory.last_total_amount END,
+        price = CASE WHEN v_unit_price IS NOT NULL THEN v_unit_price ELSE inventory.price END,
         updated_at = now()
     WHERE id = p_inventory_id;
 
-  -- 9. Insert audit transaction
+  -- 10. If vendor is provided for stock_in, update vendor's latest delivery info
+  IF p_transaction_type = 'stock_in' AND p_vendor_id IS NOT NULL THEN
+    UPDATE public.vendors
+      SET last_quantity = p_quantity,
+          last_total_amount = COALESCE(p_total_amount, vendors.last_total_amount),
+          last_delivery_date = CURRENT_DATE,
+          updated_at = now()
+      WHERE id = p_vendor_id;
+  END IF;
+
+  -- 11. Insert audit transaction
   v_transaction_id := gen_random_uuid();
   v_created_at := now();
 
@@ -707,6 +777,9 @@ BEGIN
     performed_by,
     created_by,
     patient_id,
+    vendor_id,
+    total_amount,
+    unit_price,
     created_at
   ) VALUES (
     v_transaction_id,
@@ -720,13 +793,16 @@ BEGIN
     v_user_id,
     v_user_id,
     v_final_patient_id,
+    p_vendor_id,
+    p_total_amount,
+    v_unit_price,
     v_created_at
   );
 
-  -- 10. Fetch user name for response
+  -- 12. Fetch user name for response
   SELECT full_name INTO v_user_name FROM public.profiles WHERE id = v_user_id;
 
-  -- 11. If item entered low-stock territory, generate deduplicated notification for all active Staff and Admin users
+  -- 13. If item entered low-stock territory, generate deduplicated notification for all active Staff and Admin users
   IF v_entered_low_stock THEN
     IF NOT EXISTS (
       SELECT 1 FROM public.notifications
@@ -748,32 +824,58 @@ BEGIN
         ) VALUES (
           v_admin_recipient.id,
           'Low Stock Alert: ' || v_item_name,
-          'Item "' || v_item_name || '" has fallen to ' || v_new_stock::text || ' ' || v_unit ||
-            ' (minimum required: ' || v_min_stock::text || ' ' || v_unit || '). Restock recommended.',
+          'Item "' || v_item_name || '" has fallen to ' || v_new_stock::text || ' ' || COALESCE(v_unit, 'units') ||
+            ' (minimum required: ' || v_min_stock::text || ' ' || COALESCE(v_unit, 'units') || '). Restock recommended.',
           'low_stock',
           p_inventory_id,
-          now()
+          v_created_at
         );
       END LOOP;
     END IF;
   END IF;
 
+  -- 14. Return structured JSON supporting both flat keys and nested 'transaction' object
   RETURN jsonb_build_object(
+    'success', true,
+    'current_stock', v_new_stock,
+    'stock_before', v_current_stock,
     'transaction_id', v_transaction_id,
     'inventory_id', p_inventory_id,
     'item_name', v_item_name,
     'transaction_type', p_transaction_type,
     'quantity', p_quantity,
-    'stock_before', v_current_stock,
-    'stock_after', v_new_stock,
     'reason', p_reason,
     'remarks', v_final_remarks,
     'performed_by', v_user_name,
     'patient_id', v_final_patient_id,
     'patient_name', v_patient_name,
-    'created_at', v_created_at
+    'patient_number', v_patient_number,
+    'vendor_id', p_vendor_id,
+    'total_amount', p_total_amount,
+    'unit_price', v_unit_price,
+    'created_at', v_created_at,
+    'transaction', jsonb_build_object(
+      'id', v_transaction_id,
+      'inventory_id', p_inventory_id,
+      'transaction_type', p_transaction_type,
+      'quantity', p_quantity,
+      'stock_before', v_current_stock,
+      'stock_after', v_new_stock,
+      'reason', p_reason,
+      'remarks', v_final_remarks,
+      'performed_by', v_user_id,
+      'performed_by_name', v_user_name,
+      'patient_id', v_final_patient_id,
+      'patient_name', v_patient_name,
+      'patient_number', v_patient_number,
+      'vendor_id', p_vendor_id,
+      'total_amount', p_total_amount,
+      'unit_price', v_unit_price,
+      'created_at', v_created_at
+    )
   );
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.perform_stock_operation(UUID, TEXT, NUMERIC, TEXT, TEXT, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.perform_stock_operation(UUID, TEXT, NUMERIC, TEXT, TEXT, UUID, NUMERIC, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.perform_stock_operation(UUID, TEXT, NUMERIC, TEXT, TEXT, UUID, NUMERIC, UUID) TO service_role;

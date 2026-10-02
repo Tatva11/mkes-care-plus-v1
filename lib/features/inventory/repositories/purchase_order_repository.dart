@@ -19,6 +19,15 @@ class PurchaseOrderRepository {
 
   PurchaseOrderRepository([this._supabase]);
 
+  static const String _poSelectWithProfiles =
+      '*, vendors(name, phone), created_by_profile:profiles!purchase_orders_created_by_fkey(full_name), ordered_by_profile:profiles!purchase_orders_ordered_by_fkey(full_name), purchase_order_items(*, inventory(name, unit, sku))';
+
+  static const String _poSelectWithCreatedByOnly =
+      '*, vendors(name, phone), created_by_profile:profiles!purchase_orders_created_by_fkey(full_name), purchase_order_items(*, inventory(name, unit, sku))';
+
+  static const String _poSelectWithoutProfiles =
+      '*, vendors(name, phone), purchase_order_items(*, inventory(name, unit, sku))';
+
   /// Fetches purchase orders with optional filtering by status, vendor, and search query.
   Future<List<PurchaseOrder>> getPurchaseOrders({
     String? status,
@@ -29,19 +38,46 @@ class PurchaseOrderRepository {
     if (client == null) return const [];
 
     try {
-      var query = client.from('purchase_orders').select(
-            '*, vendors(name, phone), profiles(full_name), purchase_order_items(*, inventory(name, unit, sku))',
-          );
+      dynamic response;
+      try {
+        var query = client.from('purchase_orders').select(_poSelectWithProfiles);
 
-      if (status != null && status.isNotEmpty && status.toLowerCase() != 'all') {
-        query = query.eq('status', status.toLowerCase().replaceAll(' ', '_'));
+        if (status != null && status.isNotEmpty && status.toLowerCase() != 'all') {
+          query = query.eq('status', status.toLowerCase().replaceAll(' ', '_'));
+        }
+
+        if (vendorId != null && vendorId.isNotEmpty && vendorId.toLowerCase() != 'all') {
+          query = query.eq('vendor_id', vendorId);
+        }
+
+        response = await query.order('created_at', ascending: false);
+      } catch (_) {
+        try {
+          var query = client.from('purchase_orders').select(_poSelectWithCreatedByOnly);
+
+          if (status != null && status.isNotEmpty && status.toLowerCase() != 'all') {
+            query = query.eq('status', status.toLowerCase().replaceAll(' ', '_'));
+          }
+
+          if (vendorId != null && vendorId.isNotEmpty && vendorId.toLowerCase() != 'all') {
+            query = query.eq('vendor_id', vendorId);
+          }
+
+          response = await query.order('created_at', ascending: false);
+        } catch (_) {
+          var query = client.from('purchase_orders').select(_poSelectWithoutProfiles);
+
+          if (status != null && status.isNotEmpty && status.toLowerCase() != 'all') {
+            query = query.eq('status', status.toLowerCase().replaceAll(' ', '_'));
+          }
+
+          if (vendorId != null && vendorId.isNotEmpty && vendorId.toLowerCase() != 'all') {
+            query = query.eq('vendor_id', vendorId);
+          }
+
+          response = await query.order('created_at', ascending: false);
+        }
       }
-
-      if (vendorId != null && vendorId.isNotEmpty && vendorId.toLowerCase() != 'all') {
-        query = query.eq('vendor_id', vendorId);
-      }
-
-      final response = await query.order('created_at', ascending: false);
 
       final list = (response as List<dynamic>)
           .map((json) => PurchaseOrder.fromJson(json as Map<String, dynamic>))
@@ -72,15 +108,30 @@ class PurchaseOrderRepository {
     if (client == null) throw Exception('Supabase client not initialized');
 
     try {
-      final response = await client
-          .from('purchase_orders')
-          .select(
-            '*, vendors(name, phone), profiles(full_name), purchase_order_items(*, inventory(name, unit, sku))',
-          )
-          .eq('id', id)
-          .single();
+      dynamic response;
+      try {
+        response = await client
+            .from('purchase_orders')
+            .select(_poSelectWithProfiles)
+            .eq('id', id)
+            .single();
+      } catch (_) {
+        try {
+          response = await client
+              .from('purchase_orders')
+              .select(_poSelectWithCreatedByOnly)
+              .eq('id', id)
+              .single();
+        } catch (_) {
+          response = await client
+              .from('purchase_orders')
+              .select(_poSelectWithoutProfiles)
+              .eq('id', id)
+              .single();
+        }
+      }
 
-      return PurchaseOrder.fromJson(response);
+      return PurchaseOrder.fromJson(response as Map<String, dynamic>);
     } catch (e) {
       throw Exception('Failed to fetch purchase order $id: $e');
     }
@@ -108,6 +159,12 @@ class PurchaseOrderRepository {
       poData['total_amount'] = total;
       if (currentUserId != null) {
         poData['created_by'] = currentUserId;
+      }
+      if (order.status == PurchaseOrderStatus.ordered) {
+        if (currentUserId != null) {
+          poData['ordered_by'] = currentUserId;
+        }
+        poData['ordered_at'] = DateTime.now().toUtc().toIso8601String();
       }
 
       // Concurrency-safe daily PO number generation: PO-DDMMYYYY-0001
@@ -198,6 +255,17 @@ class PurchaseOrderRepository {
       updateData['total_amount'] = total;
       updateData['updated_at'] = DateTime.now().toUtc().toIso8601String();
 
+      // If transition to ordered, record order placement audit
+      if (order.status == PurchaseOrderStatus.ordered) {
+        final currentUserId = client.auth.currentUser?.id;
+        if (currentUserId != null && (updateData['ordered_by'] == null || updateData['ordered_by'] == '')) {
+          updateData['ordered_by'] = currentUserId;
+        }
+        if (updateData['ordered_at'] == null) {
+          updateData['ordered_at'] = DateTime.now().toUtc().toIso8601String();
+        }
+      }
+
       // Ensure purchase_order_number is NEVER modified on update (guarantees immutability)
       updateData.remove('purchase_order_number');
 
@@ -234,10 +302,18 @@ class PurchaseOrderRepository {
     if (client == null) throw Exception('Supabase client not initialized');
 
     try {
-      await client.from('purchase_orders').update({
+      final updateData = <String, dynamic>{
         'status': status.dbValue,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', id);
+      };
+      if (status == PurchaseOrderStatus.ordered) {
+        final currentUserId = client.auth.currentUser?.id;
+        if (currentUserId != null) {
+          updateData['ordered_by'] = currentUserId;
+        }
+        updateData['ordered_at'] = DateTime.now().toUtc().toIso8601String();
+      }
+      await client.from('purchase_orders').update(updateData).eq('id', id);
     } catch (e) {
       throw Exception('Failed to update status for purchase order $id: $e');
     }

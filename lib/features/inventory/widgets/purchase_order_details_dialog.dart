@@ -742,30 +742,86 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
   }
 
   Widget _buildAuditTrailCard(PurchaseOrder po, DateFormat dateFormat) {
+    final String createdByName = po.createdByName ?? (po.createdBy != null ? po.createdBy! : 'Staff/Admin');
+    final String createdAtStr = po.createdAt != null ? dateFormat.format(po.createdAt!) : '—';
+
+    final String orderPlacedByName;
+    final String orderPlacedAtStr;
+
+    if (po.isDraft) {
+      orderPlacedByName = 'Not placed yet';
+      orderPlacedAtStr = 'Not placed yet';
+    } else if (po.orderedByName != null && po.orderedByName!.trim().isNotEmpty) {
+      orderPlacedByName = po.orderedByName!.trim();
+      orderPlacedAtStr = po.orderedAt != null ? dateFormat.format(po.orderedAt!) : 'Recorded';
+    } else if (po.orderedBy != null && po.orderedBy!.trim().isNotEmpty) {
+      orderPlacedByName = po.orderedBy!.trim();
+      orderPlacedAtStr = po.orderedAt != null ? dateFormat.format(po.orderedAt!) : 'Recorded';
+    } else {
+      // Existing PO was already Ordered and predates this migration
+      orderPlacedByName = 'Not recorded';
+      orderPlacedAtStr = 'Not recorded';
+    }
+
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow.withValues(alpha: 0.5),
+        color: AppColors.surfaceContainerLow.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Created By: ${po.createdByName ?? 'Staff/Admin'}',
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.onSurfaceVariant,
-              fontSize: 11,
-            ),
-          ),
-          if (po.createdAt != null)
-            Text(
-              'Created: ${dateFormat.format(po.createdAt!)}',
-              style: AppTypography.bodySm.copyWith(
-                color: AppColors.onSurfaceVariant,
-                fontSize: 11,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Created By: $createdByName',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Created At: $createdAtStr',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          const Divider(height: 1, color: AppColors.outlineVariant),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Order Placed By: $orderPlacedByName',
+                  style: AppTypography.bodySm.copyWith(
+                    color: po.isDraft ? AppColors.onSurfaceVariant : AppColors.primary,
+                    fontWeight: po.isDraft ? FontWeight.normal : FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Order Placed At: $orderPlacedAtStr',
+                style: AppTypography.bodySm.copyWith(
+                  color: po.isDraft ? AppColors.onSurfaceVariant : AppColors.primary,
+                  fontWeight: po.isDraft ? FontWeight.normal : FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

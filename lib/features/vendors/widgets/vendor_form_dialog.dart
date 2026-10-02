@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../inventory/models/inventory_item.dart';
+import '../../inventory/providers/inventory_provider.dart';
 import '../models/vendor.dart';
 import '../providers/vendor_provider.dart';
 
@@ -29,10 +31,11 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
   late final TextEditingController _phoneController;
   late final TextEditingController _emailController;
   late final TextEditingController _addressController;
-  late final TextEditingController _productsController;
   late final TextEditingController _quantityController;
   late final TextEditingController _totalAmountController;
   late final TextEditingController _remarksController;
+
+  List<String> _selectedProducts = [];
 
   DateTime? _lastOrderDate;
   DateTime? _lastDeliveryDate;
@@ -53,8 +56,9 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
     _phoneController = TextEditingController(text: v?.phone ?? '');
     _emailController = TextEditingController(text: v?.email ?? '');
     _addressController = TextEditingController(text: v?.address ?? '');
-    _productsController =
-        TextEditingController(text: v?.productsSupplied.join(', ') ?? '');
+    if (v != null && v.productsSupplied.isNotEmpty) {
+      _selectedProducts = List<String>.from(v.productsSupplied);
+    }
     _quantityController = TextEditingController(
       text: v?.lastQuantity != null
           ? (v!.lastQuantity! % 1 == 0
@@ -92,7 +96,6 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
     _phoneController.dispose();
     _emailController.dispose();
     _addressController.dispose();
-    _productsController.dispose();
     _quantityController.dispose();
     _totalAmountController.dispose();
     _remarksController.dispose();
@@ -152,15 +155,6 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
       }
     }
 
-    final rawProducts = _productsController.text.trim();
-    final productsList = rawProducts.isEmpty
-        ? <String>[]
-        : rawProducts
-            .split(',')
-            .map((p) => p.trim())
-            .where((p) => p.isNotEmpty)
-            .toList();
-
     setState(() => _isSubmitting = true);
 
     try {
@@ -179,7 +173,7 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
         address: _addressController.text.trim().isNotEmpty
             ? _addressController.text.trim()
             : null,
-        productsSupplied: productsList,
+        productsSupplied: _selectedProducts,
         lastOrderDate: _lastOrderDate,
         lastDeliveryDate: _lastDeliveryDate,
         lastQuantity: parsedQty,
@@ -230,6 +224,7 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width > 600;
+    final allInventory = ref.watch(inventoryProvider).value ?? [];
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -511,25 +506,7 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
                       const SizedBox(height: AppSpacing.md),
 
                       // 4. Products Supplied
-                      Text(
-                        'PRODUCTS SUPPLIED (COMMA-SEPARATED)',
-                        style: AppTypography.labelCaps.copyWith(
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      TextFormField(
-                        controller: _productsController,
-                        decoration: InputDecoration(
-                          hintText: 'E.g. Amoxicillin, Gauze, Syringes, Normal Saline',
-                          prefixIcon: const Icon(Icons.category_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                          ),
-                          filled: true,
-                          fillColor: AppColors.surfaceContainerLow,
-                        ),
-                      ),
+                      _buildProductsSuppliedSection(allInventory),
                       const SizedBox(height: AppSpacing.md),
 
                       // 5. Last Order & Last Delivery Dates
@@ -826,6 +803,259 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProductsSuppliedSection(List<InventoryItem> allInventory) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'PRODUCTS SUPPLIED (${_selectedProducts.length})',
+                style: AppTypography.labelCaps.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TextButton.icon(
+              key: const Key('vendor_browse_inventory_button'),
+              onPressed: () => _openProductMultiSelectDialog(allInventory),
+              icon: const Icon(Icons.playlist_add_check, size: 18),
+              label: const Text('Browse Inventory'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Autocomplete<InventoryItem>(
+          optionsBuilder: (TextEditingValue textEditingValue) {
+            if (textEditingValue.text.trim().isEmpty) {
+              return const Iterable<InventoryItem>.empty();
+            }
+            final q = textEditingValue.text.trim().toLowerCase();
+            return allInventory.where((item) {
+              final nameMatch = item.name.toLowerCase().contains(q);
+              final skuMatch = item.sku != null && item.sku!.toLowerCase().contains(q);
+              return nameMatch || skuMatch;
+            });
+          },
+          displayStringForOption: (item) => item.name,
+          onSelected: (InventoryItem selection) {
+            if (!_selectedProducts.contains(selection.name)) {
+              setState(() {
+                _selectedProducts.add(selection.name);
+              });
+            }
+          },
+          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+            return TextField(
+              key: const Key('vendor_product_search_input'),
+              controller: controller,
+              focusNode: focusNode,
+              decoration: InputDecoration(
+                hintText: 'Search or type product (e.g. Eye Drops, Gloves)...',
+                prefixIcon: const Icon(Icons.category_outlined),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+                  tooltip: 'Add product',
+                  onPressed: () {
+                    final text = controller.text.trim();
+                    if (text.isNotEmpty && !_selectedProducts.contains(text)) {
+                      setState(() {
+                        _selectedProducts.add(text);
+                        controller.clear();
+                      });
+                    }
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+                filled: true,
+                fillColor: AppColors.surfaceContainerLow,
+              ),
+              onSubmitted: (text) {
+                final trimmed = text.trim();
+                if (trimmed.isNotEmpty && !_selectedProducts.contains(trimmed)) {
+                  setState(() {
+                    _selectedProducts.add(trimmed);
+                    controller.clear();
+                  });
+                }
+              },
+            );
+          },
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        if (_selectedProducts.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(color: AppColors.outlineVariant),
+            ),
+            child: Text(
+              'No products selected. Search above or click "Browse Inventory" to select products supplied by this vendor.',
+              style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+          )
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(color: AppColors.outlineVariant),
+            ),
+            child: Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: _selectedProducts.map((prod) {
+                return Chip(
+                  key: Key('vendor_chip_$prod'),
+                  label: Text(prod),
+                  avatar: const Icon(Icons.inventory_2_outlined, size: 14, color: AppColors.primary),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  onDeleted: () {
+                    setState(() {
+                      _selectedProducts.remove(prod);
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _openProductMultiSelectDialog(List<InventoryItem> allInventory) async {
+    final tempSelected = Set<String>.from(_selectedProducts);
+    String searchFilter = '';
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final filtered = allInventory.where((i) {
+              if (searchFilter.isEmpty) return true;
+              final q = searchFilter.toLowerCase();
+              return i.name.toLowerCase().contains(q) ||
+                  (i.sku != null && i.sku!.toLowerCase().contains(q));
+            }).toList();
+
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.inventory_2_outlined, color: AppColors.primary),
+                  SizedBox(width: AppSpacing.xs),
+                  Text('Select Products Supplied'),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                height: 420,
+                child: Column(
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search products by name or SKU...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: searchFilter.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setDialogState(() => searchFilter = '');
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: (val) {
+                        setDialogState(() => searchFilter = val.trim());
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${tempSelected.length} product(s) selected',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (tempSelected.isNotEmpty)
+                          TextButton(
+                            onPressed: () {
+                              setDialogState(() => tempSelected.clear());
+                            },
+                            child: const Text('Clear All'),
+                          ),
+                      ],
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? const Center(
+                              child: Text('No inventory products found.'),
+                            )
+                          : ListView.builder(
+                              itemCount: filtered.length,
+                              itemBuilder: (context, idx) {
+                                final item = filtered[idx];
+                                final isSelected = tempSelected.contains(item.name);
+                                return CheckboxListTile(
+                                  key: Key('product_checkbox_${item.id}'),
+                                  value: isSelected,
+                                  title: Text(item.name),
+                                  subtitle: Text(
+                                    'Unit: ${item.unit}${item.sku != null ? ' | SKU: ${item.sku}' : ''}',
+                                  ),
+                                  dense: true,
+                                  onChanged: (checked) {
+                                    setDialogState(() {
+                                      if (checked == true) {
+                                        tempSelected.add(item.name);
+                                      } else {
+                                        tempSelected.remove(item.name);
+                                      }
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedProducts = tempSelected.toList();
+                    });
+                    Navigator.of(ctx).pop();
+                  },
+                  child: const Text('Save Selection'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

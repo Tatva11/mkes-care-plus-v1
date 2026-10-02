@@ -6,11 +6,14 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../vendors/models/vendor.dart';
 import '../../vendors/providers/vendor_provider.dart';
 import '../models/inventory_item.dart';
 import '../models/purchase_order.dart';
 import '../providers/inventory_provider.dart';
 import '../providers/purchase_order_provider.dart';
+import '../utils/vendor_product_matcher.dart';
 
 /// Form item holding editable line-item data in the dialog.
 class _EditablePOLineItem {
@@ -223,6 +226,7 @@ class _PurchaseOrderFormDialogState
         );
       }).toList();
 
+      final currentUserId = ref.read(currentUserProvider)?.id;
       final poOrder = PurchaseOrder(
         id: widget.order?.id ?? '',
         purchaseOrderNumber: _isEditing ? widget.order!.purchaseOrderNumber : '',
@@ -232,6 +236,13 @@ class _PurchaseOrderFormDialogState
         status: targetStatus,
         subtotal: _grandTotal,
         totalAmount: _grandTotal,
+        createdBy: widget.order?.createdBy ?? currentUserId,
+        orderedBy: targetStatus == PurchaseOrderStatus.ordered
+            ? (widget.order?.orderedBy ?? currentUserId)
+            : widget.order?.orderedBy,
+        orderedAt: targetStatus == PurchaseOrderStatus.ordered
+            ? (widget.order?.orderedAt ?? DateTime.now())
+            : widget.order?.orderedAt,
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
@@ -271,10 +282,14 @@ class _PurchaseOrderFormDialogState
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width > 768;
-    final allVendors = (ref.watch(vendorsProvider).value ?? [])
-        .where((v) => v.isActive)
-        .toList();
+    final rawVendors = ref.watch(vendorsProvider).value ?? [];
+    final allVendors = rawVendors.where((v) => v.isActive).toList();
     final allInventory = ref.watch(inventoryProvider).value ?? [];
+
+    final selectedVendor = rawVendors.where((v) => v.id == _selectedVendorId).firstOrNull;
+    final availableProducts = selectedVendor != null
+        ? allInventory.where((i) => isProductSuppliedByVendor(i, selectedVendor)).toList()
+        : allInventory;
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -398,8 +413,18 @@ class _PurchaseOrderFormDialogState
                                       ),
                                     );
                                   }).toList(),
-                                  onChanged: (val) =>
-                                      setState(() => _selectedVendorId = val),
+                                  onChanged: (val) {
+                                    if (val == _selectedVendorId) return;
+                                    setState(() {
+                                      _selectedVendorId = val;
+                                      // CHANGE 1: Immediately clear/reset all previously selected PO products/items
+                                      for (final item in _items) {
+                                        item.dispose();
+                                      }
+                                      _items.clear();
+                                      _items.add(_EditablePOLineItem());
+                                    });
+                                  },
                                   validator: (v) => (v == null || v.isEmpty)
                                       ? 'Vendor is required'
                                       : null,
@@ -541,12 +566,67 @@ class _PurchaseOrderFormDialogState
                             ),
                           ),
                           TextButton.icon(
-                            onPressed: _addItem,
+                            onPressed: (_selectedVendorId != null && availableProducts.isNotEmpty)
+                                ? _addItem
+                                : null,
                             icon: const Icon(Icons.add_circle_outline, size: 18),
                             label: const Text('Add Product'),
                           ),
                         ],
                       ),
+                      if (_selectedVendorId == null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            border: Border.all(color: AppColors.outlineVariant),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, size: 18, color: AppColors.onSurfaceVariant),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: Text(
+                                  'Please select a vendor / supplier above to choose from their supplied products.',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (availableProducts.isEmpty) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Container(
+                          key: const Key('vendor_no_products_empty_state'),
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            border: Border.all(color: Colors.amber.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded, color: Colors.amber.shade900, size: 20),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  'No products are supplied by "${selectedVendor?.name ?? 'this vendor'}". Please add products supplied to this vendor in Vendors management or select another vendor.',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.xs),
 
                       // List of Line Items
@@ -556,7 +636,7 @@ class _PurchaseOrderFormDialogState
                         itemCount: _items.length,
                         separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
                         itemBuilder: (context, index) {
-                          return _buildLineItemRow(index, allInventory);
+                          return _buildLineItemRow(index, availableProducts, selectedVendor);
                         },
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -623,8 +703,29 @@ class _PurchaseOrderFormDialogState
     );
   }
 
-  Widget _buildLineItemRow(int index, List<InventoryItem> allInventory) {
+  Widget _buildLineItemRow(
+    int index,
+    List<InventoryItem> availableProducts,
+    Vendor? selectedVendor,
+  ) {
     final line = _items[index];
+    final allInventory = ref.watch(inventoryProvider).value ?? [];
+    final hasCurrentItem = availableProducts.any((item) => item.id == line.inventoryId);
+    if (!hasCurrentItem && line.inventoryId.isNotEmpty && selectedVendor != null && allInventory.isNotEmpty) {
+      line.inventoryId = '';
+      line.inventoryName = '';
+      line.inventorySku = null;
+      line.priceController.text = '0.00';
+    }
+
+    final dropdownProducts = List<InventoryItem>.from(availableProducts);
+    if (line.inventoryId.isNotEmpty && !dropdownProducts.any((i) => i.id == line.inventoryId)) {
+      final fallbackItem = allInventory.where((i) => i.id == line.inventoryId).firstOrNull ??
+          (widget.preselectedInventoryItem?.id == line.inventoryId ? widget.preselectedInventoryItem : null);
+      if (fallbackItem != null) {
+        dropdownProducts.add(fallbackItem);
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
@@ -643,13 +744,22 @@ class _PurchaseOrderFormDialogState
               Expanded(
                 flex: 4,
                 child: DropdownButtonFormField<String>(
+                  key: ValueKey('po_item_product_${index}_${_selectedVendorId}_${line.inventoryId}'),
                   isExpanded: true,
-                  initialValue: line.inventoryId.isNotEmpty ? line.inventoryId : null,
+                  initialValue: dropdownProducts.any((i) => i.id == line.inventoryId) ? line.inventoryId : null,
+                  hint: Text(
+                    _selectedVendorId == null
+                        ? 'Select vendor first'
+                        : availableProducts.isEmpty
+                            ? 'No products supplied'
+                            : 'Select Product *',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Product ${index + 1}',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   ),
-                  items: allInventory.map((item) {
+                  items: dropdownProducts.map((item) {
                     final skuSuffix = item.sku != null ? ' (${item.sku})' : '';
                     return DropdownMenuItem<String>(
                       value: item.id,
@@ -659,18 +769,24 @@ class _PurchaseOrderFormDialogState
                       ),
                     );
                   }).toList(),
-                  onChanged: (val) {
-                    if (val == null) return;
-                    final selected = allInventory.firstWhere((i) => i.id == val);
-                    setState(() {
-                      line.inventoryId = selected.id;
-                      line.inventoryName = selected.name;
-                      line.inventoryUnit = selected.unit;
-                      line.inventorySku = selected.sku;
-                      if (selected.price != null && selected.price! > 0) {
-                        line.priceController.text = selected.price!.toStringAsFixed(2);
-                      }
-                    });
+                  onChanged: availableProducts.isEmpty
+                      ? null
+                      : (val) {
+                          if (val == null) return;
+                          final selected = dropdownProducts.firstWhere((i) => i.id == val);
+                          setState(() {
+                            line.inventoryId = selected.id;
+                            line.inventoryName = selected.name;
+                            line.inventoryUnit = selected.unit;
+                            line.inventorySku = selected.sku;
+                            if (selected.price != null && selected.price! > 0) {
+                              line.priceController.text = selected.price!.toStringAsFixed(2);
+                            }
+                          });
+                        },
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Product is required';
+                    return null;
                   },
                 ),
               ),
@@ -714,7 +830,7 @@ class _PurchaseOrderFormDialogState
 
               // Subtotal
               SizedBox(
-                width: 90,
+                width: 75,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 14),
                   child: Text(
@@ -730,6 +846,8 @@ class _PurchaseOrderFormDialogState
 
               // Delete row
               IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
                 icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
                 tooltip: 'Remove product',
                 onPressed: () => _removeItem(index),
