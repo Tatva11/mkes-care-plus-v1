@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../billing/screens/billing_management_screen.dart';
 import '../widgets/staff_shell.dart';
 import 'staff_attendance_screen.dart';
 import 'staff_patients_screen.dart';
@@ -36,6 +37,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         return const StaffTasksScreen();
       case StaffNavItem.attendance:
         return const StaffAttendanceScreen();
+      case StaffNavItem.billing:
+        return const BillingManagementScreen(isEmbedded: true, isStaff: true);
     }
   }
 }

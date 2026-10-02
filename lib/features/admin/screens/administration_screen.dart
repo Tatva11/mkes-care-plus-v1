@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../billing/screens/billing_management_screen.dart';
+import '../../billing/screens/billing_reports_screen.dart';
 import '../../admin/widgets/admin_shell.dart';
 import 'user_management_screen.dart';
 
@@ -50,9 +52,29 @@ class AdministrationContent extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _buildSettingCard(
+                            Icons.receipt_long_outlined,
+                            'Billing & Invoices',
+                            'Create patient invoices, record payments, and view billing records.',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const BillingManagementScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildSettingCard(
                             Icons.analytics_outlined,
                             'Reports & Analytics',
                             'View clinical, financial, and operational reports.',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const BillingReportsScreen(),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: AppSpacing.md),
                           _buildSettingCard(
@@ -75,15 +97,18 @@ class AdministrationContent extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _buildSettingCard(
-  Icons.manage_accounts_outlined,
-  'Users',
-  'Add, remove, or modify user accounts.',
-  onTap: () {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const UserManagementScreen()),
-    );
-  },
-), SizedBox(height: AppSpacing.md),
+                            Icons.manage_accounts_outlined,
+                            'Users',
+                            'Add, remove, or modify user accounts.',
+                            onTap: () {
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => const UserManagementScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.md),
                           _buildSettingCard(
                             Icons.settings_suggest_outlined,
                             'Clinic Settings',
@@ -105,9 +130,29 @@ class AdministrationContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildSettingCard(
+                      Icons.receipt_long_outlined,
+                      'Billing & Invoices',
+                      'Create patient invoices, record payments, and view billing records.',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const BillingManagementScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildSettingCard(
                       Icons.analytics_outlined,
                       'Reports & Analytics',
                       'View clinical, financial, and operational reports.',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const BillingReportsScreen(),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: AppSpacing.md),
                     _buildSettingCard(
@@ -128,7 +173,9 @@ class AdministrationContent extends StatelessWidget {
                       'Add, remove, or modify user accounts.',
                       onTap: () {
                         Navigator.of(context).pushReplacement(
-                         MaterialPageRoute(builder: (_) => const UserManagementScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const UserManagementScreen(),
+                          ),
                         );
                       },
                     ),

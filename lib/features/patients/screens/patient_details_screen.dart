@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../billing/screens/create_invoice_screen.dart';
 import '../models/patient_attendance.dart';
 import '../models/patient_model.dart';
 import '../providers/patient_attendance_provider.dart';
@@ -31,18 +32,37 @@ class PatientDetailsScreen extends ConsumerWidget {
         title: const Text('Patient Details'),
         actions: [
           patientAsync.whenOrNull(
-                data: (patient) => IconButton(
-                  icon: const Icon(Icons.edit_outlined),
-                  tooltip: 'Edit Patient',
-                  onPressed: () async {
-                    final updated = await showDialog<PatientModel>(
-                      context: context,
-                      builder: (_) => PatientFormDialog(patient: patient),
-                    );
-                    if (updated != null) {
-                      ref.invalidate(patientDetailsProvider(patientId));
-                    }
-                  },
+                data: (patient) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      tooltip: 'Create Invoice',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CreateInvoiceScreen(
+                              initialPatient: patient,
+                              initialDepartment: patient.department,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: 'Edit Patient',
+                      onPressed: () async {
+                        final updated = await showDialog<PatientModel>(
+                          context: context,
+                          builder: (_) => PatientFormDialog(patient: patient),
+                        );
+                        if (updated != null) {
+                          ref.invalidate(patientDetailsProvider(patientId));
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ) ??
               const SizedBox.shrink(),

@@ -9,7 +9,7 @@ import '../../../shared/widgets/notification_center_modal.dart';
 import '../../../shared/widgets/user_profile_menu.dart';
 import '../../auth/providers/auth_provider.dart';
 
-enum StaffNavItem { schedule, patients, tasks, attendance }
+enum StaffNavItem { schedule, patients, tasks, attendance, billing }
 
 class StaffShell extends ConsumerWidget {
   const StaffShell({
@@ -240,6 +240,13 @@ class _DesktopNavCluster extends StatelessWidget {
           selected: selectedItem == StaffNavItem.attendance,
           onTap: () => onNavItemSelected?.call(StaffNavItem.attendance),
         ),
+        const SizedBox(width: AppSpacing.md),
+        _DesktopNavLink(
+          label: 'Billing',
+          icon: Icons.receipt_long_outlined,
+          selected: selectedItem == StaffNavItem.billing,
+          onTap: () => onNavItemSelected?.call(StaffNavItem.billing),
+        ),
       ],
     );
   }
@@ -343,6 +350,12 @@ class _StaffBottomNavBar extends StatelessWidget {
                 icon: Icons.access_time_outlined,
                 selected: selectedItem == StaffNavItem.attendance,
                 onTap: () => onNavItemSelected?.call(StaffNavItem.attendance),
+              ),
+              _BottomNavItem(
+                label: 'Billing',
+                icon: Icons.receipt_long_outlined,
+                selected: selectedItem == StaffNavItem.billing,
+                onTap: () => onNavItemSelected?.call(StaffNavItem.billing),
               ),
             ],
           ),
