@@ -50,6 +50,25 @@ class AppointmentRepository {
         .toList();
   }
 
+  Future<List<AppointmentModel>> fetchPatientAppointments({
+    required String patientId,
+    required String department,
+  }) async {
+    final response = await _supabase
+        .from('appointments')
+        .select(
+          '*, patients!appointments_patient_id_fkey(*), profiles!appointments_doctor_id_fkey(*)',
+        )
+        .eq('patient_id', patientId)
+        .eq('department', department.toLowerCase())
+        .order('appointment_date', ascending: true)
+        .order('appointment_time', ascending: true);
+
+    return (response as List)
+        .map((json) => AppointmentModel.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<AppointmentStaffCandidate>> fetchDepartmentStaffCandidates(
     String departmentId,
   ) async {

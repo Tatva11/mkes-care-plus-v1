@@ -293,7 +293,7 @@ class InventoryDetailsDialog extends ConsumerWidget {
                         activeItem.stockStatusLabel,
                         badgeColor: activeItem.stockStatusColor,
                       ),
-                      if (activeItem.expiryDate != null)
+                      if (activeItem.effectiveExpiryDate != null)
                         _buildInfoRow(
                           'Expiry Status',
                           activeItem.expiryStatusLabel,
@@ -489,7 +489,7 @@ class InventoryDetailsDialog extends ConsumerWidget {
                 ),
             ],
           ),
-          if (activeItem.expiryDate != null) ...[
+          if (activeItem.effectiveExpiryDate != null) ...[
             const SizedBox(height: AppSpacing.sm),
             const Divider(height: 1, color: AppColors.outlineVariant),
             const SizedBox(height: AppSpacing.sm),
@@ -508,7 +508,7 @@ class InventoryDetailsDialog extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  DateFormat('MMM d, yyyy').format(activeItem.expiryDate!),
+                  DateFormat('MMM d, yyyy').format(activeItem.effectiveExpiryDate!),
                   style: AppTypography.bodySm.copyWith(
                     fontWeight: FontWeight.w600,
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mkes_care/features/auth/providers/auth_provider.dart';
+import 'package:mkes_care/features/inventory/models/expired_stock_entry.dart';
 import 'package:mkes_care/features/inventory/models/inventory_batch.dart';
 import 'package:mkes_care/features/inventory/models/inventory_item.dart';
 import 'package:mkes_care/features/inventory/models/inventory_transaction.dart';
@@ -23,6 +24,68 @@ class FakeInventoryRepository implements InventoryRepository {
   final List<InventoryTransaction> transactions = [];
   final List<PatientModel> registeredPatients;
   bool shouldThrow = false;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  @override
+  Future<List<ExpiredStockEntry>> getExpiredStockEntries() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final List<ExpiredStockEntry> entries = [];
+    for (final item in items) {
+      if (item.batches != null && item.batches!.isNotEmpty) {
+        for (final b in item.batches!) {
+          if (b.remainingQuantity > 0 && b.expiryDate != null) {
+            final exp = DateTime(b.expiryDate!.year, b.expiryDate!.month, b.expiryDate!.day);
+            if (exp.isBefore(today)) {
+              entries.add(ExpiredStockEntry(
+                inventoryId: item.id,
+                itemName: item.name,
+                unit: item.unit,
+                batchId: b.id,
+                batchNumber: b.batchNumber,
+                expiredQuantity: b.remainingQuantity,
+                totalAvailableStock: item.currentStock,
+                expiryDate: b.expiryDate!,
+              ));
+            }
+          }
+        }
+      } else if (item.currentStock > 0 && item.expiryDate != null) {
+        final exp = DateTime(item.expiryDate!.year, item.expiryDate!.month, item.expiryDate!.day);
+        if (exp.isBefore(today)) {
+          entries.add(ExpiredStockEntry(
+            inventoryId: item.id,
+            itemName: item.name,
+            unit: item.unit,
+            batchId: null,
+            batchNumber: null,
+            expiredQuantity: item.currentStock,
+            totalAvailableStock: item.currentStock,
+            expiryDate: item.expiryDate!,
+          ));
+        }
+      }
+    }
+    return entries;
+  }
+
+  @override
+  Future<InventoryTransaction> removeExpiredStock({
+    required String inventoryId,
+    required double quantity,
+    String? batchNumber,
+    String? remarks,
+  }) async {
+    return performStockOperation(
+      itemId: inventoryId,
+      transactionType: 'stock_out',
+      quantity: quantity,
+      reason: StockOutReasons.expired,
+      remarks: remarks ?? (batchNumber != null ? 'Removed expired stock from Batch $batchNumber' : 'Removed expired stock'),
+    );
+  }
 
   FakeInventoryRepository([
     List<InventoryItem>? initialItems,

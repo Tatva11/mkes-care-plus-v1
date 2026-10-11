@@ -59,6 +59,9 @@ class FakeSprint64InventoryRepo implements InventoryRepository {
   final List<InventoryBatch> batches = [];
   final List<InventoryTransaction> transactions = [];
 
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   FakeSprint64InventoryRepo([List<InventoryItem>? initialItems])
       : items = initialItems != null ? List.from(initialItems) : [];
 

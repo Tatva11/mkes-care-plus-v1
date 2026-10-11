@@ -742,7 +742,26 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
   }
 
   Widget _buildAuditTrailCard(PurchaseOrder po, DateFormat dateFormat) {
-    final String createdByName = po.createdByName ?? (po.createdBy != null ? po.createdBy! : 'Staff/Admin');
+    bool isUuid(String? str) {
+      if (str == null || str.trim().isEmpty) return false;
+      return RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      ).hasMatch(str.trim());
+    }
+
+    final String createdByName;
+    if (po.createdByName != null &&
+        po.createdByName!.trim().isNotEmpty &&
+        !isUuid(po.createdByName)) {
+      createdByName = po.createdByName!.trim();
+    } else if (po.createdBy != null &&
+        po.createdBy!.trim().isNotEmpty &&
+        !isUuid(po.createdBy)) {
+      createdByName = po.createdBy!.trim();
+    } else {
+      createdByName = 'Staff/Admin';
+    }
+
     final String createdAtStr = po.createdAt != null ? dateFormat.format(po.createdAt!) : '—';
 
     final String orderPlacedByName;
@@ -751,10 +770,14 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
     if (po.isDraft) {
       orderPlacedByName = 'Not placed yet';
       orderPlacedAtStr = 'Not placed yet';
-    } else if (po.orderedByName != null && po.orderedByName!.trim().isNotEmpty) {
+    } else if (po.orderedByName != null &&
+        po.orderedByName!.trim().isNotEmpty &&
+        !isUuid(po.orderedByName)) {
       orderPlacedByName = po.orderedByName!.trim();
       orderPlacedAtStr = po.orderedAt != null ? dateFormat.format(po.orderedAt!) : 'Recorded';
-    } else if (po.orderedBy != null && po.orderedBy!.trim().isNotEmpty) {
+    } else if (po.orderedBy != null &&
+        po.orderedBy!.trim().isNotEmpty &&
+        !isUuid(po.orderedBy)) {
       orderPlacedByName = po.orderedBy!.trim();
       orderPlacedAtStr = po.orderedAt != null ? dateFormat.format(po.orderedAt!) : 'Recorded';
     } else {

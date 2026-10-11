@@ -145,6 +145,42 @@ class AppointmentsNotifier
     }
   }
 
+  Future<void> updateAppointment(
+    String appointmentId,
+    Map<String, dynamic> updates,
+  ) async {
+    final currentList = state.value ?? [];
+    final updatedList = currentList.map((item) {
+      if (item.id == appointmentId) {
+        return item.copyWith(
+          patientId: updates['patient_id'] ?? item.patientId,
+          department: updates['department'] ?? item.department,
+          doctorId: updates['doctor_id'] ?? item.doctorId,
+          appointmentDate: updates['appointment_date'] != null
+              ? DateTime.tryParse(updates['appointment_date'] as String) ??
+                  item.appointmentDate
+              : item.appointmentDate,
+          appointmentTime: updates['appointment_time'] ?? item.appointmentTime,
+          appointmentType: updates['appointment_type'] ?? item.appointmentType,
+          status: updates['status'] ?? item.status,
+          notes: updates['notes'] ?? item.notes,
+          updatedAt: DateTime.now(),
+        );
+      }
+      return item;
+    }).toList();
+
+    state = AsyncValue.data(updatedList);
+
+    try {
+      if (!appointmentId.startsWith('APT-')) {
+        await _repository.updateAppointment(appointmentId, updates);
+      }
+    } catch (e) {
+      debugPrint('Error syncing appointment update to Supabase: $e');
+    }
+  }
+
   Future<void> deleteAppointment(String appointmentId) async {
     final currentList = state.value ?? [];
     state = AsyncValue.data(

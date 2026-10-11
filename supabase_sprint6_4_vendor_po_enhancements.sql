@@ -16,6 +16,20 @@ ALTER TABLE public.purchase_orders
   ADD COLUMN IF NOT EXISTS ordered_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS ordered_at TIMESTAMPTZ;
 
+-- Ensure foreign key for created_by to public.profiles exists for PostgREST joins
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'purchase_orders_created_by_fkey'
+      AND conrelid = 'public.purchase_orders'::regclass
+  ) THEN
+    ALTER TABLE public.purchase_orders
+      ADD CONSTRAINT purchase_orders_created_by_fkey
+      FOREIGN KEY (created_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
 -- 3. Performance indexes for audit and ordering queries
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_ordered_by
   ON public.purchase_orders(ordered_by);

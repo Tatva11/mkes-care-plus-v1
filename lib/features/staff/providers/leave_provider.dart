@@ -38,12 +38,14 @@ class StaffLeaveNotifier
     required DateTime startDate,
     required DateTime endDate,
     required String reason,
+    String dutyPeriod = 'full_day',
   }) async {
     await _repository.createLeaveRequest(
       staffId: _staffId,
       startDate: startDate,
       endDate: endDate,
       reason: reason,
+      dutyPeriod: dutyPeriod,
     );
     await fetchRequests();
   }
@@ -84,13 +86,35 @@ class AdminPendingLeaveNotifier
   }
 
   Future<void> approveRequest(String id, String adminId) async {
-    await _repository.approveLeaveRequest(id, adminId);
-    await fetchPending();
+    final prevList = state.valueOrNull;
+    if (prevList != null) {
+      state = AsyncValue.data(prevList.where((r) => r.id != id).toList());
+    }
+    try {
+      await _repository.approveLeaveRequest(id, adminId);
+      await fetchPending();
+    } catch (e) {
+      if (prevList != null) {
+        state = AsyncValue.data(prevList);
+      }
+      rethrow;
+    }
   }
 
   Future<void> rejectRequest(String id, String adminId, String reason) async {
-    await _repository.rejectLeaveRequest(id, adminId, reason);
-    await fetchPending();
+    final prevList = state.valueOrNull;
+    if (prevList != null) {
+      state = AsyncValue.data(prevList.where((r) => r.id != id).toList());
+    }
+    try {
+      await _repository.rejectLeaveRequest(id, adminId, reason);
+      await fetchPending();
+    } catch (e) {
+      if (prevList != null) {
+        state = AsyncValue.data(prevList);
+      }
+      rethrow;
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/expired_stock_entry.dart';
 import '../models/inventory_batch.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_transaction.dart';
@@ -90,6 +91,23 @@ class InventoryNotifier extends StateNotifier<AsyncValue<List<InventoryItem>>> {
     await fetchInventory();
     return transaction;
   }
+
+  /// Atomically removes expired stock for an item and refreshes inventory state.
+  Future<InventoryTransaction> removeExpiredStock({
+    required String inventoryId,
+    required double quantity,
+    String? batchNumber,
+    String? remarks,
+  }) async {
+    final transaction = await _repository.removeExpiredStock(
+      inventoryId: inventoryId,
+      quantity: quantity,
+      batchNumber: batchNumber,
+      remarks: remarks,
+    );
+    await fetchInventory();
+    return transaction;
+  }
 }
 
 /// Provider for the [InventoryNotifier].
@@ -97,6 +115,13 @@ final inventoryProvider =
     StateNotifierProvider<InventoryNotifier, AsyncValue<List<InventoryItem>>>(
   (ref) => InventoryNotifier(ref.watch(inventoryRepositoryProvider)),
 );
+
+/// Provider fetching all expired stock items and batches.
+final expiredStockEntriesProvider = FutureProvider<List<ExpiredStockEntry>>((ref) async {
+  ref.watch(inventoryProvider);
+  final repo = ref.watch(inventoryRepositoryProvider);
+  return repo.getExpiredStockEntries();
+});
 
 /// State provider for the active search query.
 final inventorySearchQueryProvider = StateProvider<String>((ref) => '');

@@ -21,6 +21,7 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
   final _reasonController = TextEditingController();
   DateTime? _startDate;
   DateTime? _endDate;
+  String _dutyPeriod = 'full_day'; // 'morning' | 'afternoon' | 'full_day'
   bool _isSubmitting = false;
 
   @override
@@ -54,6 +55,7 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
             startDate: _startDate!,
             endDate: _endDate!,
             reason: _reasonController.text.trim(),
+            dutyPeriod: _dutyPeriod,
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -63,6 +65,7 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
       setState(() {
         _startDate = null;
         _endDate = null;
+        _dutyPeriod = 'full_day';
       });
     } catch (e) {
       if (!mounted) return;
@@ -88,7 +91,7 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
     final profile = profileAsync.valueOrNull;
 
     final workingDays = (_startDate != null && _endDate != null)
-        ? LeaveRepository.calculateLeaveDays(_startDate!, _endDate!)
+        ? LeaveRepository.calculateLeaveDays(_startDate!, _endDate!, dutyPeriod: _dutyPeriod)
         : 0.0;
 
     final salary = profile?.salary;
@@ -175,6 +178,24 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                     ],
                   ),
 
+                  const SizedBox(height: AppSpacing.md),
+                  Text('DUTY PERIOD', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
+                  const SizedBox(height: AppSpacing.xs),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'full_day', label: Text('Full Day')),
+                        ButtonSegment(value: 'morning', label: Text('Morning Only')),
+                        ButtonSegment(value: 'afternoon', label: Text('Evening Only')),
+                      ],
+                      selected: {_dutyPeriod},
+                      onSelectionChanged: (newSelection) {
+                        setState(() => _dutyPeriod = newSelection.first);
+                      },
+                    ),
+                  ),
+
                   // Live Leave Days & Salary Deduction preview
                   if (_startDate != null && _endDate != null) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -197,11 +218,13 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                               const Icon(Icons.event_note,
                                   size: 16, color: AppColors.primaryContainer),
                               const SizedBox(width: 6),
-                              Text(
-                                '${workingDays.toStringAsFixed(0)} working day(s) requested (Sundays excluded)',
-                                style: AppTypography.bodySm.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primaryContainer,
+                              Expanded(
+                                child: Text(
+                                  '${workingDays.toStringAsFixed(workingDays.truncateToDouble() == workingDays ? 0 : 1)} working day(s) requested (${_dutyPeriod == 'full_day' ? 'Full Day' : _dutyPeriod == 'morning' ? 'Morning Only' : 'Evening Only'}, Sundays excluded)',
+                                  style: AppTypography.bodySm.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primaryContainer,
+                                  ),
                                 ),
                               ),
                             ],
@@ -298,10 +321,35 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                         title: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              '${DateFormat('MMM d, yyyy').format(req.startDate)} — ${DateFormat('MMM d, yyyy').format(req.endDate)}',
-                              style: AppTypography.bodyMd
-                                  .copyWith(fontWeight: FontWeight.w700),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      '${DateFormat('MMM d, yyyy').format(req.startDate)} — ${DateFormat('MMM d, yyyy').format(req.endDate)}',
+                                      style: AppTypography.bodyMd
+                                          .copyWith(fontWeight: FontWeight.w700),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      req.dutyPeriodDisplayName,
+                                      style: AppTypography.labelCaps.copyWith(
+                                        fontSize: 9,
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -329,7 +377,7 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${req.leaveDays.toStringAsFixed(0)} working day(s)  •  ${req.reason}',
+                                '${req.leaveDays.toStringAsFixed(req.leaveDays.truncateToDouble() == req.leaveDays ? 0 : 1)} working day(s) (${req.dutyPeriodDisplayName})  •  ${req.reason}',
                                 style: AppTypography.bodySm.copyWith(
                                   color: AppColors.onSurfaceVariant,
                                 ),

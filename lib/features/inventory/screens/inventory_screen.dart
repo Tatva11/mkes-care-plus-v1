@@ -17,6 +17,7 @@ import '../providers/inventory_provider.dart';
 import '../widgets/inventory_details_dialog.dart';
 import '../widgets/inventory_form_dialog.dart';
 import '../widgets/inventory_transaction_history_dialog.dart';
+import '../widgets/remove_expired_stock_dialog.dart';
 import '../widgets/stock_operation_dialog.dart';
 
 /// Full screen for Inventory Management with role-aware shell and navigation.
@@ -129,6 +130,10 @@ class _InventoryManagementContentState
     );
   }
 
+  Future<void> _openRemoveExpiredStockDialog() async {
+    await RemoveExpiredStockDialog.show(context);
+  }
+
   Future<void> _confirmDelete(InventoryItem item) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -231,7 +236,7 @@ class _InventoryManagementContentState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(isDesktop, canManageInventory),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.sm),
             _buildSearchAndFilterBar(
               isDesktop,
               availableCategories,
@@ -295,6 +300,17 @@ class _InventoryManagementContentState
             label: const Text('Departments'),
           ),
         if (canManageInventory)
+          OutlinedButton.icon(
+            key: const Key('remove_expired_stock_button'),
+            onPressed: () => _openRemoveExpiredStockDialog(),
+            icon: const Icon(Icons.remove_circle_outline, size: 18, color: AppColors.error),
+            label: const Text('Remove Expired Stock'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.error,
+              side: const BorderSide(color: AppColors.error),
+            ),
+          ),
+        if (canManageInventory)
           FilledButton.icon(
             onPressed: () => _openItemDialog(),
             icon: const Icon(Icons.add, size: 18),
@@ -340,7 +356,12 @@ class _InventoryManagementContentState
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          actions,
+          Flexible(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: actions,
+            ),
+          ),
         ],
       );
     }
@@ -849,13 +870,13 @@ class _InventoryManagementContentState
                         // Expiry Status
                         Expanded(
                           flex: 2,
-                          child: item.expiryDate != null
+                          child: item.effectiveExpiryDate != null
                               ? Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      dateFormat.format(item.expiryDate!),
+                                      dateFormat.format(item.effectiveExpiryDate!),
                                       style: AppTypography.bodySm.copyWith(
                                         fontSize: 12,
                                       ),
@@ -1158,7 +1179,7 @@ class _InventoryManagementContentState
                           Icon(item.expiryStatusIcon, size: 10, color: item.expiryStatusColor),
                           const SizedBox(width: 3),
                           Text(
-                            'Exp: ${dateFormat.format(item.expiryDate!)} (${item.expiryStatusLabel})',
+                            'Exp: ${dateFormat.format(item.effectiveExpiryDate!)} (${item.expiryStatusLabel})',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,

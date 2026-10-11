@@ -21,6 +21,13 @@ class NotificationRepository {
     ).hasMatch(value);
   }
 
+  static bool _isCheckConstraintViolation(Object err) {
+    final s = err.toString().toLowerCase();
+    return s.contains('23514') ||
+        s.contains('check constraint') ||
+        s.contains('notifications_type_check');
+  }
+
   /// Fetch all notifications for the given user, newest first.
   Future<List<NotificationModel>> fetchForUser(String userId) async {
     try {
@@ -105,30 +112,71 @@ class NotificationRepository {
   }
 
   /// Insert a notification for a specific user.
+  /// If [idempotent] is true, checks for existing notification with same user, title, and message
+  /// to avoid duplicate delivery on retries.
   /// First attempts the SECURITY DEFINER RPC `notify_user` to bypass any client RLS limits.
   /// Falls back to direct INSERT if the RPC is not loaded.
+  /// If the remote database check constraint rejects custom types (e.g., 'duty_assignment' before migration),
+  /// automatically retries with 'system' so notification creation never fails.
   Future<void> insertNotification({
     required String userId,
     required String title,
     required String message,
     required String type,
     String? relatedId,
+    bool idempotent = false,
   }) async {
     final validRelatedId = _isValidUuid(relatedId) ? relatedId : null;
+
+    if (idempotent) {
+      try {
+        final existing = await _supabase
+            .from('notifications')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('title', title)
+            .eq('message', message)
+            .limit(1);
+        if (existing.isNotEmpty) {
+          debugPrint('[NotificationRepo] Idempotent notification already exists for user $userId. Skipping duplicate insert.');
+          return;
+        }
+      } catch (checkErr) {
+        debugPrint('[NotificationRepo] Idempotency check error ($checkErr). Proceeding with insert.');
+      }
+    }
 
     // 1. Try SECURITY DEFINER RPC notify_user
     try {
       debugPrint('[NotificationRepo] Attempting notify_user RPC for user: $userId (type: $type, title: "$title")');
-      await _supabase.rpc('notify_user', params: {
+      final params = <String, dynamic>{
         'p_user_id': userId,
         'p_title': title,
         'p_message': message,
         'p_type': type,
-        'p_related_id': validRelatedId,
-      });
+        if (validRelatedId != null) 'p_related_id': validRelatedId,
+      };
+      await _supabase.rpc('notify_user', params: params);
       debugPrint('[NotificationRepo SUCCESS] notify_user RPC succeeded for user: $userId');
       return;
     } catch (rpcErr) {
+      if (_isCheckConstraintViolation(rpcErr) && type != 'system') {
+        debugPrint('[NotificationRepo] notify_user RPC failed with check constraint for type "$type". Retrying with fallback "system"...');
+        try {
+          final fallbackParams = <String, dynamic>{
+            'p_user_id': userId,
+            'p_title': title,
+            'p_message': message,
+            'p_type': 'system',
+            if (validRelatedId != null) 'p_related_id': validRelatedId,
+          };
+          await _supabase.rpc('notify_user', params: fallbackParams);
+          debugPrint('[NotificationRepo SUCCESS] notify_user RPC succeeded with fallback type "system" for user: $userId');
+          return;
+        } catch (fallbackRpcErr) {
+          debugPrint('[NotificationRepo] Fallback notify_user RPC also failed: $fallbackRpcErr');
+        }
+      }
       debugPrint('[NotificationRepo] notify_user RPC unavailable or failed ($rpcErr). Falling back to direct insert...');
     }
 
@@ -144,6 +192,23 @@ class NotificationRepository {
       });
       debugPrint('[NotificationRepo SUCCESS] Notification inserted successfully for user: $userId');
     } catch (e) {
+      if (_isCheckConstraintViolation(e) && type != 'system') {
+        debugPrint('[NotificationRepo] Direct insert failed with check constraint for type "$type". Retrying with fallback "system"...');
+        try {
+          await _supabase.from('notifications').insert({
+            'user_id': userId,
+            'title': title,
+            'message': message,
+            'type': 'system',
+            if (validRelatedId != null) 'related_id': validRelatedId,
+          });
+          debugPrint('[NotificationRepo SUCCESS] Direct insert succeeded with fallback type "system" for user: $userId');
+          return;
+        } catch (fallbackDirectErr) {
+          debugPrint('[NotificationRepo ERROR] Fallback direct insert failed: $fallbackDirectErr');
+          rethrow;
+        }
+      }
       debugPrint('[NotificationRepo ERROR] insertNotification failed for user $userId: $e');
       rethrow;
     }

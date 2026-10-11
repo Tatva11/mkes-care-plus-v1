@@ -27,6 +27,9 @@ class FakeTestInventoryRepo implements InventoryRepository {
   final List<InventoryBatch> batches = [];
   final List<InventoryTransaction> transactions = [];
 
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   FakeTestInventoryRepo(this.items);
 
   @override

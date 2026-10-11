@@ -1,90 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../dental/models/dental_lab_model.dart';
+import '../../dental/providers/dental_lab_provider.dart';
+import '../../dental/widgets/dental_lab_form_dialog.dart';
+import '../../dental/widgets/dental_lab_whatsapp_dialog.dart';
 
-enum DentalCaseStatus { inProduction, qaReview, pendingImpression, completed }
-
-class DentalCaseOrder {
-  final String caseId;
-  final String patient;
-  final String restorationType;
-  final String technician;
-  final String stageName;
-  final double progressPercent;
-  final DentalCaseStatus status;
-  final bool hasAiHighlight;
-
-  const DentalCaseOrder({
-    required this.caseId,
-    required this.patient,
-    required this.restorationType,
-    required this.technician,
-    required this.stageName,
-    required this.progressPercent,
-    required this.status,
-    this.hasAiHighlight = false,
-  });
-}
-
-class DentalLabQueueCard extends StatelessWidget {
+class DentalLabQueueCard extends ConsumerWidget {
   const DentalLabQueueCard({super.key});
 
-  static const _cases = [
-    DentalCaseOrder(
-      caseId: '#DEN-4012',
-      patient: 'David Miller',
-      restorationType: 'Zirconia Crown #14',
-      technician: 'Tech Alex Vance',
-      stageName: 'CAM Milling',
-      progressPercent: 0.65,
-      status: DentalCaseStatus.inProduction,
-    ),
-    DentalCaseOrder(
-      caseId: '#DEN-4013',
-      patient: 'Sophia Martinez',
-      restorationType: '3-Unit Porc. Bridge',
-      technician: 'Tech Maria Lopez',
-      stageName: 'Shade & Glaze QC',
-      progressPercent: 0.90,
-      status: DentalCaseStatus.qaReview,
-      hasAiHighlight: true,
-    ),
-    DentalCaseOrder(
-      caseId: '#DEN-4014',
-      patient: 'Ethan Wright',
-      restorationType: 'Implant Abutment #19',
-      technician: 'Unassigned',
-      stageName: 'Intraoral Scan Review',
-      progressPercent: 0.15,
-      status: DentalCaseStatus.pendingImpression,
-    ),
-    DentalCaseOrder(
-      caseId: '#DEN-4015',
-      patient: 'Olivia Taylor',
-      restorationType: 'Full Upper Denture',
-      technician: 'Tech Alex Vance',
-      stageName: 'Final Inspection',
-      progressPercent: 1.0,
-      status: DentalCaseStatus.completed,
-    ),
-  ];
-
-  // Builds interleaved case rows with dividers between them.
-  List<Widget> _buildCaseRows() {
-    final rows = <Widget>[];
-    for (int i = 0; i < _cases.length; i++) {
-      rows.add(_DentalRow(item: _cases[i]));
-      if (i < _cases.length - 1) {
-        rows.add(const Divider(height: 1, color: AppColors.surfaceVariant));
-      }
-    }
-    return rows;
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final casesAsync = ref.watch(dentalLabListProvider);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
@@ -103,7 +35,7 @@ class DentalLabQueueCard extends StatelessWidget {
         children: [
           // ── Card Header ──────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.all(AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
             decoration: const BoxDecoration(
               color: AppColors.surfaceContainerLowest,
               border: Border(
@@ -123,60 +55,89 @@ class DentalLabQueueCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.filter_list),
-                      color: AppColors.onSurfaceVariant,
-                      iconSize: 22,
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.more_vert),
-                      color: AppColors.onSurfaceVariant,
-                      iconSize: 22,
-                    ),
-                  ],
+                IconButton(
+                  onPressed: () => ref.read(dentalLabListProvider.notifier).refresh(),
+                  icon: const Icon(Icons.refresh),
+                  color: AppColors.onSurfaceVariant,
+                  tooltip: 'Refresh Queue',
+                  iconSize: 20,
                 ),
               ],
             ),
           ),
-          // ── Table (horizontally scrollable on narrow screens) ────
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: 650,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Column headers
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 4),
-                        Expanded(flex: 2, child: _HeaderCell('Case ID')),
-                        Expanded(flex: 3, child: _HeaderCell('Patient')),
-                        Expanded(flex: 3, child: _HeaderCell('Restoration')),
-                        Expanded(flex: 3, child: _HeaderCell('Technician')),
-                        Expanded(flex: 3, child: _HeaderCell('Stage')),
-                        Expanded(
-                          flex: 2,
-                          child: _HeaderCell('Status', alignRight: true),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1, color: AppColors.surfaceVariant),
-                  // Data rows with dividers
-                  ..._buildCaseRows(),
-                ],
+
+          // ── Table Content ────────────────────────────────────────
+          casesAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (err, _) => Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Text(
+                'Unable to load cases: $err',
+                style: AppTypography.bodySm.copyWith(color: AppColors.error),
               ),
             ),
+            data: (cases) {
+              if (cases.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Center(
+                    child: Text(
+                      'No dental lab cases logged yet.',
+                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                    ),
+                  ),
+                );
+              }
+
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: 780,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Column headers
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.xs,
+                        ),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 4),
+                            Expanded(flex: 2, child: _HeaderCell('Case ID')),
+                            Expanded(flex: 3, child: _HeaderCell('Patient')),
+                            Expanded(flex: 3, child: _HeaderCell('Restoration')),
+                            Expanded(flex: 2, child: _HeaderCell('Sent Date')),
+                            Expanded(flex: 2, child: _HeaderCell('Appointment')),
+                            Expanded(
+                              flex: 2,
+                              child: _HeaderCell('Status', alignRight: true),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, color: AppColors.surfaceVariant),
+
+                      // Data rows
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: cases.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, color: AppColors.surfaceVariant),
+                        itemBuilder: (context, index) {
+                          return _RealDentalRow(item: cases[index]);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -202,165 +163,145 @@ class _HeaderCell extends StatelessWidget {
   }
 }
 
-class _DentalRow extends StatelessWidget {
-  const _DentalRow({required this.item});
-  final DentalCaseOrder item;
+class _RealDentalRow extends ConsumerWidget {
+  const _RealDentalRow({required this.item});
+  final DentalLabModel item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dateFormat = DateFormat('dd MMM');
+
+    Color badgeBg;
+    Color badgeFg;
+    if (item.isProcessing) {
+      badgeBg = Colors.amber.shade100;
+      badgeFg = Colors.amber.shade900;
+    } else if (item.isReady) {
+      badgeBg = AppColors.secondaryContainer.withValues(alpha: 0.3);
+      badgeFg = AppColors.secondary;
+    } else {
+      badgeBg = Colors.green.shade100;
+      badgeFg = Colors.green.shade800;
+    }
+
     return Container(
-      decoration: BoxDecoration(
-        color: item.hasAiHighlight
-            ? AppColors.secondaryContainer.withValues(alpha: 0.15)
-            : AppColors.surfaceContainerLowest,
-        border: Border(
-          left: BorderSide(
-            width: 4,
-            color:
-                item.hasAiHighlight ? AppColors.secondary : Colors.transparent,
-          ),
-        ),
+      color: AppColors.surfaceContainerLowest,
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.sm,
+        horizontal: AppSpacing.md,
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.sm,
-          horizontal: AppSpacing.sm,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Text(
-                item.caseId,
-                style: AppTypography.dataMono.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
+      child: Row(
+        children: [
+          // Case ID
+          Expanded(
+            flex: 2,
+            child: Text(
+              item.caseNumber,
+              style: AppTypography.dataMono.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
               ),
             ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                item.patient,
-                style: AppTypography.bodySm.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurface,
-                ),
+          ),
+
+          // Patient
+          Expanded(
+            flex: 3,
+            child: Text(
+              item.patientName ?? 'Unknown',
+              style: AppTypography.bodySm.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.onSurface,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+
+          // Restoration
+          Expanded(
+            flex: 3,
+            child: Text(
+              item.caseType,
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+
+          // Sent Date
+          Expanded(
+            flex: 2,
+            child: Text(
+              dateFormat.format(item.sentDate),
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.onSurfaceVariant,
+                fontSize: 12,
               ),
             ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                item.restorationType,
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                ),
-                overflow: TextOverflow.ellipsis,
+          ),
+
+          // Appointment
+          Expanded(
+            flex: 2,
+            child: Text(
+              item.appointmentDate != null
+                  ? (item.formattedAppointmentDateTime ??
+                      item.formattedAppointmentDate ??
+                      '-')
+                  : '-',
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.primary,
+                fontSize: 11,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                item.technician,
-                style: AppTypography.bodySm.copyWith(
-                  color: item.technician == 'Unassigned'
-                      ? AppColors.error
-                      : AppColors.onSurfaceVariant,
-                  fontWeight: item.technician == 'Unassigned'
-                      ? FontWeight.bold
-                      : FontWeight.normal,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          ),
+
+          // Status & Quick Action
+          Expanded(
+            flex: 2,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    item.stageName.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.onSurfaceVariant,
+                  if (item.isReady)
+                    IconButton(
+                      icon: const Icon(Icons.message, color: Color(0xFF25D366), size: 16),
+                      tooltip: 'WhatsApp Ready Notice',
+                      onPressed: () => DentalLabWhatsAppDialog.show(context, item),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  LinearProgressIndicator(
-                    value: item.progressPercent,
-                    backgroundColor: AppColors.surfaceVariant,
-                    color: item.status == DentalCaseStatus.qaReview
-                        ? AppColors.secondary
-                        : AppColors.primaryContainer,
-                    minHeight: 4,
-                    borderRadius: BorderRadius.circular(2),
+                  InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => DentalLabFormDialog(initialCase: item),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        item.statusLabel,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: badgeFg,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            Expanded(
-              flex: 2,
-              child: _StatusBadge(status: item.status),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-  final DentalCaseStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    Color bgColor;
-    Color textColor;
-    String label;
-
-    switch (status) {
-      case DentalCaseStatus.inProduction:
-        bgColor = AppColors.primaryContainer.withValues(alpha: 0.15);
-        textColor = AppColors.primaryContainer;
-        label = 'Production';
-        break;
-      case DentalCaseStatus.qaReview:
-        bgColor = AppColors.secondaryContainer.withValues(alpha: 0.2);
-        textColor = AppColors.secondary;
-        label = 'QA Review';
-        break;
-      case DentalCaseStatus.pendingImpression:
-        bgColor = AppColors.errorContainer;
-        textColor = AppColors.onErrorContainer;
-        label = 'Impression';
-        break;
-      case DentalCaseStatus.completed:
-        bgColor = AppColors.surfaceContainerHigh;
-        textColor = AppColors.onSurface;
-        label = 'Completed';
-        break;
-    }
-
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: textColor,
           ),
-        ),
+        ],
       ),
     );
   }

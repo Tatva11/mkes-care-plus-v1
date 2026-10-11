@@ -40,7 +40,12 @@ class AdminShell extends ConsumerWidget {
     return roleAsync.when(
       data: (role) {
         if (Supabase.instance.client.auth.currentSession == null) {
-          debugPrint('[LOGOUT] AdminShell session is cleared; showing loader');
+          debugPrint('[LOGOUT] AdminShell session is cleared; ensuring pushed routes popped');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            }
+          });
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -52,6 +57,9 @@ class AdminShell extends ConsumerWidget {
           );
           // Redirect to login if not admin
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            }
             if (Supabase.instance.client.auth.currentSession == null) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -141,6 +149,14 @@ class _AdminTopAppBar extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: Row(
                 children: [
+                  if (Navigator.of(context).canPop()) ...[
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
                   Flexible(
                     child: _BrandCluster(isDesktop: isDesktop),
                   ),

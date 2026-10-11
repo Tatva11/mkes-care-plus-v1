@@ -79,9 +79,11 @@ class PurchaseOrderRepository {
         }
       }
 
-      final list = (response as List<dynamic>)
+      var list = (response as List<dynamic>)
           .map((json) => PurchaseOrder.fromJson(json as Map<String, dynamic>))
           .toList();
+
+      list = await _enrichWithProfiles(client, list);
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final q = searchQuery.trim().toLowerCase();
@@ -131,10 +133,74 @@ class PurchaseOrderRepository {
         }
       }
 
-      return PurchaseOrder.fromJson(response as Map<String, dynamic>);
+      final po = PurchaseOrder.fromJson(response as Map<String, dynamic>);
+      final enriched = await _enrichWithProfiles(client, [po]);
+      return enriched.first;
     } catch (e) {
       throw Exception('Failed to fetch purchase order $id: $e');
     }
+  }
+
+  Future<List<PurchaseOrder>> _enrichWithProfiles(
+    SupabaseClient client,
+    List<PurchaseOrder> orders,
+  ) async {
+    final needsEnrichment = orders.any((po) =>
+        ((po.createdByName == null || po.createdByName!.trim().isEmpty || _isUuid(po.createdByName)) &&
+            po.createdBy != null &&
+            po.createdBy!.trim().isNotEmpty) ||
+        ((po.orderedByName == null || po.orderedByName!.trim().isEmpty || _isUuid(po.orderedByName)) &&
+            po.orderedBy != null &&
+            po.orderedBy!.trim().isNotEmpty));
+
+    if (!needsEnrichment) return orders;
+
+    try {
+      final rows = await client.from('profiles').select('id, full_name');
+      final nameMap = <String, String>{};
+      for (final r in (rows as List<dynamic>)) {
+        final id = r['id'] as String?;
+        final name = r['full_name'] as String?;
+        if (id != null && name != null && name.trim().isNotEmpty) {
+          nameMap[id] = name.trim();
+        }
+      }
+
+      if (nameMap.isEmpty) return orders;
+
+      return orders.map((po) {
+        String? newCreated = po.createdByName;
+        if (newCreated == null || newCreated.trim().isEmpty || _isUuid(newCreated)) {
+          if (po.createdBy != null && nameMap.containsKey(po.createdBy)) {
+            newCreated = nameMap[po.createdBy];
+          }
+        }
+
+        String? newOrdered = po.orderedByName;
+        if (newOrdered == null || newOrdered.trim().isEmpty || _isUuid(newOrdered)) {
+          if (po.orderedBy != null && nameMap.containsKey(po.orderedBy)) {
+            newOrdered = nameMap[po.orderedBy];
+          }
+        }
+
+        if (newCreated != po.createdByName || newOrdered != po.orderedByName) {
+          return po.copyWith(
+            createdByName: newCreated,
+            orderedByName: newOrdered,
+          );
+        }
+        return po;
+      }).toList();
+    } catch (_) {
+      return orders;
+    }
+  }
+
+  static bool _isUuid(String? str) {
+    if (str == null || str.trim().isEmpty) return false;
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(str.trim());
   }
 
   /// Creates a new purchase order along with its line items.

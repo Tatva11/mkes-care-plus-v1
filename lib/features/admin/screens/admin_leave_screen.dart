@@ -77,14 +77,92 @@ class _AdminLeaveScreenState extends ConsumerState<AdminLeaveScreen>
 // ---------------------------------------------------------------------------
 // Pending Requests Tab — only 'pending' items with approve/reject actions.
 // ---------------------------------------------------------------------------
-class _PendingTab extends ConsumerWidget {
+class _PendingTab extends ConsumerStatefulWidget {
   const _PendingTab({required this.isDesktop});
   final bool isDesktop;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PendingTab> createState() => _PendingTabState();
+}
+
+class _PendingTabState extends ConsumerState<_PendingTab> {
+  final Set<String> _processingIds = {};
+
+  Future<void> _handleApprove(LeaveRequest request) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+    if (_processingIds.contains(request.id)) return;
+
+    setState(() => _processingIds.add(request.id));
+    try {
+      await ref
+          .read(pendingAdminLeaveRequestsProvider.notifier)
+          .approveRequest(request.id, currentUser.id);
+      ref.invalidate(adminAllLeaveRequestsProvider);
+      ref.invalidate(staffLeaveRequestsProvider(request.staffId));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Leave request for ${request.staffName ?? "staff"} approved.'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to approve leave request: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _processingIds.remove(request.id));
+      }
+    }
+  }
+
+  Future<void> _handleReject(LeaveRequest request, String reason) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+    if (_processingIds.contains(request.id)) return;
+
+    setState(() => _processingIds.add(request.id));
+    try {
+      await ref
+          .read(pendingAdminLeaveRequestsProvider.notifier)
+          .rejectRequest(request.id, currentUser.id, reason);
+      ref.invalidate(adminAllLeaveRequestsProvider);
+      ref.invalidate(staffLeaveRequestsProvider(request.staffId));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Leave request for ${request.staffName ?? "staff"} rejected.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to reject leave request: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _processingIds.remove(request.id));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final pendingAsync = ref.watch(pendingAdminLeaveRequestsProvider);
-    final currentUser = ref.watch(currentUserProvider);
 
     return pendingAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -116,33 +194,21 @@ class _PendingTab extends ConsumerWidget {
               ref.read(pendingAdminLeaveRequestsProvider.notifier).fetchPending(),
           child: ListView.separated(
             padding: EdgeInsets.all(
-              isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
+              widget.isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
             ),
             itemCount: requests.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (context, index) => _LeaveCard(
-              request: requests[index],
-              showActions: true,
-              onApprove: () {
-                if (currentUser == null) return;
-                ref
-                    .read(pendingAdminLeaveRequestsProvider.notifier)
-                    .approveRequest(requests[index].id, currentUser.id);
-                // Also refresh the history tab.
-                ref
-                    .read(adminAllLeaveRequestsProvider.notifier)
-                    .fetchAll();
-              },
-              onReject: (reason) {
-                if (currentUser == null) return;
-                ref
-                    .read(pendingAdminLeaveRequestsProvider.notifier)
-                    .rejectRequest(requests[index].id, currentUser.id, reason);
-                ref
-                    .read(adminAllLeaveRequestsProvider.notifier)
-                    .fetchAll();
-              },
-            ),
+            itemBuilder: (context, index) {
+              final req = requests[index];
+              final isProcessing = _processingIds.contains(req.id);
+              return _LeaveCard(
+                request: req,
+                showActions: true,
+                isProcessing: isProcessing,
+                onApprove: () => _handleApprove(req),
+                onReject: (reason) => _handleReject(req, reason),
+              );
+            },
           ),
         );
       },
@@ -201,12 +267,14 @@ class _LeaveCard extends ConsumerWidget {
   const _LeaveCard({
     required this.request,
     required this.showActions,
+    this.isProcessing = false,
     this.onApprove,
     this.onReject,
   });
 
   final LeaveRequest request;
   final bool showActions;
+  final bool isProcessing;
   final VoidCallback? onApprove;
   final void Function(String reason)? onReject;
 
@@ -304,10 +372,30 @@ class _LeaveCard extends ConsumerWidget {
                       style: AppTypography.bodyMd
                           .copyWith(fontWeight: FontWeight.w700),
                     ),
-                    Text(
-                      '${request.leaveDays.toStringAsFixed(0)} working day(s) leave',
-                      style: AppTypography.bodySm
-                          .copyWith(color: AppColors.onSurfaceVariant),
+                    Row(
+                      children: [
+                        Text(
+                          '${request.leaveDays.toStringAsFixed(request.leaveDays.truncateToDouble() == request.leaveDays ? 0 : 1)} working day(s)',
+                          style: AppTypography.bodySm
+                              .copyWith(color: AppColors.onSurfaceVariant),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            request.dutyPeriodDisplayName,
+                            style: AppTypography.labelCaps.copyWith(
+                              fontSize: 9,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -436,12 +524,22 @@ class _LeaveCard extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
                   ),
-                  onPressed: () =>
-                      _showRejectDialog(context),
+                  onPressed: isProcessing
+                      ? null
+                      : () => _showRejectDialog(context),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 FilledButton.icon(
-                  icon: const Icon(Icons.check, size: 18),
+                  icon: isProcessing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check, size: 18),
                   label: Text('Approve',
                       style: AppTypography.labelCaps
                           .copyWith(color: Colors.white)),
@@ -450,7 +548,7 @@ class _LeaveCard extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
                   ),
-                  onPressed: onApprove,
+                  onPressed: isProcessing ? null : onApprove,
                 ),
               ],
             ),

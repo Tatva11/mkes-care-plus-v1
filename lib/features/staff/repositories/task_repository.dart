@@ -58,6 +58,7 @@ class TaskRepository {
     required String assignedBy,
     DateTime? dueDate,
     String priority = 'medium',
+    String? relatedSurgeryId,
   }) async {
     final cleanPriority = priority.toLowerCase();
     if (!TaskItem.validPriorities.contains(cleanPriority)) {
@@ -72,6 +73,7 @@ class TaskRepository {
       'due_date': dueDate?.toIso8601String(),
       'priority': cleanPriority,
       'status': 'pending',
+      if (relatedSurgeryId != null) 'related_surgery_id': relatedSurgeryId,
     }).select().single();
     
     final taskId = response['id'] as String?;

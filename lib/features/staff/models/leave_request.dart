@@ -11,6 +11,7 @@ class LeaveRequest {
   final DateTime? approvedAt;
   final String? rejectionReason;
   final DateTime createdAt;
+  final String dutyPeriod; // 'morning' | 'afternoon' | 'full_day'
 
   LeaveRequest({
     required this.id,
@@ -25,7 +26,40 @@ class LeaveRequest {
     this.approvedAt,
     this.rejectionReason,
     required this.createdAt,
+    this.dutyPeriod = 'full_day',
   });
+
+  bool get isMorningOnly => dutyPeriod.toLowerCase() == 'morning';
+  bool get isAfternoonOnly =>
+      dutyPeriod.toLowerCase() == 'afternoon' ||
+      dutyPeriod.toLowerCase() == 'evening';
+  bool get isEveningOnly => isAfternoonOnly;
+  bool get isFullDay => dutyPeriod.toLowerCase() == 'full_day';
+
+  String get dutyPeriodDisplayName {
+    switch (dutyPeriod.toLowerCase()) {
+      case 'morning':
+        return 'Morning Duty Only';
+      case 'evening':
+      case 'afternoon':
+        return 'Evening Duty Only';
+      case 'full_day':
+      default:
+        return 'Full Day (All Duties)';
+    }
+  }
+
+  /// Whether this leave request covers the specified [shift].
+  bool coversShift(String shift) {
+    final s = shift.toLowerCase();
+    if (dutyPeriod.toLowerCase() == 'full_day') return true;
+    if (dutyPeriod.toLowerCase() == 'morning' && s == 'morning') return true;
+    if ((dutyPeriod.toLowerCase() == 'afternoon' || dutyPeriod.toLowerCase() == 'evening') &&
+        (s == 'afternoon' || s == 'evening' || s == 'night')) {
+      return true;
+    }
+    return false;
+  }
 
   factory LeaveRequest.fromJson(Map<String, dynamic> json) {
     // The join key may be returned as 'profiles' when using
@@ -48,7 +82,10 @@ class LeaveRequest {
           ? DateTime.parse(json['approved_at'] as String)
           : null,
       rejectionReason: json['rejection_reason'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      dutyPeriod: (json['duty_period'] as String?)?.toLowerCase() ?? 'full_day',
     );
   }
 
@@ -64,6 +101,8 @@ class LeaveRequest {
       'approved_by': approvedBy,
       'approved_at': approvedAt?.toIso8601String(),
       'rejection_reason': rejectionReason,
+      'duty_period': dutyPeriod,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 }

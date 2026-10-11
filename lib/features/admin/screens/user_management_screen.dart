@@ -10,6 +10,7 @@ import '../../admin/screens/administration_screen.dart';
 import '../../department/screens/department_management_screen.dart';
 import '../../patients/screens/patient_list_screen.dart';
 import '../../staff/screens/staff_management_screen.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/user_profile.dart';
 import '../providers/users_provider.dart';
 import 'user_form_dialog.dart';
@@ -88,14 +89,31 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
     );
   }
 
+  final Set<String> _deletingUserIds = {};
+
   Future<void> _confirmDelete(UserProfile user) async {
+    final currentUserId = ref.read(currentUserProvider)?.id;
+    if (currentUserId != null && user.id == currentUserId) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You cannot delete your own admin account.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (_deletingUserIds.contains(user.id)) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Remove User'),
         content: Text(
           'Are you sure you want to permanently remove ${user.fullName}? '
-          'This cannot be undone.',
+          'This will remove their login access while preserving all clinical, attendance, and audit history.',
         ),
         actions: [
           TextButton(
@@ -111,19 +129,30 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
+      setState(() => _deletingUserIds.add(user.id));
       try {
         await ref.read(usersProvider.notifier).deleteUser(user.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${user.fullName} removed.')),
+            SnackBar(
+              content: Text('${user.fullName} removed successfully.'),
+              backgroundColor: AppColors.primaryContainer,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error removing user: $e'), backgroundColor: AppColors.error),
+            SnackBar(
+              content: Text('Error removing user: $e'),
+              backgroundColor: AppColors.error,
+            ),
           );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _deletingUserIds.remove(user.id));
         }
       }
     }
@@ -391,12 +420,22 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                   tooltip: 'Edit user',
                   onPressed: () => _openEditUserDialog(user),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  color: AppColors.error,
-                  tooltip: 'Remove user',
-                  onPressed: () => _confirmDelete(user),
-                ),
+                if (_deletingUserIds.contains(user.id))
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    color: AppColors.error,
+                    tooltip: 'Remove user',
+                    onPressed: () => _confirmDelete(user),
+                  ),
               ],
             ),
           ),

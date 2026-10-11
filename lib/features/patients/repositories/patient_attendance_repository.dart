@@ -35,7 +35,7 @@ class PatientAttendanceRepository {
 
   // ── Staff: fetch own attendance for a specific date ──────────────────────
 
-  Future<List<PatientAttendance>> fetchForStaff(
+    Future<List<PatientAttendance>> fetchForStaff(
       String staffId, DateTime date) async {
     final response = await _supabase
         .from('patient_attendance')
@@ -54,11 +54,12 @@ class PatientAttendanceRepository {
   // Uses the "Staff can read today patient attendance" RLS policy.
   // This allows any active staff to see which patients have already been
   // attended today by any staff member, preventing duplicate attempts.
-  Future<List<PatientAttendance>> fetchTodayForAllStaff() async {
+  Future<List<PatientAttendance>> fetchTodayForAllStaff({DateTime? today}) async {
+    final referenceDate = today ?? DateTime.now();
     final response = await _supabase
         .from('patient_attendance')
         .select(_kSelectWithStaff)
-        .eq('attendance_date', _dateKey(DateTime.now()))
+        .eq('attendance_date', _dateKey(referenceDate))
         .order('attended_at', ascending: true)
         .timeout(const Duration(seconds: 15));
     return (response as List)

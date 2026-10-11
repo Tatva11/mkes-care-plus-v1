@@ -30,9 +30,24 @@ class StaffShell extends ConsumerWidget {
 
     return roleAsync.when(
       data: (role) {
+        if (Supabase.instance.client.auth.currentSession == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            }
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
         if (role != 'staff') {
           // Redirect to login if not staff
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            }
+            if (Supabase.instance.client.auth.currentSession == null) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Access denied. Staff privileges required.'),
