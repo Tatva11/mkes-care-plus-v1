@@ -4,7 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../billing/screens/billing_management_screen.dart';
-import '../../billing/screens/billing_reports_screen.dart';
+import '../../reports/screens/admin_reports_screen.dart';
 import '../../admin/widgets/admin_shell.dart';
 import 'user_management_screen.dart';
 
@@ -71,7 +71,7 @@ class AdministrationContent extends StatelessWidget {
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => const BillingReportsScreen(),
+                                  builder: (_) => const AdminReportsScreen(),
                                 ),
                               );
                             },
@@ -149,7 +149,7 @@ class AdministrationContent extends StatelessWidget {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => const BillingReportsScreen(),
+                            builder: (_) => const AdminReportsScreen(),
                           ),
                         );
                       },

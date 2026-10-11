@@ -10,6 +10,7 @@ import '../models/billing_payment_model.dart';
 import '../providers/billing_provider.dart';
 import '../widgets/billing_summary_cards.dart';
 import '../widgets/record_payment_dialog.dart';
+import '../../reports/screens/admin_reports_screen.dart';
 import 'billing_reports_screen.dart';
 import 'create_invoice_screen.dart';
 
@@ -41,7 +42,7 @@ class BillingManagementScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const BillingReportsScreen(),
+                    builder: (_) => const AdminReportsScreen(),
                   ),
                 );
               },
