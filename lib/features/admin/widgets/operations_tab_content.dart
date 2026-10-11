@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../department/screens/department_management_screen.dart';
 import '../../dental/screens/dental_lab_screen.dart';
+import '../../eye/screens/eye_surgery_screen.dart';
 import '../../inventory/screens/inventory_screen.dart';
 import '../../inventory/screens/purchase_order_list_screen.dart';
 import '../../vendors/screens/vendor_management_screen.dart';
@@ -15,7 +16,7 @@ class OperationsTabContent extends StatefulWidget {
     this.initialTab = 0,
   });
 
-  /// 0 = Inventory (default), 1 = Departments, 2 = Vendors, 3 = Purchase Orders, 4 = Dental Lab
+  /// 0 = Inventory, 1 = Departments, 2 = Vendors, 3 = Purchase Orders, 4 = Dental Lab, 5 = Eye Surgery
   final int initialTab;
 
   @override
@@ -79,6 +80,11 @@ class _OperationsTabContentState extends State<OperationsTabContent> {
                       label: Text('Dental Lab'),
                       icon: Icon(Icons.biotech_outlined, size: 16),
                     ),
+                    ButtonSegment<int>(
+                      value: 5,
+                      label: Text('Eye Surgery'),
+                      icon: Icon(Icons.visibility_outlined, size: 16),
+                    ),
                   ],
                   selected: {_selectedTab},
                   onSelectionChanged: (newSelection) {
@@ -110,7 +116,9 @@ class _OperationsTabContentState extends State<OperationsTabContent> {
                       ? const VendorManagementContent()
                       : _selectedTab == 3
                           ? const PurchaseOrderManagementContent()
-                          : const DentalLabContent(),
+                          : _selectedTab == 4
+                              ? const DentalLabContent()
+                              : const EyeSurgeryScreen(),
         ),
       ],
     );

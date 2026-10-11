@@ -12,6 +12,9 @@ class ProfileModel {
   final bool isActive;
   final double? salary;
   final DateTime? joiningDate;
+  final String? assignedShift;
+  final String? nextShift;
+  final DateTime? shiftEffectiveDate;
   final DateTime createdAt;
 
   const ProfileModel({
@@ -27,10 +30,34 @@ class ProfileModel {
     required this.isActive,
     this.salary,
     this.joiningDate,
+    this.assignedShift,
+    this.nextShift,
+    this.shiftEffectiveDate,
     required this.createdAt,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    DateTime? parseCalendarDate(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) return DateTime(value.year, value.month, value.day);
+      final str = value.toString().trim();
+      if (str.isEmpty) return null;
+      final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(str);
+      if (match != null) {
+        return DateTime(
+          int.parse(match.group(1)!),
+          int.parse(match.group(2)!),
+          int.parse(match.group(3)!),
+        );
+      }
+      final parsed = DateTime.tryParse(str);
+      if (parsed != null) {
+        final local = parsed.toLocal();
+        return DateTime(local.year, local.month, local.day);
+      }
+      return null;
+    }
+
     return ProfileModel(
       id: json['id'] as String,
       fullName: json['full_name'] as String,
@@ -44,9 +71,12 @@ class ProfileModel {
       role: json['role'] as String,
       isActive: json['is_active'] as bool? ?? true,
       salary: json['salary'] != null ? (json['salary'] as num).toDouble() : null,
-      joiningDate: json['joining_date'] != null
-          ? DateTime.tryParse(json['joining_date'] as String)
-          : null,
+      joiningDate: parseCalendarDate(json['joining_date']),
+      assignedShift: (json['assigned_shift'] as String?)?.toLowerCase() == 'night'
+          ? 'afternoon'
+          : (json['assigned_shift'] as String?)?.toLowerCase(),
+      nextShift: (json['next_shift'] as String?)?.toLowerCase(),
+      shiftEffectiveDate: parseCalendarDate(json['shift_effective_date']),
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -69,5 +99,76 @@ class ProfileModel {
       default:
         return role;
     }
+  }
+
+  bool get isMorningShift => (assignedShift ?? 'morning').toLowerCase() == 'morning';
+  bool get isAfternoonShift =>
+      (assignedShift ?? '').toLowerCase() == 'afternoon' ||
+      (assignedShift ?? '').toLowerCase() == 'evening' ||
+      (assignedShift ?? '').toLowerCase() == 'night';
+  bool get isEveningShift => isAfternoonShift;
+  bool get isBothShifts => (assignedShift ?? '').toLowerCase() == 'both';
+
+  bool get hasScheduledShift => nextShift != null && shiftEffectiveDate != null;
+
+  String getShiftForDate(DateTime date) {
+    if (nextShift != null && shiftEffectiveDate != null) {
+      final targetOnly = DateTime(date.year, date.month, date.day);
+      final effOnly = DateTime(
+        shiftEffectiveDate!.year,
+        shiftEffectiveDate!.month,
+        shiftEffectiveDate!.day,
+      );
+      if (!targetOnly.isBefore(effOnly)) {
+        return nextShift!;
+      }
+    }
+    return assignedShift ?? 'morning';
+  }
+
+  static String formatShiftLabel(String? shift, {bool includeSuffix = false}) {
+    if (shift == null) return includeSuffix ? 'Morning Shift' : 'Morning';
+    switch (shift.toLowerCase()) {
+      case 'evening':
+      case 'afternoon':
+      case 'night':
+        return includeSuffix ? 'Evening Shift' : 'Evening';
+      case 'both':
+        return includeSuffix ? 'Both (Morning & Evening)' : 'Morning & Evening';
+      case 'morning':
+      default:
+        return includeSuffix ? 'Morning Shift' : 'Morning';
+    }
+  }
+
+  String get shiftDisplayName => formatShiftLabel(assignedShift ?? 'morning');
+
+  String? get scheduledShiftDisplayName =>
+      nextShift != null ? formatShiftLabel(nextShift!) : null;
+
+  String shiftDisplayNameForDate(DateTime date) =>
+      formatShiftLabel(getShiftForDate(date));
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'full_name': fullName,
+      'phone_number': phoneNumber,
+      'department': department,
+      'designation': designation,
+      'role': role,
+      'is_active': isActive,
+      'salary': salary,
+      'joining_date': joiningDate != null
+          ? '${joiningDate!.year.toString().padLeft(4, '0')}-${joiningDate!.month.toString().padLeft(2, '0')}-${joiningDate!.day.toString().padLeft(2, '0')}'
+          : null,
+      'assigned_shift': assignedShift,
+      'next_shift': nextShift,
+      'shift_effective_date': shiftEffectiveDate != null
+          ? '${shiftEffectiveDate!.year.toString().padLeft(4, '0')}-${shiftEffectiveDate!.month.toString().padLeft(2, '0')}-${shiftEffectiveDate!.day.toString().padLeft(2, '0')}'
+          : null,
+      'created_at': createdAt.toIso8601String(),
+    };
   }
 }

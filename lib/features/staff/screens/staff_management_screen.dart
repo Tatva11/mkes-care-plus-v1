@@ -16,6 +16,7 @@ import '../widgets/staff_stat_card.dart';
 import '../../admin/screens/admin_leave_screen.dart';
 import '../../admin/screens/admin_task_screen.dart';
 import '../../admin/screens/admin_performance_attendance_screens.dart';
+import '../../admin/screens/shift_management_screen.dart';
 import '../../admin/providers/users_provider.dart';
 
 class StaffManagementScreen extends StatelessWidget {
@@ -163,6 +164,12 @@ class _PageHeader extends StatelessWidget {
                   onPressed: () => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => const AdminPerformanceScreen())),
                   child: const Text('Performance'),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const ShiftManagementScreen())),
+                  child: const Text('Shifts'),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 _AddStaffButton(isDesktop: isDesktop),

@@ -145,12 +145,22 @@ class InventoryItem {
 
   /// Returns the effective earliest expiry date among active batches,
   /// falling back to [expiryDate] if no active batches with expiry exist.
+  /// When multiple batches exist, prioritizes valid non-expired batches
+  /// (FEFO among usable stock) rather than applying an expired batch's date
+  /// to the entire available balance.
   DateTime? get effectiveExpiryDate {
     if (batches != null && batches!.isNotEmpty) {
       final activeWithExpiry = batches!
           .where((b) => b.remainingQuantity > 0 && b.expiryDate != null)
           .toList();
       if (activeWithExpiry.isNotEmpty) {
+        // Prioritize active batches that have not yet expired
+        final validBatches = activeWithExpiry.where((b) => !b.isExpired).toList();
+        if (validBatches.isNotEmpty) {
+          validBatches.sort((a, b) => a.expiryDate!.compareTo(b.expiryDate!));
+          return validBatches.first.expiryDate;
+        }
+        // If all active remaining batches are expired, return earliest expired batch
         activeWithExpiry.sort((a, b) => a.expiryDate!.compareTo(b.expiryDate!));
         return activeWithExpiry.first.expiryDate;
       }
@@ -245,13 +255,32 @@ class InventoryItem {
     return Colors.green;
   }
 
+  /// Parses a calendar date without UTC timezone shift.
+  static DateTime? parseCalendarDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) {
+      return DateTime(value.year, value.month, value.day);
+    }
+    final str = value.toString().trim();
+    if (str.isEmpty) return null;
+    final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(str);
+    if (match != null) {
+      return DateTime(
+        int.parse(match.group(1)!),
+        int.parse(match.group(2)!),
+        int.parse(match.group(3)!),
+      );
+    }
+    final parsed = DateTime.tryParse(str);
+    if (parsed != null) {
+      final local = parsed.toLocal();
+      return DateTime(local.year, local.month, local.day);
+    }
+    return null;
+  }
+
   /// Deserializes a database row from Supabase.
   factory InventoryItem.fromJson(Map<String, dynamic> json) {
-    DateTime? parseDate(dynamic value) {
-      if (value == null) return null;
-      if (value is DateTime) return value;
-      return DateTime.tryParse(value.toString());
-    }
 
     final rawQuantity = json['quantity'] ?? json['current_stock'];
     final stockVal = rawQuantity is num
@@ -309,7 +338,7 @@ class InventoryItem {
       sku: json['sku'] as String?,
       department: json['department'] as String?,
       minimumStock: minStockVal,
-      expiryDate: parseDate(json['expiry_date']),
+      expiryDate: parseCalendarDate(json['expiry_date']),
       brand: json['brand'] as String?,
       price: priceVal,
       vendorId: (json['vendor_id'] ?? json['vendorId'])?.toString(),
@@ -319,8 +348,8 @@ class InventoryItem {
       lastTotalAmount: lastTotalVal,
       batches: parsedBatches,
       isActive: json['is_active'] as bool? ?? true,
-      createdAt: parseDate(json['created_at']),
-      updatedAt: parseDate(json['updated_at']),
+      createdAt: parseCalendarDate(json['created_at']),
+      updatedAt: parseCalendarDate(json['updated_at']),
     );
   }
 

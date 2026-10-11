@@ -73,6 +73,9 @@ class NotificationModel {
 
   IconData get icon {
     switch (type) {
+      case 'duty_assignment':
+      case 'shift_change':
+        return Icons.event_available_outlined;
       case 'leave_request':
         return Icons.event_busy_outlined;
       case 'leave_approved':
@@ -80,6 +83,7 @@ class NotificationModel {
       case 'leave_rejected':
         return Icons.cancel_outlined;
       case 'task_assigned':
+      case 'eye_surgery_assigned':
         return Icons.assignment_ind_outlined;
       case 'task_updated':
         return Icons.edit_note_outlined;
@@ -95,6 +99,8 @@ class NotificationModel {
         return Icons.event_busy_outlined;
       case 'system':
         return Icons.info_outline;
+      case 'eye_surgery':
+        return Icons.visibility_outlined;
       default:
         return Icons.notifications_none;
     }
@@ -102,6 +108,9 @@ class NotificationModel {
 
   Color get iconColor {
     switch (type) {
+      case 'duty_assignment':
+      case 'shift_change':
+        return AppColors.primary;
       case 'leave_request':
         return AppColors.secondary;
       case 'leave_approved':
@@ -109,6 +118,7 @@ class NotificationModel {
       case 'leave_rejected':
         return AppColors.error;
       case 'task_assigned':
+      case 'eye_surgery_assigned':
         return AppColors.primary;
       case 'task_updated':
         return AppColors.secondary;
@@ -124,6 +134,8 @@ class NotificationModel {
         return const Color(0xFFE65100);
       case 'system':
         return AppColors.onSurfaceVariant;
+      case 'eye_surgery':
+        return AppColors.primary;
       default:
         return AppColors.primary;
     }

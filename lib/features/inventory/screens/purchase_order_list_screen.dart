@@ -194,6 +194,14 @@ class _PurchaseOrderManagementContentState
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (Navigator.of(context).canPop()) ...[
+          IconButton.filledTonal(
+            tooltip: 'Back to previous screen',
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

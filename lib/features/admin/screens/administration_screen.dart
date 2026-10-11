@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../admin/widgets/admin_shell.dart';
 import 'user_management_screen.dart';
+import 'shift_management_screen.dart';
 
 class AdministrationScreen extends StatelessWidget {
   const AdministrationScreen({super.key});
@@ -83,12 +84,24 @@ class AdministrationContent extends StatelessWidget {
       MaterialPageRoute(builder: (_) => const UserManagementScreen()),
     );
   },
-), SizedBox(height: AppSpacing.md),
-                          _buildSettingCard(
-                            Icons.settings_suggest_outlined,
-                            'Clinic Settings',
-                            'Configure clinic details, locations, and defaults.',
-                          ),
+),
+const SizedBox(height: AppSpacing.md),
+_buildSettingCard(
+  Icons.schedule_outlined,
+  'Shift Management',
+  'Configure shift timings, grace periods, and assign staff shifts.',
+  onTap: () {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ShiftManagementScreen()),
+    );
+  },
+),
+const SizedBox(height: AppSpacing.md),
+_buildSettingCard(
+  Icons.settings_suggest_outlined,
+  'Clinic Settings',
+  'Configure clinic details, locations, and defaults.',
+),
                           const SizedBox(height: AppSpacing.md),
                           _buildSettingCard(
                             Icons.history_outlined,
@@ -129,6 +142,17 @@ class AdministrationContent extends StatelessWidget {
                       onTap: () {
                         Navigator.of(context).pushReplacement(
                          MaterialPageRoute(builder: (_) => const UserManagementScreen()),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildSettingCard(
+                      Icons.schedule_outlined,
+                      'Shift Management',
+                      'Configure shift timings, grace periods, and assign staff shifts.',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ShiftManagementScreen()),
                         );
                       },
                     ),

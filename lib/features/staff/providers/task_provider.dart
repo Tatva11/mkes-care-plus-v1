@@ -18,9 +18,16 @@ class StaffTasksNotifier extends StateNotifier<AsyncValue<List<TaskItem>>> {
   final String _staffId;
   RealtimeChannel? _realtimeChannel;
 
-  StaffTasksNotifier(this._repository, this._supabase, this._staffId) : super(const AsyncValue.loading()) {
+  StaffTasksNotifier(
+    this._repository,
+    this._supabase,
+    this._staffId, {
+    bool enableRealtime = true,
+  }) : super(const AsyncValue.loading()) {
     fetchTasks();
-    _setupRealtime();
+    if (enableRealtime) {
+      _setupRealtime();
+    }
   }
 
   void _setupRealtime() {

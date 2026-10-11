@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_provider.dart';
+import '../models/expired_stock_entry.dart';
 import '../models/inventory_batch.dart';
 import '../models/inventory_item.dart';
 import '../models/inventory_transaction.dart';
@@ -43,28 +44,55 @@ class InventoryRepository {
     bool? activeOnly,
   }) async {
     try {
-      var query = _supabase.from('inventory').select('*, vendors(id, name, phone)');
+      dynamic response;
+      try {
+        var query = _supabase.from('inventory').select('*, vendors(id, name, phone), inventory_batches(*)');
 
-      if (category != null && category.isNotEmpty && category != 'All') {
-        query = query.eq('category', category);
+        if (category != null && category.isNotEmpty && category != 'All') {
+          query = query.eq('category', category);
+        }
+
+        if (department != null && department.isNotEmpty && department != 'All') {
+          query = query.eq('department', department.toLowerCase());
+        }
+
+        if (activeOnly == true) {
+          query = query.eq('is_active', true);
+        }
+
+        final normalizedQuery = searchQuery?.trim();
+        if (normalizedQuery != null && normalizedQuery.isNotEmpty) {
+          query = query.or(
+            'name.ilike.%$normalizedQuery%,category.ilike.%$normalizedQuery%,sku.ilike.%$normalizedQuery%',
+          );
+        }
+
+        response = await query.order('name', ascending: true);
+      } catch (batchErr) {
+        debugPrint('InventoryRepository.getInventoryItems with batches failed ($batchErr), using fallback');
+        var fallbackQuery = _supabase.from('inventory').select('*, vendors(id, name, phone)');
+
+        if (category != null && category.isNotEmpty && category != 'All') {
+          fallbackQuery = fallbackQuery.eq('category', category);
+        }
+
+        if (department != null && department.isNotEmpty && department != 'All') {
+          fallbackQuery = fallbackQuery.eq('department', department.toLowerCase());
+        }
+
+        if (activeOnly == true) {
+          fallbackQuery = fallbackQuery.eq('is_active', true);
+        }
+
+        final normalizedQuery = searchQuery?.trim();
+        if (normalizedQuery != null && normalizedQuery.isNotEmpty) {
+          fallbackQuery = fallbackQuery.or(
+            'name.ilike.%$normalizedQuery%,category.ilike.%$normalizedQuery%,sku.ilike.%$normalizedQuery%',
+          );
+        }
+
+        response = await fallbackQuery.order('name', ascending: true);
       }
-
-      if (department != null && department.isNotEmpty && department != 'All') {
-        query = query.eq('department', department.toLowerCase());
-      }
-
-      if (activeOnly == true) {
-        query = query.eq('is_active', true);
-      }
-
-      final normalizedQuery = searchQuery?.trim();
-      if (normalizedQuery != null && normalizedQuery.isNotEmpty) {
-        query = query.or(
-          'name.ilike.%$normalizedQuery%,category.ilike.%$normalizedQuery%,sku.ilike.%$normalizedQuery%',
-        );
-      }
-
-      final response = await query.order('name', ascending: true);
 
       final items = (response as List)
           .map((json) => InventoryItem.fromJson(json as Map<String, dynamic>))
@@ -84,11 +112,20 @@ class InventoryRepository {
   /// Fetches a single inventory item by [id].
   Future<InventoryItem> getInventoryItem(String id) async {
     try {
-      final response = await _supabase
-          .from('inventory')
-          .select('*, vendors(id, name, phone)')
-          .eq('id', id)
-          .single();
+      dynamic response;
+      try {
+        response = await _supabase
+            .from('inventory')
+            .select('*, vendors(id, name, phone), inventory_batches(*)')
+            .eq('id', id)
+            .single();
+      } catch (_) {
+        response = await _supabase
+            .from('inventory')
+            .select('*, vendors(id, name, phone)')
+            .eq('id', id)
+            .single();
+      }
 
       return InventoryItem.fromJson(response);
     } on PostgrestException catch (e) {
@@ -361,6 +398,116 @@ class InventoryRepository {
       debugPrint('InventoryRepository.getBatchesForPO error: $e');
       rethrow;
     }
+  }
+
+  /// Fetches all expired stock entries across batches and standalone items with expired shelf life.
+  Future<List<ExpiredStockEntry>> getExpiredStockEntries() async {
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final todayStr = today.toIso8601String().split('T').first;
+
+      final List<ExpiredStockEntry> entries = [];
+      final Set<String> inventoryIdsWithBatches = {};
+
+      // 1. Fetch batches with remaining_quantity > 0 and expiry_date < today
+      try {
+        final batchRows = await _supabase
+            .from('inventory_batches')
+            .select('*, inventory(id, name, unit, quantity)')
+            .gt('remaining_quantity', 0)
+            .lt('expiry_date', todayStr)
+            .order('expiry_date', ascending: true);
+
+        for (final row in (batchRows as List)) {
+          final inv = row['inventory'] as Map<String, dynamic>?;
+          if (inv == null) continue;
+          final invId = inv['id'] as String;
+          inventoryIdsWithBatches.add(invId);
+
+          final expDate = DateTime.tryParse(row['expiry_date'] as String? ?? '');
+          if (expDate == null) continue;
+
+          final qty = (row['remaining_quantity'] as num?)?.toDouble() ?? 0.0;
+          if (qty <= 0) continue;
+
+          entries.add(ExpiredStockEntry(
+            inventoryId: invId,
+            itemName: inv['name'] as String? ?? 'Unknown Item',
+            unit: inv['unit'] as String? ?? 'units',
+            batchId: row['id'] as String?,
+            batchNumber: row['batch_number'] as String?,
+            expiredQuantity: qty,
+            totalAvailableStock: (inv['quantity'] as num?)?.toDouble() ?? qty,
+            expiryDate: expDate,
+          ));
+        }
+      } catch (batchErr) {
+        debugPrint('Warning: unable to load inventory_batches for expired check: $batchErr');
+      }
+
+      // 2. Fetch inventory items with quantity > 0 and expiry_date < today
+      // (for items not tracked via inventory_batches)
+      final itemRows = await _supabase
+          .from('inventory')
+          .select('id, name, unit, quantity, expiry_date')
+          .gt('quantity', 0)
+          .lt('expiry_date', todayStr);
+
+      for (final row in (itemRows as List)) {
+        final invId = row['id'] as String;
+        if (inventoryIdsWithBatches.contains(invId)) {
+          // Already handled via batch details
+          continue;
+        }
+
+        final expDate = DateTime.tryParse(row['expiry_date'] as String? ?? '');
+        if (expDate == null) continue;
+
+        final qty = (row['quantity'] as num?)?.toDouble() ?? 0.0;
+        if (qty <= 0) continue;
+
+        entries.add(ExpiredStockEntry(
+          inventoryId: invId,
+          itemName: row['name'] as String? ?? 'Unknown Item',
+          unit: row['unit'] as String? ?? 'units',
+          batchId: null,
+          batchNumber: null,
+          expiredQuantity: qty,
+          totalAvailableStock: qty,
+          expiryDate: expDate,
+        ));
+      }
+
+      return entries;
+    } on PostgrestException catch (e) {
+      debugPrint('InventoryRepository.getExpiredStockEntries PostgrestException: ${e.message}');
+      throw Exception('Database error checking expired stock: ${e.message}');
+    } catch (e) {
+      debugPrint('InventoryRepository.getExpiredStockEntries error: $e');
+      rethrow;
+    }
+  }
+
+  /// Atomically removes expired stock for an item, recording an audit transaction with reason 'Expired'.
+  Future<InventoryTransaction> removeExpiredStock({
+    required String inventoryId,
+    required double quantity,
+    String? batchNumber,
+    String? remarks,
+  }) async {
+    final defaultRemarks = batchNumber != null && batchNumber.isNotEmpty
+        ? 'Removed expired stock from Batch $batchNumber'
+        : 'Removed expired stock adjustment';
+    final finalRemarks = remarks != null && remarks.isNotEmpty ? remarks : defaultRemarks;
+
+    return performStockOperation(
+      itemId: inventoryId,
+      transactionType: 'stock_out',
+      quantity: quantity,
+      reason: StockOutReasons.expired,
+      remarks: finalRemarks,
+    );
   }
 }
 

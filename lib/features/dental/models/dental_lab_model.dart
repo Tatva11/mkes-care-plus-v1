@@ -23,6 +23,12 @@ class DentalLabModel {
   final String? patientNumber;
   final String? patientMobile;
 
+  // Linked appointment fields
+  final String? appointmentId;
+  final DateTime? appointmentDate;
+  final String? appointmentTime;
+  final String? appointmentStatus;
+
   const DentalLabModel({
     required this.id,
     this.patientId,
@@ -39,11 +45,44 @@ class DentalLabModel {
     this.patientName,
     this.patientNumber,
     this.patientMobile,
+    this.appointmentId,
+    this.appointmentDate,
+    this.appointmentTime,
+    this.appointmentStatus,
   });
 
   bool get isProcessing => status.toLowerCase() == 'processing';
   bool get isReady => status.toLowerCase() == 'ready';
   bool get isDelivered => status.toLowerCase() == 'delivered';
+
+  String? get formattedAppointmentTime {
+    if (appointmentTime == null || appointmentTime!.trim().isEmpty) return null;
+    final parts = appointmentTime!.split(':');
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]) ?? 9;
+      final minute = int.tryParse(parts[1]) ?? 0;
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      final displayMinute = minute.toString().padLeft(2, '0');
+      return '$displayHour:$displayMinute $period';
+    }
+    return appointmentTime;
+  }
+
+  String? get formattedAppointmentDate {
+    if (appointmentDate == null) return null;
+    return DateFormat('d MMM yyyy').format(appointmentDate!);
+  }
+
+  String? get formattedAppointmentDateTime {
+    if (appointmentDate == null) return null;
+    final dateStr = formattedAppointmentDate!;
+    final timeStr = formattedAppointmentTime;
+    if (timeStr != null && timeStr.isNotEmpty) {
+      return '$dateStr at $timeStr';
+    }
+    return dateStr;
+  }
 
   String get statusLabel {
     switch (status.toLowerCase()) {
@@ -108,6 +147,16 @@ class DentalLabModel {
         ? DateTime.tryParse(json['delivered_date'] as String)
         : null;
 
+    final apptJson = json['appointments'] is Map<String, dynamic>
+        ? json['appointments'] as Map<String, dynamic>
+        : null;
+
+    final parsedApptDate = apptJson != null && apptJson['appointment_date'] != null
+        ? DateTime.tryParse(apptJson['appointment_date'] as String)
+        : (json['appointment_date'] != null
+            ? DateTime.tryParse(json['appointment_date'] as String)
+            : null);
+
     return DentalLabModel(
       id: json['id'] as String? ?? '',
       patientId: json['patient_id'] as String?,
@@ -128,6 +177,10 @@ class DentalLabModel {
       patientName: patientObj?.name ?? (json['patient_name'] as String?),
       patientNumber: patientObj?.patientNumber ?? (json['patient_number'] as String?),
       patientMobile: patientObj?.mobile ?? (json['patient_mobile'] as String?),
+      appointmentId: json['appointment_id'] as String? ?? apptJson?['id'] as String?,
+      appointmentDate: parsedApptDate,
+      appointmentTime: apptJson?['appointment_time'] as String? ?? json['appointment_time'] as String?,
+      appointmentStatus: apptJson?['status'] as String? ?? json['appointment_status'] as String?,
     );
   }
 
@@ -142,6 +195,7 @@ class DentalLabModel {
       'sent_date': formatter.format(sentDate),
       if (readyDate != null) 'ready_date': formatter.format(readyDate!),
       if (deliveredDate != null) 'delivered_date': formatter.format(deliveredDate!),
+      if (appointmentId != null) 'appointment_id': appointmentId,
       'remarks': remarks,
     };
   }
@@ -162,6 +216,10 @@ class DentalLabModel {
     String? patientName,
     String? patientNumber,
     String? patientMobile,
+    String? appointmentId,
+    DateTime? appointmentDate,
+    String? appointmentTime,
+    String? appointmentStatus,
   }) {
     return DentalLabModel(
       id: id ?? this.id,
@@ -179,6 +237,10 @@ class DentalLabModel {
       patientName: patientName ?? this.patientName,
       patientNumber: patientNumber ?? this.patientNumber,
       patientMobile: patientMobile ?? this.patientMobile,
+      appointmentId: appointmentId ?? this.appointmentId,
+      appointmentDate: appointmentDate ?? this.appointmentDate,
+      appointmentTime: appointmentTime ?? this.appointmentTime,
+      appointmentStatus: appointmentStatus ?? this.appointmentStatus,
     );
   }
 }

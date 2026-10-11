@@ -106,6 +106,26 @@ class DentalLabListNotifier extends AsyncNotifier<List<DentalLabModel>> {
     return updated;
   }
 
+  /// Explicitly marks a case as ready and idempotently schedules/links the follow-up appointment.
+  Future<DentalLabModel> markReady({
+    required String id,
+    DateTime? readyDate,
+  }) async {
+    final repo = ref.read(dentalLabRepositoryProvider);
+    final updated = await repo.markCaseReadyWithAppointment(
+      id: id,
+      readyDate: readyDate,
+    );
+
+    state.whenData((currentList) {
+      state = AsyncData(
+        currentList.map((c) => c.id == id ? updated : c).toList(),
+      );
+    });
+
+    return updated;
+  }
+
   /// Deletes a dental lab case and removes it from local state.
   Future<void> deleteCase(String id) async {
     final repo = ref.read(dentalLabRepositoryProvider);

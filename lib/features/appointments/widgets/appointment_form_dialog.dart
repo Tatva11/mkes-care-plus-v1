@@ -20,12 +20,37 @@ class AppointmentFormDialog extends ConsumerStatefulWidget {
     this.initialPatientId,
     this.initialPatientName,
     this.initialAppointmentType = 'regular',
+    this.existingAppointment,
   });
 
   final DateTime? initialDate;
   final String? initialPatientId;
   final String? initialPatientName;
   final String initialAppointmentType;
+  final AppointmentModel? existingAppointment;
+
+  bool get isEditing => existingAppointment != null;
+
+  static const List<({String id, String label})> availableAppointmentTypes = [
+    (id: 'regular', label: 'Regular Visit'),
+    (id: 'walk_in', label: 'Walk-in'),
+    (id: 'follow_up', label: 'Follow-up'),
+  ];
+
+  static String normalizeAppointmentType(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return 'regular';
+    final normalized = raw.trim().toLowerCase().replaceAll('-', '_');
+    if (normalized == 'follow_up' || normalized == 'followup') {
+      return 'follow_up';
+    }
+    if (normalized == 'walk_in' || normalized == 'walkin') {
+      return 'walk_in';
+    }
+    if (normalized == 'regular') {
+      return 'regular';
+    }
+    return raw.trim();
+  }
 
   @override
   ConsumerState<AppointmentFormDialog> createState() =>
@@ -60,14 +85,51 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
   bool _isLoading = false;
 
+  static List<({String id, String label})> get availableAppointmentTypes =>
+      AppointmentFormDialog.availableAppointmentTypes;
+
+  static String normalizeAppointmentType(String? raw) =>
+      AppointmentFormDialog.normalizeAppointmentType(raw);
+
+
   @override
   void initState() {
     super.initState();
-    _selectedDate = widget.initialDate ?? DateTime.now();
-    _selectedType = widget.initialAppointmentType;
-    _selectedPatientId = widget.initialPatientId;
-    _selectedPatientName = widget.initialPatientName;
-    _notesController = TextEditingController();
+    if (widget.existingAppointment != null) {
+      final existing = widget.existingAppointment!;
+      _selectedDepartment = existing.department;
+      _selectedDate = existing.appointmentDate;
+      _selectedType = normalizeAppointmentType(existing.appointmentType);
+      _selectedPatientId = existing.patientId ?? widget.initialPatientId;
+      _selectedPatientName = existing.patientName ?? widget.initialPatientName;
+      _selectedPatientNumber = existing.patientNumber;
+      _selectedDoctorId = existing.doctorId;
+      _selectedDoctorName = existing.doctorName;
+      _selectedDoctorSpecialty = existing.specialty;
+      final parsedTime = _parseTimeOfDay(existing.appointmentTime);
+      if (parsedTime != null) _selectedTime = parsedTime;
+      _notesController = TextEditingController(text: existing.notes ?? '');
+    } else {
+      _selectedDate = widget.initialDate ?? DateTime.now();
+      _selectedType = normalizeAppointmentType(widget.initialAppointmentType);
+      _selectedPatientId = widget.initialPatientId;
+      _selectedPatientName = widget.initialPatientName;
+      _notesController = TextEditingController();
+    }
+  }
+
+  TimeOfDay? _parseTimeOfDay(String timeText) {
+    final normalized = timeText.trim();
+    if (normalized.isEmpty) return null;
+
+    final pieces = normalized.split(':');
+    if (pieces.length < 2) return null;
+
+    final hour = int.tryParse(pieces[0]);
+    final minute = int.tryParse(pieces[1]);
+    if (hour == null || minute == null) return null;
+
+    return TimeOfDay(hour: hour, minute: minute);
   }
 
   @override
@@ -190,30 +252,48 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      final newAppointment = AppointmentModel(
-        id: '',
-        patientId: _selectedPatientId,
-        patientName: _selectedPatientName ?? 'Walk-in Patient',
-        patientNumber: _selectedPatientNumber ?? 'Unknown ID',
-        department: _selectedDepartment,
-        doctorId: _selectedDoctorId,
-        doctorName: _selectedDoctorName,
-        specialty: _selectedDoctorSpecialty,
-        appointmentDate: _selectedDate,
-        appointmentTime: _formatTimeOfDay(_selectedTime),
-        appointmentType: _selectedType,
-        status: _selectedType == 'walk_in' ? 'waiting' : 'scheduled',
-        notes: _notesController.text.trim().isNotEmpty
-            ? _notesController.text.trim()
-            : null,
-        aiBooked: false,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+      if (widget.isEditing && widget.existingAppointment != null) {
+        final updates = <String, dynamic>{
+          'patient_id': _selectedPatientId,
+          'department': _selectedDepartment,
+          'doctor_id': _selectedDoctorId,
+          'appointment_date': _selectedDate.toIso8601String().split('T').first,
+          'appointment_time': _formatTimeOfDay(_selectedTime),
+          'appointment_type': _selectedType,
+          'status': _selectedType == 'walk_in' ? 'waiting' : 'scheduled',
+          if (_notesController.text.trim().isNotEmpty) 'notes': _notesController.text.trim(),
+          if (_notesController.text.trim().isEmpty) 'notes': null,
+        };
 
-      await ref
-          .read(appointmentsNotifierProvider.notifier)
-          .createAppointment(newAppointment);
+        await ref
+            .read(appointmentsNotifierProvider.notifier)
+            .updateAppointment(widget.existingAppointment!.id, updates);
+      } else {
+        final newAppointment = AppointmentModel(
+          id: '',
+          patientId: _selectedPatientId,
+          patientName: _selectedPatientName ?? 'Walk-in Patient',
+          patientNumber: _selectedPatientNumber ?? 'Unknown ID',
+          department: _selectedDepartment,
+          doctorId: _selectedDoctorId,
+          doctorName: _selectedDoctorName,
+          specialty: _selectedDoctorSpecialty,
+          appointmentDate: _selectedDate,
+          appointmentTime: _formatTimeOfDay(_selectedTime),
+          appointmentType: _selectedType,
+          status: _selectedType == 'walk_in' ? 'waiting' : 'scheduled',
+          notes: _notesController.text.trim().isNotEmpty
+              ? _notesController.text.trim()
+              : null,
+          aiBooked: false,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        await ref
+            .read(appointmentsNotifierProvider.notifier)
+            .createAppointment(newAppointment);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -225,7 +305,9 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
-                    'Appointment for ${_selectedPatientName ?? "Patient"} booked successfully!',
+                    widget.isEditing
+                        ? 'Appointment for ${_selectedPatientName ?? "Patient"} updated successfully!'
+                        : 'Appointment for ${_selectedPatientName ?? "Patient"} booked successfully!',
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
@@ -239,7 +321,9 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create appointment: $e'),
+            content: Text(widget.isEditing
+                ? 'Failed to update appointment: $e'
+                : 'Failed to create appointment: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -274,6 +358,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
     final dialogMaxWidth = (screenWidth - 32).clamp(280.0, 580.0);
     final dialogMaxHeight =
         (screenHeight - viewInsets.bottom - 60).clamp(320.0, 780.0);
+
+    final isEditing = widget.isEditing;
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -319,7 +405,7 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Text(
-                          'New Appointment',
+                          isEditing ? 'Edit Appointment' : 'New Appointment',
                           style: AppTypography.headlineMd,
                         ),
                       ],
@@ -352,6 +438,7 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: _selectedDepartment,
+                              isExpanded: true,
                               decoration: InputDecoration(
                                 labelText: 'Department *',
                                 prefixIcon:
@@ -364,11 +451,17 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                               items: const [
                                 DropdownMenuItem(
                                   value: 'eye',
-                                  child: Text('Eye Clinic'),
+                                  child: Text(
+                                    'Eye Clinic',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                                 DropdownMenuItem(
                                   value: 'dental',
-                                  child: Text('Dental Clinic'),
+                                  child: Text(
+                                    'Dental Clinic',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                               onChanged: (val) {
@@ -378,35 +471,55 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                           ),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _selectedType,
-                              decoration: InputDecoration(
-                                labelText: 'Type *',
-                                prefixIcon:
-                                    const Icon(Icons.medical_services_outlined),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(
-                                      AppSpacing.radiusMd),
-                                ),
-                              ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'regular',
-                                  child: Text('Regular Visit'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'walk_in',
-                                  child: Text('Walk-in'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'follow_up',
-                                  child: Text('Follow-up'),
-                                ),
-                              ],
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() => _selectedType = val);
+                            child: Builder(
+                              builder: (context) {
+                                final Map<String, String> typesMap = {
+                                  for (final item in availableAppointmentTypes)
+                                    item.id: item.label,
+                                };
+                                final canonicalSelected =
+                                    normalizeAppointmentType(_selectedType);
+                                if (!typesMap.containsKey(canonicalSelected)) {
+                                  typesMap[canonicalSelected] = canonicalSelected
+                                      .split('_')
+                                      .map((w) => w.isEmpty
+                                          ? ''
+                                          : '${w[0].toUpperCase()}${w.substring(1)}')
+                                      .join(' ');
                                 }
+                                final safeValue = typesMap.containsKey(canonicalSelected)
+                                    ? canonicalSelected
+                                    : 'regular';
+
+                                return DropdownButtonFormField<String>(
+                                  key: ValueKey(safeValue),
+                                  initialValue: safeValue,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Type *',
+                                    prefixIcon: const Icon(
+                                        Icons.medical_services_outlined),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          AppSpacing.radiusMd),
+                                    ),
+                                  ),
+                                  items: typesMap.entries.map((entry) {
+                                    return DropdownMenuItem<String>(
+                                      value: entry.key,
+                                      child: Text(
+                                        entry.value,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() => _selectedType =
+                                          normalizeAppointmentType(val));
+                                    }
+                                  },
+                                );
                               },
                             ),
                           ),
@@ -693,7 +806,7 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                     else
                       Expanded(
                         child: MkesPrimaryButton(
-                          label: 'Book Appointment',
+                          label: isEditing ? 'Update Appointment' : 'Book Appointment',
                           onPressed: _submit,
                         ),
                       ),

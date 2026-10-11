@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -10,6 +11,7 @@ import '../models/user_profile.dart';
 import '../providers/users_provider.dart';
 import '../../department/models/department.dart';
 import '../../department/providers/departments_provider.dart';
+import '../../notifications/repositories/notification_repository.dart';
 
 class UserFormDialog extends ConsumerStatefulWidget {
   const UserFormDialog({super.key, this.user});
@@ -31,6 +33,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
   late final TextEditingController _confirmPasswordController;
 
   String _selectedRole = 'staff';
+  String _assignedShift = 'morning';
   String? _selectedDepartmentId;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -55,6 +58,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
     _confirmPasswordController = TextEditingController();
     if (widget.user != null) {
       _selectedRole = widget.user!.role;
+      final shift = widget.user!.assignedShift.toLowerCase();
+      _assignedShift = shift == 'night' ? 'afternoon' : shift;
       _selectedDepartmentId = widget.user!.departmentId;
     }
   }
@@ -106,12 +111,16 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
         }
       } else {
         // Edit existing user
+        final oldShift = widget.user!.assignedShift.toLowerCase();
+        final newShift = _assignedShift.toLowerCase();
+
         await ref.read(usersProvider.notifier).updateUser(widget.user!.id, {
           'full_name': _nameController.text.trim(),
           'phone_number': _phoneController.text.trim(),
           'department_id': _selectedDepartmentId,
           'designation': _designationController.text.trim(),
           'role': _selectedRole,
+          'assigned_shift': _assignedShift,
           'salary': _salaryController.text.trim().isEmpty
               ? null
               : double.tryParse(_salaryController.text.trim()),
@@ -119,6 +128,29 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
               ? null
               : _joiningDateController.text.trim(),
         });
+
+        // Notify affected staff if duty changed
+        if (widget.user!.role == 'staff' && oldShift != newShift) {
+          try {
+            final now = DateTime.now();
+            final tomorrow = now.add(const Duration(days: 1));
+            final effStr = DateFormat('d MMMM yyyy').format(tomorrow);
+            final shiftLabel = newShift == 'both'
+                ? 'Both (Morning & Evening)'
+                : (newShift == 'afternoon' || newShift == 'evening' ? 'Evening' : 'Morning');
+
+            await ref.read(notificationRepositoryProvider).insertNotification(
+              userId: widget.user!.id,
+              title: 'Duty Assignment Updated',
+              message: 'Your shift effective $effStr has been changed to $shiftLabel.',
+              type: 'duty_assignment',
+              idempotent: true,
+            );
+          } catch (notifErr) {
+            debugPrint('Failed to send duty change notification: $notifErr');
+          }
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('User updated.')),
@@ -339,6 +371,26 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                     );
                   },
                 ),
+                if (_selectedRole == 'staff') ...[
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    initialValue: _assignedShift,
+                    decoration: InputDecoration(
+                      labelText: 'Assigned Duty',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'morning', child: Text('Morning Shift')),
+                      DropdownMenuItem(value: 'afternoon', child: Text('Evening Shift')),
+                      DropdownMenuItem(value: 'both', child: Text('Both (Morning & Evening)')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setState(() => _assignedShift = val);
+                    },
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 Row(
                   children: [

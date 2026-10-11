@@ -24,6 +24,9 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
   bool shouldThrow = false;
   String? callerRole; // 'admin' or 'staff' or other
 
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   FakeInventoryRepositoryWithSKU([List<InventoryItem>? initial, this.callerRole])
       : items = initial != null ? List.from(initial) : [];
 

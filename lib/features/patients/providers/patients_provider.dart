@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../appointments/models/appointment_model.dart';
+import '../../appointments/repositories/appointment_repository.dart';
 import '../models/patient_model.dart';
 import '../repositories/patient_repository.dart';
 
@@ -80,5 +82,60 @@ final patientsByDepartmentProvider =
       .then((patients) => patients
           .where((patient) => patient.department == department)
           .toList());
+});
+
+class ScheduledPatientEntry {
+  final PatientModel patient;
+  final List<AppointmentModel> todayAppointments;
+
+  const ScheduledPatientEntry({
+    required this.patient,
+    required this.todayAppointments,
+  });
+
+  String get id => patient.id;
+}
+
+/// Fetches only patients who have an appointment scheduled for the current local calendar date.
+final todayScheduledPatientsProvider =
+    FutureProvider<List<ScheduledPatientEntry>>((ref) async {
+  final repo = ref.watch(appointmentRepositoryProvider);
+  final appointments = await repo.fetchTodayAppointments();
+
+  final now = DateTime.now();
+  final todayStr =
+      '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+  final todayList = appointments.where((a) {
+    final local = a.appointmentDate.toLocal();
+    final localStr =
+        '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+    return localStr == todayStr;
+  }).toList();
+
+  final Map<String, List<AppointmentModel>> grouped = {};
+  final Map<String, PatientModel> patientMap = {};
+
+  for (final appt in todayList) {
+    final p = appt.patient ??
+        PatientModel(
+          id: appt.patientId ?? appt.id,
+          name: appt.patientName ?? 'Scheduled Patient',
+          patientNumber: appt.patientNumber ?? 'APPT',
+          department: appt.department,
+          createdAt: appt.createdAt,
+          updatedAt: appt.updatedAt,
+        );
+    final key = p.id;
+    grouped.putIfAbsent(key, () => []).add(appt);
+    patientMap[key] = p;
+  }
+
+  return grouped.entries
+      .map((e) => ScheduledPatientEntry(
+            patient: patientMap[e.key]!,
+            todayAppointments: e.value,
+          ))
+      .toList();
 });
 

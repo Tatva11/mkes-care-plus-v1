@@ -172,6 +172,29 @@ class InventoryBatch {
     final vendorData = json['vendors'] as Map<String, dynamic>?;
     final invData = json['inventory'] as Map<String, dynamic>?;
 
+    DateTime? parseCalendarDate(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) {
+        return DateTime(value.year, value.month, value.day);
+      }
+      final str = value.toString().trim();
+      if (str.isEmpty) return null;
+      final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(str);
+      if (match != null) {
+        return DateTime(
+          int.parse(match.group(1)!),
+          int.parse(match.group(2)!),
+          int.parse(match.group(3)!),
+        );
+      }
+      final parsed = DateTime.tryParse(str);
+      if (parsed != null) {
+        final local = parsed.toLocal();
+        return DateTime(local.year, local.month, local.day);
+      }
+      return null;
+    }
+
     return InventoryBatch(
       id: json['id'] as String? ?? '',
       inventoryId: json['inventory_id'] as String? ?? '',
@@ -187,12 +210,8 @@ class InventoryBatch {
       remainingQuantity: (json['remaining_quantity'] as num?)?.toDouble() ?? 0.0,
       unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
-      expiryDate: json['expiry_date'] != null
-          ? DateTime.tryParse(json['expiry_date'] as String)
-          : null,
-      receivedDate: json['received_date'] != null
-          ? DateTime.tryParse(json['received_date'] as String) ?? DateTime.now()
-          : DateTime.now(),
+      expiryDate: parseCalendarDate(json['expiry_date']),
+      receivedDate: parseCalendarDate(json['received_date']) ?? DateTime.now(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
           : DateTime.now(),

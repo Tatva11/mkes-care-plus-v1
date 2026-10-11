@@ -52,6 +52,10 @@ class UserProfileMenu extends StatelessWidget {
         if (value == 'logout') {
           debugPrint('[LOGOUT] menu callback entered');
           try {
+            debugPrint('[LOGOUT] popping any pushed routes back to root');
+            if (Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            }
             debugPrint('[LOGOUT] starting Supabase signOut');
             await Supabase.instance.client.auth.signOut();
             debugPrint(

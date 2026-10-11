@@ -26,6 +26,7 @@ class TaskItem {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
+  final String? relatedSurgeryId;
 
   TaskItem({
     required this.id,
@@ -40,7 +41,11 @@ class TaskItem {
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
+    this.relatedSurgeryId,
   });
+
+  bool get isSurgeryTask =>
+      relatedSurgeryId != null && relatedSurgeryId!.trim().isNotEmpty;
 
   TaskItem copyWith({
     String? id,
@@ -55,6 +60,7 @@ class TaskItem {
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? completedAt,
+    String? relatedSurgeryId,
   }) {
     return TaskItem(
       id: id ?? this.id,
@@ -69,6 +75,7 @@ class TaskItem {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
+      relatedSurgeryId: relatedSurgeryId ?? this.relatedSurgeryId,
     );
   }
 
@@ -91,6 +98,7 @@ class TaskItem {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at'] as String) : null,
+      relatedSurgeryId: json['related_surgery_id']?.toString(),
     );
   }
 
@@ -125,6 +133,7 @@ class TaskItem {
       'due_date': dueDate?.toIso8601String(),
       'priority': priority,
       'status': status,
+      if (relatedSurgeryId != null) 'related_surgery_id': relatedSurgeryId,
     };
   }
 }

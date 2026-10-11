@@ -141,7 +141,7 @@ class StaffAttendanceSummaryCard extends StatelessWidget {
               statusColor: AppColors.primaryContainer,
             ),
             _DepartmentRow(
-              department: 'Afternoon Shift (15:00 - 23:00)',
+              department: 'Evening Shift (15:00 - 23:00)',
               staffed: '10/12',
               status: 'Short - 2',
               dotColor: AppColors.secondary,

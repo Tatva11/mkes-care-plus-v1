@@ -170,6 +170,14 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
       return;
     }
 
+    if (_selectedPatient!.department?.toLowerCase() != 'dental') {
+      setState(() {
+        _errorMessage =
+            'Patient "${_selectedPatient!.name}" is registered in "${_selectedPatient!.department ?? 'unknown'}" department. Dental Lab cases are strictly for Dental department patients.';
+      });
+      return;
+    }
+
     final dateError = DentalLabModel.validateDates(
       sentDate: _sentDate,
       readyDate: _readyDate,
@@ -226,8 +234,13 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.initialCase != null;
-    final patientsAsync = ref.watch(patientsProvider);
-    final allPatients = patientsAsync.valueOrNull ?? [];
+    final dentalPatientsAsync = ref.watch(patientsByDepartmentProvider('dental'));
+    final allPatientsAsync = ref.watch(patientsProvider);
+    final dentalPatients = (dentalPatientsAsync.valueOrNull ??
+            allPatientsAsync.valueOrNull ??
+            [])
+        .where((p) => p.department?.toLowerCase() == 'dental')
+        .toList();
 
     return AlertDialog(
       shape: RoundedRectangleBorder(
@@ -350,10 +363,10 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
                     displayStringForOption: (patient) => '${patient.name} (${patient.patientNumber})',
                     optionsBuilder: (TextEditingValue textEditingValue) {
                       if (textEditingValue.text.isEmpty) {
-                        return allPatients.take(15);
+                        return dentalPatients.take(15);
                       }
                       final query = textEditingValue.text.toLowerCase();
-                      return allPatients.where((patient) {
+                      return dentalPatients.where((patient) {
                         return patient.name.toLowerCase().contains(query) ||
                             patient.patientNumber.toLowerCase().contains(query) ||
                             (patient.mobile != null && patient.mobile!.contains(query));

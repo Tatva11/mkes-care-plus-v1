@@ -189,7 +189,22 @@ class _StaffRosterCardState extends ConsumerState<StaffRosterCard> {
               error: (e, st) => Center(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Text('Error: $e'),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Unable to load staff roster: $e',
+                        style: AppTypography.bodySm.copyWith(color: AppColors.error),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      TextButton.icon(
+                        onPressed: () => ref.invalidate(usersProvider),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               data: (users) {

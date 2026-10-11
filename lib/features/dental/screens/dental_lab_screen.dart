@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../appointments/models/appointment_model.dart';
+import '../../appointments/widgets/appointment_form_dialog.dart';
 import '../models/dental_lab_model.dart';
 import '../providers/dental_lab_provider.dart';
 import '../widgets/dental_lab_form_dialog.dart';
@@ -59,6 +61,37 @@ class _DentalLabContentState extends ConsumerState<DentalLabContent> {
       barrierDismissible: false,
       builder: (_) => DentalLabFormDialog(initialCase: item),
     );
+  }
+
+  Future<void> _editLinkedAppointment(DentalLabModel item) async {
+    if (item.appointmentId == null || item.patientId == null) return;
+
+    final initialAppointment = AppointmentModel(
+      id: item.appointmentId!,
+      patientId: item.patientId,
+      patientName: item.patientName ?? 'Patient',
+      patientNumber: item.patientNumber ?? 'Unknown ID',
+      department: 'dental',
+      appointmentDate: item.appointmentDate ?? DateTime.now(),
+      appointmentTime: item.appointmentTime ?? '10:30:00',
+      appointmentType: 'follow_up',
+      status: item.appointmentStatus ?? 'scheduled',
+      notes: item.remarks,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    );
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => AppointmentFormDialog(
+        existingAppointment: initialAppointment,
+        initialPatientId: item.patientId,
+        initialPatientName: item.patientName,
+      ),
+    );
+
+    if (saved != true || !mounted) return;
+    await ref.read(dentalLabListProvider.notifier).refresh();
   }
 
   Future<void> _transitionStatus(DentalLabModel item, String newStatus) async {
@@ -409,6 +442,7 @@ class _DentalLabContentState extends ConsumerState<DentalLabContent> {
             isDesktop: isDesktop,
             onTransitionStatus: (status) => _transitionStatus(item, status),
             onEdit: () => _openEditDialog(item),
+            onEditAppointment: () => _editLinkedAppointment(item),
             onDelete: () => _deleteCase(item),
             onWhatsApp: () => DentalLabWhatsAppDialog.show(context, item),
           );
@@ -532,6 +566,7 @@ class _DentalLabCaseRow extends StatelessWidget {
     required this.isDesktop,
     required this.onTransitionStatus,
     required this.onEdit,
+    required this.onEditAppointment,
     required this.onDelete,
     required this.onWhatsApp,
   });
@@ -540,6 +575,7 @@ class _DentalLabCaseRow extends StatelessWidget {
   final bool isDesktop;
   final ValueChanged<String> onTransitionStatus;
   final VoidCallback onEdit;
+  final VoidCallback onEditAppointment;
   final VoidCallback onDelete;
   final VoidCallback onWhatsApp;
 
@@ -674,6 +710,11 @@ class _DentalLabCaseRow extends StatelessWidget {
                   Text('Sent: $sentStr', style: const TextStyle(fontSize: 12)),
                   if (item.readyDate != null)
                     Text('Ready: $readyStr', style: TextStyle(fontSize: 11, color: AppColors.secondary)),
+                  if (item.appointmentDate != null)
+                    Text(
+                      'Appt: ${item.formattedAppointmentDateTime ?? item.formattedAppointmentDate ?? '-'}',
+                      style: TextStyle(fontSize: 11, color: AppColors.primary),
+                    ),
                   if (item.deliveredDate != null)
                     Text('Delivered: $deliveredStr', style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
                 ],
@@ -741,6 +782,7 @@ class _DentalLabCaseRow extends StatelessWidget {
                 icon: const Icon(Icons.more_vert, size: 20, color: AppColors.onSurfaceVariant),
                 onSelected: (val) {
                   if (val == 'edit') onEdit();
+                  if (val == 'edit_appointment') onEditAppointment();
                   if (val == 'whatsapp') onWhatsApp();
                   if (val == 'delete') onDelete();
                 },
@@ -755,6 +797,17 @@ class _DentalLabCaseRow extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (item.appointmentId != null)
+                    const PopupMenuItem(
+                      value: 'edit_appointment',
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_month_outlined, size: 16),
+                          SizedBox(width: 8),
+                          Text('Edit Linked Appointment'),
+                        ],
+                      ),
+                    ),
                   const PopupMenuItem(
                     value: 'whatsapp',
                     child: Row(

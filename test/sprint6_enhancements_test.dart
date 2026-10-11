@@ -19,6 +19,9 @@ class FakeInventoryRepository implements InventoryRepository {
   final List<InventoryItem> items;
   final List<InventoryTransaction> transactions = [];
 
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   FakeInventoryRepository([List<InventoryItem>? initial])
       : items = initial != null ? List.from(initial) : [];
 

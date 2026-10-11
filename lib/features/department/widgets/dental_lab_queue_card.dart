@@ -95,7 +95,7 @@ class DentalLabQueueCard extends ConsumerWidget {
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: SizedBox(
-                  width: 650,
+                  width: 780,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -112,6 +112,7 @@ class DentalLabQueueCard extends ConsumerWidget {
                             Expanded(flex: 3, child: _HeaderCell('Patient')),
                             Expanded(flex: 3, child: _HeaderCell('Restoration')),
                             Expanded(flex: 2, child: _HeaderCell('Sent Date')),
+                            Expanded(flex: 2, child: _HeaderCell('Appointment')),
                             Expanded(
                               flex: 2,
                               child: _HeaderCell('Status', alignRight: true),
@@ -238,6 +239,23 @@ class _RealDentalRow extends ConsumerWidget {
                 color: AppColors.onSurfaceVariant,
                 fontSize: 12,
               ),
+            ),
+          ),
+
+          // Appointment
+          Expanded(
+            flex: 2,
+            child: Text(
+              item.appointmentDate != null
+                  ? (item.formattedAppointmentDateTime ??
+                      item.formattedAppointmentDate ??
+                      '-')
+                  : '-',
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.primary,
+                fontSize: 11,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
 

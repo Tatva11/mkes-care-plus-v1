@@ -41,13 +41,22 @@ class LeaveRepository {
     return (response as List).map((json) => LeaveRequest.fromJson(json)).toList();
   }
 
-  /// Calculates leave days excluding Sundays (the weekly holiday).
-  static double calculateLeaveDays(DateTime start, DateTime end) {
+  /// Calculates leave days excluding Sundays (the weekly holiday),
+  /// accounting for partial-day duties (morning/afternoon = 0.5 days).
+  static double calculateLeaveDays(
+    DateTime start,
+    DateTime end, {
+    String dutyPeriod = 'full_day',
+  }) {
     double count = 0;
+    final normalized = dutyPeriod.toLowerCase();
+    final isPartial = normalized == 'morning' || normalized == 'afternoon';
     for (var d = start;
         !d.isAfter(end);
         d = d.add(const Duration(days: 1))) {
-      if (d.weekday != DateTime.sunday) count++;
+      if (d.weekday != DateTime.sunday) {
+        count += isPartial ? 0.5 : 1.0;
+      }
     }
     return count;
   }
@@ -64,10 +73,13 @@ class LeaveRepository {
     required DateTime startDate,
     required DateTime endDate,
     required String reason,
+    String dutyPeriod = 'full_day',
   }) async {
-    // Exclude Sundays when calculating leave days.
-    final days = calculateLeaveDays(startDate, endDate);
+    // Exclude Sundays when calculating leave days and account for duty period.
+    final days = calculateLeaveDays(startDate, endDate, dutyPeriod: dutyPeriod);
     if (days <= 0) throw Exception('Selected date range contains no working days (Sundays are excluded).');
+
+    final normalizedDuty = dutyPeriod.toLowerCase();
 
     final response = await _supabase.from('leave_requests').insert({
       'staff_id': staffId,
@@ -76,6 +88,7 @@ class LeaveRepository {
       'leave_days': days,
       'reason': reason,
       'status': 'pending',
+      'duty_period': normalizedDuty,
     }).select().single();
 
     final leaveId = response['id'] as String?;
