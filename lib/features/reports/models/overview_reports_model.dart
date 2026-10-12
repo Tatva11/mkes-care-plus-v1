@@ -35,6 +35,10 @@ class OverviewReportsData {
   final double eyeSales;
   final double dentalSales;
 
+  final double totalInventoryValuation;
+  final int lowStockCount;
+  final int expiredBatchesCount;
+
   final List<ActivityTrendPoint> trendPoints;
 
   const OverviewReportsData({
@@ -54,9 +58,14 @@ class OverviewReportsData {
     required this.dentalProcedures,
     required this.eyeSales,
     required this.dentalSales,
+    this.totalInventoryValuation = 0.0,
+    this.lowStockCount = 0,
+    this.expiredBatchesCount = 0,
     required this.trendPoints,
   });
 
-  double get eyePercentage => totalPatients > 0 ? (eyePatients / totalPatients * 100) : 0.0;
-  double get dentalPercentage => totalPatients > 0 ? (dentalPatients / totalPatients * 100) : 0.0;
+  double get eyePercentage =>
+      totalPatients > 0 ? (eyePatients / totalPatients * 100) : 0.0;
+  double get dentalPercentage =>
+      totalPatients > 0 ? (dentalPatients / totalPatients * 100) : 0.0;
 }

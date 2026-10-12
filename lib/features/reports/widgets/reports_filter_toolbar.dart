@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../models/reports_filter_model.dart';
 import '../providers/reports_provider.dart';
 
@@ -15,12 +17,14 @@ class ReportsFilterToolbar extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark
+            ? AppColors.surfaceContainerHigh
+            : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          color: isDark ? AppColors.outline : AppColors.outlineVariant,
         ),
       ),
       child: Column(
@@ -38,26 +42,40 @@ class ReportsFilterToolbar extends ConsumerWidget {
                     avatar: Icon(
                       section.icon,
                       size: 16,
-                      color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark
+                              ? AppColors.outlineVariant
+                              : AppColors.onSurfaceVariant),
                     ),
                     label: Text(section.displayName),
                     selected: isSelected,
                     onSelected: (val) {
                       if (val) {
-                        ref.read(adminReportsSectionProvider.notifier).state = section;
+                        ref.read(adminReportsSectionProvider.notifier).state =
+                            section;
                       }
                     },
-                    selectedColor: const Color(0xFF0D9488),
-                    backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    selectedColor: AppColors.primary,
+                    backgroundColor: AppColors.surfaceContainerLow,
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark
+                              ? AppColors.outlineVariant
+                              : AppColors.onSurfaceVariant),
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
                       fontSize: 13,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       side: BorderSide(
-                        color: isSelected ? const Color(0xFF0D9488) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        color: isSelected
+                            ? AppColors.primary
+                            : (isDark
+                                ? AppColors.outline
+                                : AppColors.outlineVariant),
                       ),
                     ),
                   ),
@@ -66,7 +84,12 @@ class ReportsFilterToolbar extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            color: isDark
+                ? AppColors.outline.withValues(alpha: 0.3)
+                : AppColors.outlineVariant,
+          ),
           const SizedBox(height: 16),
 
           // Filters row: Date Presets + Department + Custom Date Range
@@ -89,45 +112,58 @@ class ReportsFilterToolbar extends ConsumerWidget {
                         final picked = await showDateRangePicker(
                           context: context,
                           firstDate: DateTime(2020),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                          initialDateRange: filter.customStartDate != null && filter.customEndDate != null
-                              ? DateTimeRange(start: filter.customStartDate!, end: filter.customEndDate!)
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
+                          initialDateRange: filter.customStartDate != null &&
+                                  filter.customEndDate != null
+                              ? DateTimeRange(
+                                  start: filter.customStartDate!,
+                                  end: filter.customEndDate!)
                               : DateTimeRange(
-                                  start: DateTime.now().subtract(const Duration(days: 30)),
+                                  start: DateTime.now()
+                                      .subtract(const Duration(days: 30)),
                                   end: DateTime.now(),
                                 ),
                         );
                         if (picked != null) {
-                          ref.read(adminReportsFilterProvider.notifier).state = filter.copyWith(
+                          ref.read(adminReportsFilterProvider.notifier).state =
+                              filter.copyWith(
                             datePreset: ReportsDatePreset.custom,
                             customStartDate: picked.start,
                             customEndDate: picked.end,
                           );
                         }
                       } else {
-                        ref.read(adminReportsFilterProvider.notifier).state = filter.copyWith(
+                        ref.read(adminReportsFilterProvider.notifier).state =
+                            filter.copyWith(
                           datePreset: preset,
                           customStartDate: null,
                           customEndDate: null,
                         );
                       }
                     },
-                    selectedColor: const Color(0xFF0D9488).withValues(alpha: 0.15),
-                    checkmarkColor: const Color(0xFF0D9488),
-                    backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    selectedColor:
+                        AppColors.primaryContainer.withValues(alpha: 0.15),
+                    checkmarkColor: AppColors.primary,
+                    backgroundColor: AppColors.surfaceContainerLow,
                     labelStyle: TextStyle(
                       color: isSelected
-                          ? const Color(0xFF0D9488)
-                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          ? AppColors.primary
+                          : (isDark
+                              ? AppColors.outlineVariant
+                              : AppColors.onSurfaceVariant),
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
                       fontSize: 12,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       side: BorderSide(
                         color: isSelected
-                            ? const Color(0xFF0D9488)
-                            : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                            ? AppColors.primary
+                            : (isDark
+                                ? AppColors.outline
+                                : AppColors.outlineVariant),
                       ),
                     ),
                   );
@@ -138,10 +174,11 @@ class ReportsFilterToolbar extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    color:
+                        isDark ? AppColors.outline : AppColors.outlineVariant,
                   ),
                 ),
                 child: DropdownButtonHideUnderline(
@@ -150,18 +187,23 @@ class ReportsFilterToolbar extends ConsumerWidget {
                     icon: const Icon(Icons.arrow_drop_down, size: 20),
                     style: TextStyle(
                       fontSize: 13,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      color: isDark ? Colors.white : AppColors.onSurface,
                       fontWeight: FontWeight.w500,
                     ),
-                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    dropdownColor: isDark
+                        ? AppColors.surfaceContainerHigh
+                        : AppColors.surfaceContainerLowest,
                     items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All Departments')),
+                      DropdownMenuItem(
+                          value: 'all', child: Text('All Departments')),
                       DropdownMenuItem(value: 'eye', child: Text('Eye Clinic')),
-                      DropdownMenuItem(value: 'dental', child: Text('Dental Clinic')),
+                      DropdownMenuItem(
+                          value: 'dental', child: Text('Dental Clinic')),
                     ],
                     onChanged: (val) {
                       if (val != null) {
-                        ref.read(adminReportsFilterProvider.notifier).state = filter.copyWith(department: val);
+                        ref.read(adminReportsFilterProvider.notifier).state =
+                            filter.copyWith(department: val);
                       }
                     },
                   ),
@@ -169,24 +211,29 @@ class ReportsFilterToolbar extends ConsumerWidget {
               ),
 
               // Active Date Range Indicator
-              if (filter.effectiveStartDate != null || filter.effectiveEndDate != null)
+              if (filter.effectiveStartDate != null ||
+                  filter.effectiveEndDate != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                    color: AppColors.primaryContainer.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF0D9488)),
+                      const Icon(Icons.calendar_today_outlined,
+                          size: 14, color: AppColors.primary),
                       const SizedBox(width: 6),
                       Text(
-                        _formatDateRange(filter.effectiveStartDate, filter.effectiveEndDate),
+                        _formatDateRange(
+                            filter.effectiveStartDate, filter.effectiveEndDate),
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF0D9488),
+                          color: AppColors.primary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

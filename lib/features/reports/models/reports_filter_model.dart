@@ -32,7 +32,8 @@ enum ReportsSection {
   appointments,
   staff,
   clinical,
-  financial;
+  financial,
+  inventory;
 
   String get displayName {
     switch (this) {
@@ -48,6 +49,8 @@ enum ReportsSection {
         return 'Clinical / Procedures';
       case ReportsSection.financial:
         return 'Billing & Financial';
+      case ReportsSection.inventory:
+        return 'Inventory & Stock';
     }
   }
 
@@ -65,6 +68,8 @@ enum ReportsSection {
         return Icons.medical_services_outlined;
       case ReportsSection.financial:
         return Icons.account_balance_wallet_outlined;
+      case ReportsSection.inventory:
+        return Icons.inventory_2_outlined;
     }
   }
 }
@@ -91,7 +96,8 @@ class AdminReportsFilter {
         return DateTime(now.year, now.month, now.day, 0, 0, 0);
       case ReportsDatePreset.thisWeek:
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-        return DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day, 0, 0, 0);
+        return DateTime(
+            startOfWeek.year, startOfWeek.month, startOfWeek.day, 0, 0, 0);
       case ReportsDatePreset.thisMonth:
         return DateTime(now.year, now.month, 1, 0, 0, 0);
       case ReportsDatePreset.thisYear:
@@ -111,7 +117,8 @@ class AdminReportsFilter {
       case ReportsDatePreset.thisWeek:
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
         final endOfWeek = startOfWeek.add(const Duration(days: 6));
-        return DateTime(endOfWeek.year, endOfWeek.month, endOfWeek.day, 23, 59, 59, 999);
+        return DateTime(
+            endOfWeek.year, endOfWeek.month, endOfWeek.day, 23, 59, 59, 999);
       case ReportsDatePreset.thisMonth:
         final nextMonth = DateTime(now.year, now.month + 1, 1);
         return nextMonth.subtract(const Duration(milliseconds: 1));
@@ -119,7 +126,8 @@ class AdminReportsFilter {
         return DateTime(now.year, 12, 31, 23, 59, 59, 999);
       case ReportsDatePreset.custom:
         if (customEndDate != null) {
-          return DateTime(customEndDate!.year, customEndDate!.month, customEndDate!.day, 23, 59, 59, 999);
+          return DateTime(customEndDate!.year, customEndDate!.month,
+              customEndDate!.day, 23, 59, 59, 999);
         }
         return null;
       case ReportsDatePreset.allTime:
@@ -141,8 +149,10 @@ class AdminReportsFilter {
       section: section ?? this.section,
       department: department ?? this.department,
       datePreset: datePreset ?? this.datePreset,
-      customStartDate: clearCustomDates ? null : (customStartDate ?? this.customStartDate),
-      customEndDate: clearCustomDates ? null : (customEndDate ?? this.customEndDate),
+      customStartDate:
+          clearCustomDates ? null : (customStartDate ?? this.customStartDate),
+      customEndDate:
+          clearCustomDates ? null : (customEndDate ?? this.customEndDate),
     );
   }
 

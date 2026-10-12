@@ -15,8 +15,9 @@ class DoctorAppointmentStat {
     required this.cancelledAppointments,
   });
 
-  double get completionRate =>
-      totalAppointments > 0 ? (completedAppointments / totalAppointments * 100) : 0.0;
+  double get completionRate => totalAppointments > 0
+      ? (completedAppointments / totalAppointments * 100)
+      : 0.0;
 }
 
 class AppointmentTrendPoint {

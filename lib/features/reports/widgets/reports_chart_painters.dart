@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
+
 /// Data point for line charts
 class ChartDataPoint {
   final String label;
@@ -29,8 +31,8 @@ class ReportsLineChart extends StatelessWidget {
     required this.data,
     this.primaryLabel,
     this.secondaryLabel,
-    this.primaryColor = const Color(0xFF0D9488),
-    this.secondaryColor = const Color(0xFF6366F1),
+    this.primaryColor = AppColors.primary,
+    this.secondaryColor = AppColors.secondary,
     this.height = 220,
     this.valueFormatter,
   });
@@ -41,7 +43,8 @@ class ReportsLineChart extends StatelessWidget {
       return SizedBox(
         height: height,
         child: const Center(
-          child: Text('No trend data for selected period', style: TextStyle(color: Colors.grey)),
+          child: Text('No trend data for selected period',
+              style: TextStyle(color: Colors.grey)),
         ),
       );
     }
@@ -72,7 +75,9 @@ class ReportsLineChart extends StatelessWidget {
                       primaryLabel!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        color: isDark
+                            ? AppColors.outlineVariant
+                            : AppColors.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -92,7 +97,9 @@ class ReportsLineChart extends StatelessWidget {
                       secondaryLabel!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        color: isDark
+                            ? AppColors.outlineVariant
+                            : AppColors.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -132,7 +139,7 @@ class ReportsLineChart extends StatelessWidget {
           data[i].label,
           style: TextStyle(
             fontSize: 10,
-            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            color: isDark ? AppColors.outlineVariant : AppColors.outline,
           ),
         ),
       );
@@ -210,7 +217,8 @@ class _LineChartPainter extends CustomPainter {
     required double Function(ChartDataPoint) getValue,
   }) {
     final points = <Offset>[];
-    final dx = data.length > 1 ? size.width / (data.length - 1) : size.width / 2;
+    final dx =
+        data.length > 1 ? size.width / (data.length - 1) : size.width / 2;
 
     for (int i = 0; i < data.length; i++) {
       final val = getValue(data[i]);
@@ -264,7 +272,9 @@ class _LineChartPainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.fill;
     final dotBorderPaint = Paint()
-      ..color = isDark ? const Color(0xFF1E293B) : Colors.white
+      ..color = isDark
+          ? AppColors.surfaceContainerHigh
+          : AppColors.surfaceContainerLowest
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
@@ -287,7 +297,7 @@ class ReportsBarChart extends StatelessWidget {
   const ReportsBarChart({
     super.key,
     required this.data,
-    this.barColor = const Color(0xFF0D9488),
+    this.barColor = AppColors.primary,
     this.height = 180,
   });
 
@@ -297,7 +307,8 @@ class ReportsBarChart extends StatelessWidget {
       return SizedBox(
         height: height,
         child: const Center(
-          child: Text('No comparison data available', style: TextStyle(color: Colors.grey)),
+          child: Text('No comparison data available',
+              style: TextStyle(color: Colors.grey)),
         ),
       );
     }
@@ -325,7 +336,9 @@ class ReportsBarChart extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                      color: isDark
+                          ? AppColors.outlineVariant
+                          : AppColors.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -333,7 +346,8 @@ class ReportsBarChart extends StatelessWidget {
                     height: (height - 45) * ratio,
                     decoration: BoxDecoration(
                       color: barColor,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(6)),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -341,7 +355,8 @@ class ReportsBarChart extends StatelessWidget {
                     item.label,
                     style: TextStyle(
                       fontSize: 10,
-                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                      color:
+                          isDark ? AppColors.outlineVariant : AppColors.outline,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -393,7 +408,8 @@ class ReportsDonutChart extends StatelessWidget {
       return SizedBox(
         height: size,
         child: const Center(
-          child: Text('No breakdown data', style: TextStyle(color: Colors.grey)),
+          child:
+              Text('No breakdown data', style: TextStyle(color: Colors.grey)),
         ),
       );
     }
@@ -424,7 +440,7 @@ class ReportsDonutChart extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      color: isDark ? Colors.white : AppColors.onSurface,
                     ),
                   ),
                   if (centerSubtitle.isNotEmpty)
@@ -432,7 +448,9 @@ class ReportsDonutChart extends StatelessWidget {
                       centerSubtitle,
                       style: TextStyle(
                         fontSize: 11,
-                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                        color: isDark
+                            ? AppColors.outlineVariant
+                            : AppColors.outline,
                       ),
                     ),
                 ],
@@ -465,7 +483,9 @@ class ReportsDonutChart extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                      color: isDark
+                          ? AppColors.outlineVariant
+                          : AppColors.onSurface,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -473,7 +493,9 @@ class ReportsDonutChart extends StatelessWidget {
                     '$pct% (${seg.value.toInt()})',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: isDark
+                          ? AppColors.outlineVariant
+                          : AppColors.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -561,28 +583,33 @@ class DepartmentRatioBar extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.remove_red_eye_outlined, size: 16, color: Color(0xFF0D9488)),
+                const Icon(Icons.remove_red_eye_outlined,
+                    size: 16, color: AppColors.primary),
                 const SizedBox(width: 6),
                 Text(
                   'Eye Care: ${eyeCount.toString()} (${eyePercentage.toStringAsFixed(1)}%)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
+                    color:
+                        isDark ? AppColors.primaryContainer : AppColors.primary,
                   ),
                 ),
               ],
             ),
             Row(
               children: [
-                const Icon(Icons.medical_services_outlined, size: 16, color: Color(0xFF6366F1)),
+                const Icon(Icons.medical_services_outlined,
+                    size: 16, color: AppColors.secondary),
                 const SizedBox(width: 6),
                 Text(
                   'Dental Care: ${dentalCount.toString()} (${dentalPercentage.toStringAsFixed(1)}%)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF818CF8) : const Color(0xFF6366F1),
+                    color: isDark
+                        ? AppColors.secondaryContainer
+                        : AppColors.secondary,
                   ),
                 ),
               ],
@@ -595,16 +622,18 @@ class DepartmentRatioBar extends StatelessWidget {
           child: Container(
             height: 12,
             width: double.infinity,
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            color: isDark
+                ? AppColors.surfaceContainerHigh
+                : AppColors.outlineVariant,
             child: Row(
               children: [
                 Flexible(
                   flex: (effectiveEyePct * 1000).toInt(),
-                  child: Container(color: const Color(0xFF0D9488)),
+                  child: Container(color: AppColors.primary),
                 ),
                 Flexible(
                   flex: ((1.0 - effectiveEyePct) * 1000).toInt(),
-                  child: Container(color: const Color(0xFF6366F1)),
+                  child: Container(color: AppColors.secondary),
                 ),
               ],
             ),

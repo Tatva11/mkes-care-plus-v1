@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+
 class ReportsMetricCard extends StatelessWidget {
   final String title;
   final String value;
@@ -16,7 +19,7 @@ class ReportsMetricCard extends StatelessWidget {
     required this.value,
     this.subtitle,
     required this.icon,
-    this.iconColor = const Color(0xFF0D9488),
+    this.iconColor = AppColors.primary,
     this.backgroundColor,
     this.trailing,
     this.onTap,
@@ -27,17 +30,20 @@ class ReportsMetricCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final cardBg = backgroundColor ?? (isDark ? const Color(0xFF1E293B) : Colors.white);
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final cardBg = backgroundColor ??
+        (isDark
+            ? AppColors.surfaceContainerHigh
+            : AppColors.surfaceContainerLowest);
+    final borderColor = isDark ? AppColors.outline : AppColors.outlineVariant;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: cardBg,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
@@ -58,7 +64,7 @@ class ReportsMetricCard extends StatelessWidget {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: iconColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   ),
                   child: Icon(
                     icon,
@@ -76,7 +82,9 @@ class ReportsMetricCard extends StatelessWidget {
                 Text(
                   title,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    color: isDark
+                        ? AppColors.outlineVariant
+                        : AppColors.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
@@ -90,7 +98,7 @@ class ReportsMetricCard extends StatelessWidget {
                     value,
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      color: isDark ? Colors.white : AppColors.onSurface,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -100,7 +108,8 @@ class ReportsMetricCard extends StatelessWidget {
                   Text(
                     subtitle!,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                      color:
+                          isDark ? AppColors.outlineVariant : AppColors.outline,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

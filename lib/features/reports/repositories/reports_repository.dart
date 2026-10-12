@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,9 +6,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/providers/supabase_provider.dart';
 import '../../billing/models/billing_reports_model.dart';
 import '../../billing/repositories/billing_repository.dart';
+import '../../inventory/models/inventory_item.dart';
+import '../../inventory/repositories/department_inventory_repository.dart';
+import '../../inventory/repositories/inventory_repository.dart';
 import '../../patients/models/patient_model.dart';
 import '../models/appointment_reports_model.dart';
 import '../models/clinical_reports_model.dart';
+import '../models/inventory_reports_model.dart';
 import '../models/overview_reports_model.dart';
 import '../models/patient_reports_model.dart';
 import '../models/reports_filter_model.dart';
@@ -16,23 +21,36 @@ import '../models/staff_reports_model.dart';
 final reportsRepositoryProvider = Provider<ReportsRepository>((ref) {
   final supabase = ref.watch(supabaseProvider);
   final billingRepo = ref.watch(billingRepositoryProvider);
-  return ReportsRepository(supabase, billingRepo);
+  final inventoryRepo = ref.watch(inventoryRepositoryProvider);
+  final deptInventoryRepo = ref.watch(departmentInventoryRepositoryProvider);
+  return ReportsRepository(
+      supabase, billingRepo, inventoryRepo, deptInventoryRepo);
 });
 
 class ReportsRepository {
   final SupabaseClient _supabase;
   final BillingRepository _billingRepo;
+  final InventoryRepository _inventoryRepo;
+  final DepartmentInventoryRepository _deptInventoryRepo;
 
-  ReportsRepository(this._supabase, this._billingRepo);
+  ReportsRepository(
+    this._supabase,
+    this._billingRepo,
+    this._inventoryRepo,
+    this._deptInventoryRepo,
+  );
 
   /// 1. Fetch Overview snapshot analytics
-  Future<OverviewReportsData> fetchOverviewData(AdminReportsFilter filter) async {
+  Future<OverviewReportsData> fetchOverviewData(
+      AdminReportsFilter filter) async {
     final start = filter.effectiveStartDate;
     final end = filter.effectiveEndDate;
-    final dept = filter.department == 'all' ? null : filter.department.toLowerCase();
+    final dept =
+        filter.department == 'all' ? null : filter.department.toLowerCase();
 
     // 1. Fetch all patients
-    var patientsQuery = _supabase.from('patients').select('id, department, created_at');
+    var patientsQuery =
+        _supabase.from('patients').select('id, department, created_at');
     if (dept != null) {
       patientsQuery = patientsQuery.eq('department', dept);
     }
@@ -49,10 +67,16 @@ class ReportsRepository {
       if (pDept == 'eye') eyePatients++;
       if (pDept == 'dental') dentalPatients++;
 
-      final createdAt = p['created_at'] != null ? DateTime.tryParse(p['created_at'] as String) : null;
+      final createdAt = p['created_at'] != null
+          ? DateTime.tryParse(p['created_at'] as String)
+          : null;
       if (createdAt != null) {
-        final afterStart = start == null || createdAt.isAfter(start) || createdAt.isAtSameMomentAs(start);
-        final beforeEnd = end == null || createdAt.isBefore(end) || createdAt.isAtSameMomentAs(end);
+        final afterStart = start == null ||
+            createdAt.isAfter(start) ||
+            createdAt.isAtSameMomentAs(start);
+        final beforeEnd = end == null ||
+            createdAt.isBefore(end) ||
+            createdAt.isAtSameMomentAs(end);
         if (afterStart && beforeEnd) {
           newPatients++;
         }
@@ -60,15 +84,19 @@ class ReportsRepository {
     }
 
     // 2. Fetch appointments in period
-    var apptQuery = _supabase.from('appointments').select('id, department, status, appointment_date, created_at');
+    var apptQuery = _supabase
+        .from('appointments')
+        .select('id, department, status, appointment_date, created_at');
     if (dept != null) {
       apptQuery = apptQuery.eq('department', dept);
     }
     if (start != null) {
-      apptQuery = apptQuery.gte('appointment_date', start.toIso8601String().split('T').first);
+      apptQuery = apptQuery.gte(
+          'appointment_date', start.toIso8601String().split('T').first);
     }
     if (end != null) {
-      apptQuery = apptQuery.lte('appointment_date', end.toIso8601String().split('T').first);
+      apptQuery = apptQuery.lte(
+          'appointment_date', end.toIso8601String().split('T').first);
     }
     final apptRes = await apptQuery;
     final apptList = apptRes as List;
@@ -131,7 +159,8 @@ class ReportsRepository {
       if (!trendMap.containsKey(dateKey)) {
         trendMap[dateKey] = ActivityTrendPoint(
           label: DateFormat('dd MMM').format(inv.createdAt),
-          date: DateTime(inv.createdAt.year, inv.createdAt.month, inv.createdAt.day),
+          date: DateTime(
+              inv.createdAt.year, inv.createdAt.month, inv.createdAt.day),
           patientCount: 0,
           appointmentCount: 0,
           procedureCount: 0,
@@ -144,12 +173,80 @@ class ReportsRepository {
         date: current.date,
         patientCount: current.patientCount,
         appointmentCount: current.appointmentCount,
-        procedureCount: current.procedureCount + inv.items.fold(0, (sum, i) => sum + i.quantity),
+        procedureCount: current.procedureCount +
+            inv.items.fold(0, (sum, i) => sum + i.quantity),
         salesAmount: current.salesAmount + inv.totalAmount,
       );
     }
 
-    final sortedTrend = trendMap.values.toList()..sort((a, b) => a.date.compareTo(b.date));
+    final sortedTrend = trendMap.values.toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    // Inventory metrics for overview
+    double totalInventoryValuation = 0.0;
+    int lowStockCount = 0;
+    int expiredBatchesCount = 0;
+    try {
+      final items = await _inventoryRepo.getInventoryItems();
+      final deptItems = await _deptInventoryRepo.fetchDepartmentInventory();
+      final itemMap = {for (final i in items) i.id: i};
+
+      if (dept == null) {
+        for (final item in items) {
+          final price = item.price ?? 0.0;
+          final cStock = item.currentStock;
+          totalInventoryValuation += cStock * price;
+          if (cStock <= (item.minimumStock ?? 5.0)) {
+            lowStockCount++;
+          }
+          if (item.batches != null) {
+            final now = DateTime.now();
+            for (final b in item.batches!) {
+              if (b.hasRemainingStock &&
+                  b.expiryDate != null &&
+                  b.expiryDate!.isBefore(now)) {
+                expiredBatchesCount++;
+              }
+            }
+          }
+        }
+
+        for (final d in deptItems) {
+          final price = itemMap[d.inventoryId]?.price ?? 0.0;
+          totalInventoryValuation += d.quantity * price;
+          if (d.isLowStock) {
+            lowStockCount++;
+          }
+        }
+      } else {
+        for (final d in deptItems) {
+          final dName = d.departmentName.toLowerCase();
+          if (dName.contains(dept)) {
+            final price = itemMap[d.inventoryId]?.price ?? 0.0;
+            totalInventoryValuation += d.quantity * price;
+            if (d.isLowStock || d.quantity <= d.minimumStock) {
+              lowStockCount++;
+            }
+          }
+        }
+
+        final now = DateTime.now();
+        for (final item in items) {
+          final itemDept = item.department?.toLowerCase();
+          if (itemDept == dept) {
+            if (item.batches != null) {
+              for (final b in item.batches!) {
+                if (b.hasRemainingStock &&
+                    b.expiryDate != null &&
+                    b.expiryDate!.isBefore(now)) {
+                  expiredBatchesCount++;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
 
     return OverviewReportsData(
       totalPatients: totalPatients,
@@ -168,15 +265,20 @@ class ReportsRepository {
       dentalProcedures: dentalProcedures,
       eyeSales: eyeSales,
       dentalSales: dentalSales,
+      totalInventoryValuation: totalInventoryValuation,
+      lowStockCount: lowStockCount,
+      expiredBatchesCount: expiredBatchesCount,
       trendPoints: sortedTrend,
     );
   }
 
   /// 2. Fetch Patient Reports & Demographics
-  Future<PatientReportsData> fetchPatientReports(AdminReportsFilter filter) async {
+  Future<PatientReportsData> fetchPatientReports(
+      AdminReportsFilter filter) async {
     final start = filter.effectiveStartDate;
     final end = filter.effectiveEndDate;
-    final dept = filter.department == 'all' ? null : filter.department.toLowerCase();
+    final dept =
+        filter.department == 'all' ? null : filter.department.toLowerCase();
 
     var query = _supabase.from('patients').select();
     if (dept != null) {
@@ -184,7 +286,9 @@ class ReportsRepository {
     }
 
     final res = await query.order('created_at', ascending: false);
-    final allPatients = (res as List).map((json) => PatientModel.fromJson(json as Map<String, dynamic>)).toList();
+    final allPatients = (res as List)
+        .map((json) => PatientModel.fromJson(json as Map<String, dynamic>))
+        .toList();
 
     int totalPatients = allPatients.length;
     int newPatients = 0;
@@ -200,8 +304,12 @@ class ReportsRepository {
       if (pDept == 'dental') dentalPatients++;
 
       final createdAt = p.createdAt;
-      final afterStart = start == null || createdAt.isAfter(start) || createdAt.isAtSameMomentAs(start);
-      final beforeEnd = end == null || createdAt.isBefore(end) || createdAt.isAtSameMomentAs(end);
+      final afterStart = start == null ||
+          createdAt.isAfter(start) ||
+          createdAt.isAtSameMomentAs(start);
+      final beforeEnd = end == null ||
+          createdAt.isBefore(end) ||
+          createdAt.isAtSameMomentAs(end);
 
       if (afterStart && beforeEnd) {
         newPatients++;
@@ -213,7 +321,8 @@ class ReportsRepository {
     }
 
     // Query returning patients (patients with >1 appointment)
-    final returningRes = await _supabase.from('appointments').select('patient_id');
+    final returningRes =
+        await _supabase.from('appointments').select('patient_id');
     final Map<String, int> patientVisits = {};
     for (final a in returningRes as List) {
       final pid = a['patient_id'] as String?;
@@ -221,7 +330,8 @@ class ReportsRepository {
         patientVisits[pid] = (patientVisits[pid] ?? 0) + 1;
       }
     }
-    final returningPatients = patientVisits.values.where((count) => count > 1).length;
+    final returningPatients =
+        patientVisits.values.where((count) => count > 1).length;
 
     final sortedTrend = trendMap.entries.map((e) {
       final d = DateTime.parse(e.key);
@@ -251,10 +361,12 @@ class ReportsRepository {
   }
 
   /// 3. Fetch Appointment Reports & Doctor Analytics
-  Future<AppointmentReportsData> fetchAppointmentReports(AdminReportsFilter filter) async {
+  Future<AppointmentReportsData> fetchAppointmentReports(
+      AdminReportsFilter filter) async {
     final start = filter.effectiveStartDate;
     final end = filter.effectiveEndDate;
-    final dept = filter.department == 'all' ? null : filter.department.toLowerCase();
+    final dept =
+        filter.department == 'all' ? null : filter.department.toLowerCase();
 
     var query = _supabase.from('appointments').select('''
       id,
@@ -277,10 +389,12 @@ class ReportsRepository {
       query = query.eq('department', dept);
     }
     if (start != null) {
-      query = query.gte('appointment_date', start.toIso8601String().split('T').first);
+      query = query.gte(
+          'appointment_date', start.toIso8601String().split('T').first);
     }
     if (end != null) {
-      query = query.lte('appointment_date', end.toIso8601String().split('T').first);
+      query =
+          query.lte('appointment_date', end.toIso8601String().split('T').first);
     }
 
     final res = await query.order('appointment_date', ascending: true);
@@ -309,9 +423,11 @@ class ReportsRepository {
       if (status == 'completed') completed++;
       if (status == 'cancelled' || status == 'missed') cancelled++;
       if (status == 'scheduled' || status == 'confirmed') scheduled++;
-      if (status == 'waiting' || status == 'in_triage' || status == 'in triage') inTriage++;
+      if (status == 'waiting' || status == 'in_triage' || status == 'in triage')
+        inTriage++;
 
-      final type = (item['appointment_type'] as String?)?.toLowerCase() ?? 'regular';
+      final type =
+          (item['appointment_type'] as String?)?.toLowerCase() ?? 'regular';
       if (type == 'walk_in' || type == 'walkin') {
         walkIn++;
       } else if (type == 'follow_up' || type == 'followup') {
@@ -321,9 +437,12 @@ class ReportsRepository {
       }
 
       // Doctor breakdown
-      final docProfile = item['profiles'] is Map ? item['profiles'] as Map<String, dynamic> : null;
+      final docProfile = item['profiles'] is Map
+          ? item['profiles'] as Map<String, dynamic>
+          : null;
       final docId = (item['doctor_id'] as String?) ?? 'unassigned';
-      final docName = docProfile?['full_name'] as String? ?? 'General Consultation';
+      final docName =
+          docProfile?['full_name'] as String? ?? 'General Consultation';
 
       if (!doctorMap.containsKey(docId)) {
         doctorMap[docId] = _DoctorAccumulator(
@@ -412,9 +531,14 @@ class ReportsRepository {
         .select('id, full_name, designation, department_id, is_active, role')
         .order('full_name', ascending: true);
 
-    final staffProfiles = (profilesRes as List).where((p) => (p['role'] as String?) == 'staff' || (p['role'] as String?) == 'admin').toList();
+    final staffProfiles = (profilesRes as List)
+        .where((p) =>
+            (p['role'] as String?) == 'staff' ||
+            (p['role'] as String?) == 'admin')
+        .toList();
     final int totalStaff = staffProfiles.length;
-    final int activeStaff = staffProfiles.where((p) => p['is_active'] == true).length;
+    final int activeStaff =
+        staffProfiles.where((p) => p['is_active'] == true).length;
 
     // 2. Fetch Attendance in date range
     var attQuery = _supabase.from('staff_attendance').select('''
@@ -426,10 +550,12 @@ class ReportsRepository {
       working_hours
     ''');
     if (start != null) {
-      attQuery = attQuery.gte('record_date', start.toIso8601String().split('T').first);
+      attQuery =
+          attQuery.gte('record_date', start.toIso8601String().split('T').first);
     }
     if (end != null) {
-      attQuery = attQuery.lte('record_date', end.toIso8601String().split('T').first);
+      attQuery =
+          attQuery.lte('record_date', end.toIso8601String().split('T').first);
     }
     final attRes = await attQuery;
     final attList = attRes as List;
@@ -475,7 +601,8 @@ class ReportsRepository {
     }
 
     // 3. Fetch Tasks in date range
-    var taskQuery = _supabase.from('tasks').select('id, assigned_to, priority, status, due_date, created_at, completed_at');
+    var taskQuery = _supabase.from('tasks').select(
+        'id, assigned_to, priority, status, due_date, created_at, completed_at');
     if (start != null) {
       taskQuery = taskQuery.gte('created_at', start.toIso8601String());
     }
@@ -496,8 +623,12 @@ class ReportsRepository {
     for (final item in taskList) {
       final sid = item['assigned_to'] as String;
       final status = (item['status'] as String?)?.toLowerCase() ?? 'pending';
-      final dueDate = item['due_date'] != null ? DateTime.tryParse(item['due_date'] as String) : null;
-      final isOverdue = (status != 'completed' && status != 'cancelled') && dueDate != null && dueDate.isBefore(DateTime.now());
+      final dueDate = item['due_date'] != null
+          ? DateTime.tryParse(item['due_date'] as String)
+          : null;
+      final isOverdue = (status != 'completed' && status != 'cancelled') &&
+          dueDate != null &&
+          dueDate.isBefore(DateTime.now());
 
       if (status == 'completed') completedTasks++;
       if (status == 'pending') pendingTasks++;
@@ -523,8 +654,10 @@ class ReportsRepository {
       final att = staffAttMap[sid] ?? _StaffAttAccumulator();
       final task = staffTaskMap[sid] ?? _StaffTaskAccumulator();
 
-      final attPct = att.totalLogs > 0 ? (att.presentDays / att.totalLogs * 100) : 0.0;
-      final taskPct = task.total > 0 ? (task.completed / task.total * 100) : 0.0;
+      final attPct =
+          att.totalLogs > 0 ? (att.presentDays / att.totalLogs * 100) : 0.0;
+      final taskPct =
+          task.total > 0 ? (task.completed / task.total * 100) : 0.0;
 
       staffStats.add(StaffPerformanceStat(
         staffId: sid,
@@ -543,8 +676,11 @@ class ReportsRepository {
       ));
     }
 
-    final overallAttRate = totalAttendanceLogs > 0 ? ((presentCount + lateCount) / totalAttendanceLogs * 100) : 0.0;
-    final taskCompRate = totalTasks > 0 ? (completedTasks / totalTasks * 100) : 0.0;
+    final overallAttRate = totalAttendanceLogs > 0
+        ? ((presentCount + lateCount) / totalAttendanceLogs * 100)
+        : 0.0;
+    final taskCompRate =
+        totalTasks > 0 ? (completedTasks / totalTasks * 100) : 0.0;
 
     final sortedAttTrends = attTrendMap.values.map((t) {
       return AttendanceTrendPoint(
@@ -577,10 +713,12 @@ class ReportsRepository {
   }
 
   /// 5. Fetch Clinical Procedure Reports
-  Future<ClinicalReportsData> fetchClinicalReports(AdminReportsFilter filter) async {
+  Future<ClinicalReportsData> fetchClinicalReports(
+      AdminReportsFilter filter) async {
     final start = filter.effectiveStartDate;
     final end = filter.effectiveEndDate;
-    final dept = filter.department == 'all' ? null : filter.department.toLowerCase();
+    final dept =
+        filter.department == 'all' ? null : filter.department.toLowerCase();
 
     final invoices = await _billingRepo.fetchInvoicesForReports(
       department: dept,
@@ -602,7 +740,8 @@ class ReportsRepository {
       final dateKey = DateFormat('yyyy-MM-dd').format(inv.createdAt);
       if (!trendMap.containsKey(dateKey)) {
         trendMap[dateKey] = _ProcTrendAccumulator(
-          date: DateTime(inv.createdAt.year, inv.createdAt.month, inv.createdAt.day),
+          date: DateTime(
+              inv.createdAt.year, inv.createdAt.month, inv.createdAt.day),
         );
       }
       final t = trendMap[dateKey]!;
@@ -671,9 +810,11 @@ class ReportsRepository {
   }
 
   /// 6. Fetch Financial Reports (Reusing Sprint 7 billing data)
-  Future<BillingReportsData> fetchFinancialReports(AdminReportsFilter filter) async {
+  Future<BillingReportsData> fetchFinancialReports(
+      AdminReportsFilter filter) async {
     final invoices = await _billingRepo.fetchInvoicesForReports(
-      department: filter.department == 'all' ? null : filter.department.toLowerCase(),
+      department:
+          filter.department == 'all' ? null : filter.department.toLowerCase(),
       startDate: filter.effectiveStartDate,
       endDate: filter.effectiveEndDate,
     );
@@ -681,6 +822,519 @@ class ReportsRepository {
     return BillingReportsData.fromInvoices(
       invoices: invoices,
       aggregationMode: ReportAggregationMode.daily,
+    );
+  }
+
+  /// 7. Fetch Inventory & Stock Reports (Sprint 8 Phase 8.2)
+  Future<InventoryReportsData> fetchInventoryReports(
+      AdminReportsFilter filter) async {
+    final start = filter.effectiveStartDate;
+    final end = filter.effectiveEndDate;
+    final dept =
+        filter.department == 'all' ? null : filter.department.toLowerCase();
+
+    // 1. Fetch catalog items and department allocations
+    final allItems = await _inventoryRepo.getInventoryItems();
+    final allDeptItems = await _deptInventoryRepo.fetchDepartmentInventory();
+
+    final itemMap = {for (final item in allItems) item.id: item};
+
+    // Filter items if specific department chosen
+    final List<InventoryItem> relevantItems;
+    if (dept == null) {
+      relevantItems = allItems;
+    } else {
+      relevantItems = allItems.where((i) {
+        final itemDept = i.department?.toLowerCase();
+        return itemDept == dept || itemDept == 'all' || itemDept == null;
+      }).toList();
+    }
+
+    final int totalCatalogItems = relevantItems.length;
+    final int activeItemsCount = relevantItems.where((i) => i.isActive).length;
+
+    // 2. Valuation calculation (Preventing double-counting)
+    // Central stock + Eye department allocated stock + Dental department allocated stock
+    double centralValuation = 0.0;
+    double centralUnits = 0.0;
+    for (final item in relevantItems) {
+      final unitPrice = item.price ?? 0.0;
+      centralValuation += item.currentStock * unitPrice;
+      centralUnits += item.currentStock;
+    }
+
+    double eyeValuation = 0.0;
+    double eyeUnits = 0.0;
+    double dentalValuation = 0.0;
+    double dentalUnits = 0.0;
+
+    for (final d in allDeptItems) {
+      final dName = d.departmentName.toLowerCase();
+      final unitPrice = itemMap[d.inventoryId]?.price ?? 0.0;
+      if (dName.contains('eye')) {
+        eyeValuation += d.quantity * unitPrice;
+        eyeUnits += d.quantity;
+      } else if (dName.contains('dental')) {
+        dentalValuation += d.quantity * unitPrice;
+        dentalUnits += d.quantity;
+      }
+    }
+
+    // Adjust for department filter if applied
+    double totalValuation = 0.0;
+    double totalUnits = 0.0;
+    if (dept == 'eye') {
+      totalValuation = eyeValuation;
+      totalUnits = eyeUnits;
+    } else if (dept == 'dental') {
+      totalValuation = dentalValuation;
+      totalUnits = dentalUnits;
+    } else {
+      totalValuation = centralValuation + eyeValuation + dentalValuation;
+      totalUnits = centralUnits + eyeUnits + dentalUnits;
+    }
+
+    // 3. Category-wise valuation
+    final Map<String, _CatStatAccumulator> catMap = {};
+    for (final item in relevantItems) {
+      final cat = item.category.trim().isEmpty ? 'General' : item.category;
+      final acc =
+          catMap.putIfAbsent(cat, () => _CatStatAccumulator(category: cat));
+      acc.itemCount++;
+      final uPrice = item.price ?? 0.0;
+      if (dept == null || dept == 'all') {
+        acc.totalUnits += item.currentStock;
+        acc.totalValuation += item.currentStock * uPrice;
+      }
+    }
+
+    for (final d in allDeptItems) {
+      final dName = d.departmentName.toLowerCase();
+      if (dept != null && !dName.contains(dept)) continue;
+      final parent = itemMap[d.inventoryId];
+      final cat = (parent?.category ?? d.itemCategory ?? 'General').trim();
+      final safeCat = cat.isEmpty ? 'General' : cat;
+      final acc = catMap.putIfAbsent(
+          safeCat, () => _CatStatAccumulator(category: safeCat));
+      final uPrice = parent?.price ?? 0.0;
+      acc.totalUnits += d.quantity;
+      acc.totalValuation += d.quantity * uPrice;
+    }
+
+    final List<CategoryValuationStat> categoryValuations =
+        catMap.values.map((c) {
+      final pct =
+          totalValuation > 0 ? (c.totalValuation / totalValuation * 100) : 0.0;
+      return CategoryValuationStat(
+        category: c.category,
+        itemCount: c.itemCount,
+        totalUnits: c.totalUnits,
+        totalValuation: c.totalValuation,
+        percentage: pct,
+      );
+    }).toList()
+          ..sort((a, b) => b.totalValuation.compareTo(a.totalValuation));
+
+    // 4. Low-Stock & Reordering
+    final List<LowStockItemStat> lowStockList = [];
+    int centralLowStockCount = 0;
+    int deptLowStockCount = 0;
+    int stockOutCount = 0;
+
+    // Central store check
+    if (dept == null || dept == 'all') {
+      for (final item in relevantItems) {
+        final minStock = item.minimumStock ?? 5.0;
+        final isStockOut = item.currentStock <= 0;
+        final isLow = item.currentStock <= minStock;
+
+        if (isStockOut) stockOutCount++;
+        if (isLow) centralLowStockCount++;
+
+        if (isLow) {
+          final shortfall = (minStock - item.currentStock) > 0
+              ? (minStock - item.currentStock)
+              : 0.0;
+          lowStockList.add(LowStockItemStat(
+            itemId: item.id,
+            itemName: item.name,
+            sku: item.sku,
+            unit: item.unit,
+            location: 'Central Store',
+            currentStock: item.currentStock,
+            minimumStock: minStock,
+            shortfall: shortfall,
+            vendorName: item.vendorName,
+            vendorPhone: item.vendorPhone,
+            lastPrice: item.price,
+            isStockOut: isStockOut,
+          ));
+        }
+      }
+    }
+
+    // Department-level check
+    for (final d in allDeptItems) {
+      final dName = d.departmentName.toLowerCase();
+      if (dept != null && !dName.contains(dept)) continue;
+
+      final isStockOut = d.quantity <= 0;
+      final isLow = d.isLowStock || d.quantity <= d.minimumStock;
+      if (isStockOut) stockOutCount++;
+      if (isLow) deptLowStockCount++;
+
+      if (isLow) {
+        final parent = itemMap[d.inventoryId];
+        final shortfall = (d.minimumStock - d.quantity) > 0
+            ? (d.minimumStock - d.quantity)
+            : 0.0;
+        final loc = dName.contains('eye')
+            ? 'Eye Clinic'
+            : (dName.contains('dental') ? 'Dental Clinic' : d.departmentName);
+
+        lowStockList.add(LowStockItemStat(
+          itemId: d.inventoryId,
+          itemName: d.itemName,
+          sku: d.itemSku,
+          unit: d.itemUnit,
+          location: loc,
+          currentStock: d.quantity,
+          minimumStock: d.minimumStock,
+          shortfall: shortfall,
+          vendorName: parent?.vendorName,
+          vendorPhone: parent?.vendorPhone,
+          lastPrice: parent?.price,
+          isStockOut: isStockOut,
+        ));
+      }
+    }
+
+    // Sort: Stockouts first, then highest shortfall
+    lowStockList.sort((a, b) {
+      if (a.isStockOut != b.isStockOut) {
+        return a.isStockOut ? -1 : 1;
+      }
+      return b.shortfall.compareTo(a.shortfall);
+    });
+
+    // 5. Expiry Analytics (Batches)
+    final now = DateTime.now();
+    final List<BatchExpiryStat> batchExpiryDetails = [];
+    int expiredBatchesCount = 0;
+    double expiredValueLost = 0.0;
+    int expiring30DaysCount = 0;
+    double expiring30DaysValue = 0.0;
+    int expiring60DaysCount = 0;
+    double expiring60DaysValue = 0.0;
+    int expiring90DaysCount = 0;
+    double expiring90DaysValue = 0.0;
+
+    for (final item in relevantItems) {
+      final batches = item.batches;
+      if (batches != null && batches.isNotEmpty) {
+        for (final b in batches) {
+          if (!b.hasRemainingStock) continue;
+          final expDate = b.expiryDate;
+          final uPrice = b.unitPrice > 0 ? b.unitPrice : (item.price ?? 0.0);
+          final batchValue = b.remainingQuantity * uPrice;
+
+          int? daysRemaining;
+          String status = 'safe';
+          if (expDate != null) {
+            daysRemaining = expDate.difference(now).inDays;
+            if (daysRemaining < 0) {
+              status = 'expired';
+              expiredBatchesCount++;
+              expiredValueLost += batchValue;
+            } else if (daysRemaining <= 30) {
+              status = '30days';
+              expiring30DaysCount++;
+              expiring30DaysValue += batchValue;
+            } else if (daysRemaining <= 60) {
+              status = '60days';
+              expiring60DaysCount++;
+              expiring60DaysValue += batchValue;
+            } else if (daysRemaining <= 90) {
+              status = '90days';
+              expiring90DaysCount++;
+              expiring90DaysValue += batchValue;
+            }
+          }
+
+          if (status != 'safe') {
+            batchExpiryDetails.add(BatchExpiryStat(
+              batchId: b.id,
+              batchNumber: b.batchNumber,
+              itemId: item.id,
+              itemName: item.name,
+              category: item.category,
+              expiryDate: expDate,
+              daysRemaining: daysRemaining,
+              remainingQuantity: b.remainingQuantity,
+              unitPrice: uPrice,
+              totalAmount: batchValue,
+              urgencyStatus: status,
+            ));
+          }
+        }
+      } else if (item.expiryDate != null && item.currentStock > 0) {
+        final expDate = item.expiryDate!;
+        final daysRemaining = expDate.difference(now).inDays;
+        final uPrice = item.price ?? 0.0;
+        final totalVal = item.currentStock * uPrice;
+        String status = 'safe';
+        if (daysRemaining < 0) {
+          status = 'expired';
+          expiredBatchesCount++;
+          expiredValueLost += totalVal;
+        } else if (daysRemaining <= 30) {
+          status = '30days';
+          expiring30DaysCount++;
+          expiring30DaysValue += totalVal;
+        } else if (daysRemaining <= 60) {
+          status = '60days';
+          expiring60DaysCount++;
+          expiring60DaysValue += totalVal;
+        } else if (daysRemaining <= 90) {
+          status = '90days';
+          expiring90DaysCount++;
+          expiring90DaysValue += totalVal;
+        }
+
+        if (status != 'safe') {
+          batchExpiryDetails.add(BatchExpiryStat(
+            batchId: 'item-${item.id}',
+            batchNumber: 'N/A',
+            itemId: item.id,
+            itemName: item.name,
+            category: item.category,
+            expiryDate: expDate,
+            daysRemaining: daysRemaining,
+            remainingQuantity: item.currentStock,
+            unitPrice: uPrice,
+            totalAmount: totalVal,
+            urgencyStatus: status,
+          ));
+        }
+      }
+    }
+
+    batchExpiryDetails.sort((a, b) {
+      final dayA = a.daysRemaining ?? 9999;
+      final dayB = b.daysRemaining ?? 9999;
+      return dayA.compareTo(dayB);
+    });
+
+    final double totalAtRiskValue = expiredValueLost +
+        expiring30DaysValue +
+        expiring60DaysValue +
+        expiring90DaysValue;
+
+    // 6. Stock Movement, Trends & Audit Ledger
+    double totalStockInUnits = 0.0;
+    double totalStockInValue = 0.0;
+    double totalStockOutUnits = 0.0;
+    double totalStockOutValue = 0.0;
+
+    final Map<String, _StockTrendAccumulator> trendMap = {};
+    final Map<String, _ReasonAccumulator> reasonMap = {};
+    final Map<String, _FastMovingAccumulator> fastMovingMap = {};
+    final List<InventoryAuditEntry> auditList = [];
+
+    try {
+      final txnQuery = _supabase.from('inventory_transactions').select(
+          '*, profiles!performed_by(full_name), patients(name, patient_number), vendors(id, name, phone)');
+
+      final txnsRes = await txnQuery.order('created_at', ascending: false);
+      final txnsList = (txnsRes as List).cast<Map<String, dynamic>>();
+
+      for (final raw in txnsList) {
+        final createdAtStr = raw['created_at'] as String?;
+        final dt =
+            createdAtStr != null ? DateTime.tryParse(createdAtStr) : null;
+        if (dt == null) continue;
+
+        if (start != null && dt.isBefore(start)) continue;
+        if (end != null && dt.isAfter(end)) continue;
+
+        final invId = (raw['inventory_id'] ?? '').toString();
+        final parentItem = itemMap[invId];
+
+        if (dept != null && parentItem != null) {
+          final pDept = parentItem.department?.toLowerCase();
+          if (pDept != null && pDept != dept && pDept != 'all') {
+            continue;
+          }
+        }
+
+        final tType =
+            (raw['transaction_type'] as String? ?? 'stock_out').toLowerCase();
+        final qty = (raw['quantity'] as num?)?.toDouble() ?? 0.0;
+        final uPrice = (raw['unit_price'] as num?)?.toDouble() ??
+            (parentItem?.price ?? 0.0);
+        final tAmount =
+            (raw['total_amount'] as num?)?.toDouble() ?? (qty * uPrice);
+        final reason = (raw['reason'] as String?)?.trim() ?? 'Unspecified';
+        final remarks = raw['remarks'] as String?;
+        final stockBefore = (raw['stock_before'] as num?)?.toDouble();
+        final stockAfter = (raw['stock_after'] as num?)?.toDouble();
+
+        final performedByName =
+            (raw['profiles'] as Map<String, dynamic>?)?['full_name'] as String?;
+        final patientName =
+            (raw['patients'] as Map<String, dynamic>?)?['name'] as String?;
+        final patientNum = (raw['patients']
+            as Map<String, dynamic>?)?['patient_number'] as String?;
+        final vendorName =
+            (raw['vendors'] as Map<String, dynamic>?)?['name'] as String?;
+
+        String? recipientInfo;
+        if (patientName != null && patientName.isNotEmpty) {
+          recipientInfo =
+              'Patient: $patientName${patientNum != null ? ' ($patientNum)' : ''}';
+        } else if (vendorName != null && vendorName.isNotEmpty) {
+          recipientInfo = 'Vendor: $vendorName';
+        }
+
+        final itemName =
+            parentItem?.name ?? (raw['item_name'] as String? ?? 'Unknown Item');
+
+        if (tType == 'stock_in') {
+          totalStockInUnits += qty;
+          totalStockInValue += tAmount;
+        } else {
+          totalStockOutUnits += qty;
+          totalStockOutValue += tAmount;
+
+          final fastAcc = fastMovingMap.putIfAbsent(
+            invId,
+            () => _FastMovingAccumulator(
+              itemId: invId,
+              itemName: itemName,
+              category: parentItem?.category ?? 'General',
+            ),
+          );
+          fastAcc.totalUnits += qty;
+          fastAcc.totalValue += tAmount;
+          fastAcc.count++;
+        }
+
+        final dateKey = DateFormat('yyyy-MM-dd').format(dt);
+        final trendAcc = trendMap.putIfAbsent(
+          dateKey,
+          () => _StockTrendAccumulator(
+            label: DateFormat('dd MMM').format(dt),
+            date: DateTime(dt.year, dt.month, dt.day),
+          ),
+        );
+        if (tType == 'stock_in') {
+          trendAcc.stockInUnits += qty;
+          trendAcc.stockInValue += tAmount;
+        } else {
+          trendAcc.stockOutUnits += qty;
+          trendAcc.stockOutValue += tAmount;
+        }
+
+        final reasonAcc = reasonMap.putIfAbsent(
+          reason,
+          () => _ReasonAccumulator(
+              reason: reason, isStockIn: tType == 'stock_in'),
+        );
+        reasonAcc.count++;
+        reasonAcc.units += qty;
+        reasonAcc.value += tAmount;
+
+        auditList.add(InventoryAuditEntry(
+          id: (raw['id'] ?? '').toString(),
+          date: dt,
+          itemName: itemName,
+          transactionType: tType,
+          quantity: qty,
+          stockBefore: stockBefore,
+          stockAfter: stockAfter,
+          reason: reason,
+          performedByName: performedByName,
+          recipientInfo: recipientInfo,
+          remarks: remarks,
+          totalAmount: tAmount,
+        ));
+      }
+    } catch (e) {
+      debugPrint(
+          'ReportsRepository.fetchInventoryReports transactions error: $e');
+    }
+
+    final sortedTrends = trendMap.values
+        .map((t) => StockMovementTrendPoint(
+              label: t.label,
+              date: t.date,
+              stockInUnits: t.stockInUnits,
+              stockOutUnits: t.stockOutUnits,
+              stockInValue: t.stockInValue,
+              stockOutValue: t.stockOutValue,
+            ))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    final sortedReasons = reasonMap.values
+        .map((r) => MovementReasonStat(
+              reason: r.reason,
+              transactionCount: r.count,
+              totalUnits: r.units,
+              totalValue: r.value,
+              isStockIn: r.isStockIn,
+            ))
+        .toList()
+      ..sort((a, b) => b.totalUnits.compareTo(a.totalUnits));
+
+    final sortedFastMoving = fastMovingMap.values
+        .map((f) => FastMovingItemStat(
+              itemId: f.itemId,
+              itemName: f.itemName,
+              category: f.category,
+              totalConsumedUnits: f.totalUnits,
+              totalConsumedValue: f.totalValue,
+              transactionCount: f.count,
+            ))
+        .toList()
+      ..sort((a, b) => b.totalConsumedUnits.compareTo(a.totalConsumedUnits));
+
+    auditList.sort((a, b) => b.date.compareTo(a.date));
+
+    return InventoryReportsData(
+      totalCatalogItems: totalCatalogItems,
+      activeItemsCount: activeItemsCount,
+      centralValuation: centralValuation,
+      eyeValuation: eyeValuation,
+      dentalValuation: dentalValuation,
+      totalValuation: totalValuation,
+      centralUnits: centralUnits,
+      eyeUnits: eyeUnits,
+      dentalUnits: dentalUnits,
+      totalUnits: totalUnits,
+      categoryValuations: categoryValuations,
+      centralLowStockCount: centralLowStockCount,
+      departmentLowStockCount: deptLowStockCount,
+      stockOutCount: stockOutCount,
+      lowStockItems: lowStockList,
+      expiredBatchesCount: expiredBatchesCount,
+      expiredValueLost: expiredValueLost,
+      expiring30DaysCount: expiring30DaysCount,
+      expiring30DaysValue: expiring30DaysValue,
+      expiring60DaysCount: expiring60DaysCount,
+      expiring60DaysValue: expiring60DaysValue,
+      expiring90DaysCount: expiring90DaysCount,
+      expiring90DaysValue: expiring90DaysValue,
+      totalAtRiskValue: totalAtRiskValue,
+      batchExpiryDetails: batchExpiryDetails,
+      totalStockInUnits: totalStockInUnits,
+      totalStockInValue: totalStockInValue,
+      totalStockOutUnits: totalStockOutUnits,
+      totalStockOutValue: totalStockOutValue,
+      movementTrends: sortedTrends,
+      movementReasons: sortedReasons,
+      fastMovingItems: sortedFastMoving,
+      auditLedger: auditList,
     );
   }
 }
@@ -754,4 +1408,49 @@ class _ProcTrendAccumulator {
   int dental = 0;
 
   _ProcTrendAccumulator({required this.date});
+}
+
+class _CatStatAccumulator {
+  final String category;
+  int itemCount = 0;
+  double totalUnits = 0.0;
+  double totalValuation = 0.0;
+
+  _CatStatAccumulator({required this.category});
+}
+
+class _StockTrendAccumulator {
+  final String label;
+  final DateTime date;
+  double stockInUnits = 0.0;
+  double stockOutUnits = 0.0;
+  double stockInValue = 0.0;
+  double stockOutValue = 0.0;
+
+  _StockTrendAccumulator({required this.label, required this.date});
+}
+
+class _ReasonAccumulator {
+  final String reason;
+  final bool isStockIn;
+  int count = 0;
+  double units = 0.0;
+  double value = 0.0;
+
+  _ReasonAccumulator({required this.reason, required this.isStockIn});
+}
+
+class _FastMovingAccumulator {
+  final String itemId;
+  final String itemName;
+  final String category;
+  double totalUnits = 0.0;
+  double totalValue = 0.0;
+  int count = 0;
+
+  _FastMovingAccumulator({
+    required this.itemId,
+    required this.itemName,
+    required this.category,
+  });
 }
