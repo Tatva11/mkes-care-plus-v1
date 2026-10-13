@@ -1,14 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../billing/models/billing_reports_model.dart';
+import '../../../core/providers/supabase_provider.dart';
 import '../models/appointment_reports_model.dart';
 import '../models/clinical_reports_model.dart';
+import '../models/excel_sync_state_model.dart';
 import '../models/inventory_reports_model.dart';
 import '../models/overview_reports_model.dart';
 import '../models/patient_reports_model.dart';
 import '../models/reports_filter_model.dart';
 import '../models/staff_reports_model.dart';
 import '../repositories/reports_repository.dart';
+import '../services/excel_historical_export_service.dart';
+
 
 /// Filter state provider for Admin Reports.
 /// Kept autoDispose and isolated so it never leaks to Staff or other billing filter states.
@@ -78,3 +82,25 @@ final inventoryReportsProvider =
   final filter = ref.watch(adminReportsFilterProvider);
   return repo.fetchInventoryReports(filter);
 });
+
+/// Service provider for central Excel workbook synchronization and historical export (Sprint 9.3).
+final excelHistoricalExportServiceProvider =
+    Provider<ExcelHistoricalExportService>((ref) {
+  final supabase = ref.watch(supabaseProvider);
+  return ExcelHistoricalExportService(supabase: supabase);
+});
+
+/// Async provider for the latest Excel synchronization execution state.
+final latestExcelSyncStateProvider =
+    FutureProvider.autoDispose<ExcelSyncStateModel?>((ref) async {
+  final service = ref.watch(excelHistoricalExportServiceProvider);
+  return service.fetchLatestSyncState();
+});
+
+/// Async provider for per-worksheet synchronization high-water mark checkpoints.
+final excelSyncCheckpointsProvider =
+    FutureProvider.autoDispose<List<ExcelSyncCheckpointModel>>((ref) async {
+  final service = ref.watch(excelHistoricalExportServiceProvider);
+  return service.fetchSyncCheckpoints();
+});
+
