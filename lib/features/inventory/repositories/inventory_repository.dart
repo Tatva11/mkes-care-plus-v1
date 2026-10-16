@@ -298,7 +298,7 @@ class InventoryRepository {
     try {
       var query = _supabase
           .from('inventory_transactions')
-          .select('*, profiles!performed_by(full_name), patients(name, patient_number), vendors(id, name, phone)')
+          .select('*, profiles!performed_by(full_name), patients(name, patient_number), vendors(id, name, phone), departments(id, name)')
           .eq('inventory_id', inventoryItemId);
 
       if (transactionType != null &&
@@ -334,7 +334,7 @@ class InventoryRepository {
     try {
       var query = _supabase
           .from('inventory_transactions')
-          .select('*, profiles!performed_by(full_name), patients(name, patient_number), vendors(id, name, phone)');
+          .select('*, profiles!performed_by(full_name), patients(name, patient_number), vendors(id, name, phone), departments(id, name)');
 
       if (transactionType != null &&
           transactionType.isNotEmpty &&

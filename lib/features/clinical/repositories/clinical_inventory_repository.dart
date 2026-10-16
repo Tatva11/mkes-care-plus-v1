@@ -8,7 +8,7 @@ class ClinicalInventoryRepository {
   final SupabaseClient _client;
 
   static const String _fullSelect =
-      '*, inventory(name, unit, quantity), patients(name, patient_number), profiles(full_name)';
+      '*, inventory(name, unit, quantity), patients(name, patient_number), profiles(full_name), departments(name)';
   static const String _fallbackSelect =
       '*, inventory(name, unit, quantity)';
 
@@ -20,6 +20,8 @@ class ClinicalInventoryRepository {
     required String inventoryId,
     required double quantity,
     String? remarks,
+    String? departmentId,
+    String? idempotencyKey,
   }) async {
     if (quantity <= 0) {
       throw ArgumentError('Quantity must be greater than zero.');
@@ -32,6 +34,10 @@ class ClinicalInventoryRepository {
       'p_inventory_id': inventoryId,
       'p_quantity': quantity,
       'p_remarks': remarks?.trim().isEmpty ?? true ? null : remarks!.trim(),
+      if (departmentId != null && departmentId.trim().isNotEmpty)
+        'p_department_id': departmentId.trim(),
+      if (idempotencyKey != null && idempotencyKey.trim().isNotEmpty)
+        'p_idempotency_key': idempotencyKey.trim(),
     };
 
     final response = await _client.rpc(
@@ -61,6 +67,7 @@ class ClinicalInventoryRepository {
       consumedAt: DateTime.now(),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      departmentId: departmentId,
     );
   }
 

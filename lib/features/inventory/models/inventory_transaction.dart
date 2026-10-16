@@ -56,6 +56,8 @@ class InventoryTransaction {
   final String? patientNumber;
   final String? vendorId;
   final String? vendorName;
+  final String? departmentId;
+  final String? departmentName;
   final double? totalAmount;
   final double? unitPrice;
   final DateTime createdAt;
@@ -76,6 +78,8 @@ class InventoryTransaction {
     this.patientNumber,
     this.vendorId,
     this.vendorName,
+    this.departmentId,
+    this.departmentName,
     this.totalAmount,
     this.unitPrice,
     required this.createdAt,
@@ -191,6 +195,13 @@ class InventoryTransaction {
       vName ??= (rawVendor as Map<String, dynamic>)['name']?.toString();
     }
 
+    // Department join resolution
+    String? deptName = json['department_name']?.toString();
+    final rawDept = json['departments'] ?? json['department'];
+    if (deptName == null && rawDept is Map) {
+      deptName = (rawDept as Map<String, dynamic>)['name']?.toString();
+    }
+
     final rawTotal = json['total_amount'] ?? json['totalAmount'];
     final totalVal = rawTotal is num
         ? rawTotal.toDouble()
@@ -217,6 +228,8 @@ class InventoryTransaction {
       patientNumber: patNumber,
       vendorId: (json['vendor_id'] ?? json['vendorId'])?.toString(),
       vendorName: vName,
+      departmentId: (json['department_id'] ?? json['departmentId'])?.toString(),
+      departmentName: deptName,
       totalAmount: totalVal,
       unitPrice: unitVal,
       createdAt: parseDate(json['created_at']),
@@ -237,6 +250,7 @@ class InventoryTransaction {
       if (performedBy != null) 'created_by': performedBy,
       if (patientId != null && patientId!.trim().isNotEmpty) 'patient_id': patientId!.trim(),
       if (vendorId != null && vendorId!.trim().isNotEmpty) 'vendor_id': vendorId!.trim(),
+      if (departmentId != null && departmentId!.trim().isNotEmpty) 'department_id': departmentId!.trim(),
       if (totalAmount != null) 'total_amount': totalAmount,
       if (unitPrice != null) 'unit_price': unitPrice,
       'created_at': createdAt.toIso8601String(),
@@ -266,6 +280,8 @@ class InventoryTransaction {
     String? patientNumber,
     String? vendorId,
     String? vendorName,
+    String? departmentId,
+    String? departmentName,
     double? totalAmount,
     double? unitPrice,
     DateTime? createdAt,
@@ -286,6 +302,8 @@ class InventoryTransaction {
       patientNumber: patientNumber ?? this.patientNumber,
       vendorId: vendorId ?? this.vendorId,
       vendorName: vendorName ?? this.vendorName,
+      departmentId: departmentId ?? this.departmentId,
+      departmentName: departmentName ?? this.departmentName,
       totalAmount: totalAmount ?? this.totalAmount,
       unitPrice: unitPrice ?? this.unitPrice,
       createdAt: createdAt ?? this.createdAt,

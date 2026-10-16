@@ -103,7 +103,11 @@ class AdminReportsFilter {
       case ReportsDatePreset.thisYear:
         return DateTime(now.year, 1, 1, 0, 0, 0);
       case ReportsDatePreset.custom:
-        return customStartDate;
+        if (customStartDate != null) {
+          return DateTime(customStartDate!.year, customStartDate!.month,
+              customStartDate!.day, 0, 0, 0);
+        }
+        return null;
       case ReportsDatePreset.allTime:
         return null;
     }
@@ -136,6 +140,49 @@ class AdminReportsFilter {
   }
 
   String get datePresetLabel => datePreset.displayName;
+
+  /// Returns the standard prefix for report file naming according to section.
+  static String sectionFilenamePrefix(ReportsSection sec) {
+    switch (sec) {
+      case ReportsSection.overview:
+        return 'Overview';
+      case ReportsSection.patients:
+        return 'Patients';
+      case ReportsSection.appointments:
+        return 'Appointments';
+      case ReportsSection.staff:
+        return 'Staff_Tasks';
+      case ReportsSection.clinical:
+        return 'Clinical_Procedures';
+      case ReportsSection.financial:
+        return 'Billing';
+      case ReportsSection.inventory:
+        return 'Inventory';
+    }
+  }
+
+  /// Returns the standard period suffix for report file naming according to preset.
+  String get datePresetFilenameSuffix {
+    switch (datePreset) {
+      case ReportsDatePreset.allTime:
+        return 'All_Time';
+      case ReportsDatePreset.today:
+        return 'Today';
+      case ReportsDatePreset.thisWeek:
+        return 'This_Week';
+      case ReportsDatePreset.thisMonth:
+        return 'This_Month';
+      case ReportsDatePreset.thisYear:
+        return 'This_Year';
+      case ReportsDatePreset.custom:
+        return 'Custom_Range';
+    }
+  }
+
+  /// Generates the standard Excel export filename for a given report section.
+  String getReportFileName(ReportsSection sec) {
+    return '${sectionFilenamePrefix(sec)}_$datePresetFilenameSuffix.xlsx';
+  }
 
   AdminReportsFilter copyWith({
     ReportsSection? section,

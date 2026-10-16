@@ -54,6 +54,7 @@ class BillingRepository {
     BillingPaymentModel? payment,
     DateTime? invoiceDate,
     String? notes,
+    String? eyeSurgeryId,
   }) async {
     final normDept = department.trim().toLowerCase();
     if (normDept != 'eye' && normDept != 'dental') {
@@ -61,6 +62,21 @@ class BillingRepository {
     }
     if (items.isEmpty) {
       throw ArgumentError('Invoice must contain at least one line item.');
+    }
+
+    final surgeryIdTrimmed = eyeSurgeryId?.trim();
+
+    // Defensive check: If surgery ID is provided, check if an active invoice already exists
+    if (surgeryIdTrimmed != null && surgeryIdTrimmed.isNotEmpty) {
+      try {
+        final existing = await fetchInvoiceForSurgery(surgeryIdTrimmed);
+        if (existing != null) {
+          debugPrint(
+            'BillingRepository.createInvoice: Active invoice ${existing.invoiceNumber} already exists for surgery $surgeryIdTrimmed. Returning existing.',
+          );
+          return existing;
+        }
+      } catch (_) {}
     }
 
     final params = <String, dynamic>{
@@ -76,18 +92,52 @@ class BillingRepository {
         'p_invoice_date': invoiceDate.toIso8601String().split('T').first,
       if (notes != null && notes.trim().isNotEmpty)
         'p_notes': notes.trim(),
+      if (surgeryIdTrimmed != null && surgeryIdTrimmed.isNotEmpty)
+        'p_eye_surgery_id': surgeryIdTrimmed,
     };
 
     debugPrint('BillingRepository.createInvoice calling create_billing_invoice RPC: $params');
 
-    final response = await _supabase.rpc(
-      'create_billing_invoice',
-      params: params,
-    );
+    try {
+      final response = await _supabase.rpc(
+        'create_billing_invoice',
+        params: params,
+      );
 
-    debugPrint('BillingRepository.createInvoice RPC response: $response');
-    final invoiceJson = response as Map<String, dynamic>;
-    return BillingInvoiceModel.fromJson(invoiceJson);
+      debugPrint('BillingRepository.createInvoice RPC response: $response');
+      final invoiceJson = response as Map<String, dynamic>;
+      return BillingInvoiceModel.fromJson(invoiceJson);
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      // If unique violation occurred or invoice already exists, recover existing invoice
+      if (surgeryIdTrimmed != null &&
+          (errStr.contains('unique') || errStr.contains('already linked'))) {
+        final existing = await fetchInvoiceForSurgery(surgeryIdTrimmed);
+        if (existing != null) return existing;
+      }
+
+      // Fallback: If RPC without p_eye_surgery_id was not yet updated in remote DB
+      if (params.containsKey('p_eye_surgery_id') &&
+          (errStr.contains('p_eye_surgery_id') || errStr.contains('schema cache'))) {
+        debugPrint('BillingRepository.createInvoice retrying without p_eye_surgery_id fallback');
+        final fallbackParams = Map<String, dynamic>.from(params)..remove('p_eye_surgery_id');
+        final response = await _supabase.rpc('create_billing_invoice', params: fallbackParams);
+        final invoiceJson = response as Map<String, dynamic>;
+        final created = BillingInvoiceModel.fromJson(invoiceJson);
+
+        // Attempt to link eye_surgery_id directly
+        try {
+          await _supabase
+              .from('billing')
+              .update({'eye_surgery_id': surgeryIdTrimmed})
+              .eq('id', created.id);
+          return created.copyWith(eyeSurgeryId: surgeryIdTrimmed);
+        } catch (_) {
+          return created;
+        }
+      }
+      rethrow;
+    }
   }
 
   /// Fetch list of invoices with optional department, patient, status, date range, and search filtering.
@@ -334,4 +384,92 @@ class BillingRepository {
     debugPrint('BillingRepository.fetchInvoicesForReports returned ${list.length} records');
     return list;
   }
+
+  /// Fetch all unpaid or partially-paid invoices for a patient with outstanding balances.
+  Future<List<BillingInvoiceModel>> fetchPatientOutstandingInvoices(String patientId) async {
+    if (patientId.trim().isEmpty) return const [];
+    final invoices = await fetchInvoices(patientId: patientId, limit: 100);
+    return invoices
+        .where((inv) =>
+            !inv.isCancelled &&
+            !inv.isPaid &&
+            inv.remainingAmount > 0.01)
+        .toList();
+  }
+
+  /// Record consolidation transfers for previous invoices when their balance
+  /// has been included in a newly created consolidated invoice.
+  Future<void> consolidateInvoices({
+    required List<BillingInvoiceModel> previousInvoices,
+    required String newInvoiceNumber,
+    required String newInvoiceId,
+  }) async {
+    for (final prev in previousInvoices) {
+      if (prev.remainingAmount <= 0) continue;
+      try {
+        await recordPayment(
+          billingId: prev.id,
+          amount: prev.remainingAmount,
+          paymentMode: 'other',
+          paymentReference: 'Consolidated to $newInvoiceNumber',
+          paidAt: DateTime.now(),
+          notes: 'Balance transferred to new invoice #$newInvoiceNumber (ID: $newInvoiceId)',
+        );
+      } catch (e) {
+        debugPrint('Warning consolidating invoice ${prev.invoiceNumber}: $e');
+      }
+    }
+  }
+
+  /// Fetch the active invoice linked to a specific eye surgery.
+  Future<BillingInvoiceModel?> fetchInvoiceForSurgery(String surgeryId) async {
+    if (surgeryId.trim().isEmpty) return null;
+    try {
+      final response = await _supabase
+          .from('billing')
+          .select('''
+            *,
+            patients (
+              id,
+              name,
+              patient_number,
+              mobile
+            ),
+            billing_items (
+              id,
+              billing_id,
+              service_id,
+              service_name,
+              quantity,
+              unit_price,
+              total_amount,
+              is_custom,
+              created_at
+            ),
+            billing_payments (
+              id,
+              billing_id,
+              amount,
+              payment_mode,
+              payment_reference,
+              paid_at,
+              recorded_by,
+              notes,
+              created_at
+            )
+          ''')
+          .eq('eye_surgery_id', surgeryId.trim())
+          .neq('payment_status', 'cancelled')
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return BillingInvoiceModel.fromJson(response);
+    } catch (e) {
+      debugPrint('BillingRepository.fetchInvoiceForSurgery error: $e');
+      rethrow;
+    }
+  }
 }
+

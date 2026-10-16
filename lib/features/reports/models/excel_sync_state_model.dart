@@ -90,6 +90,7 @@ class ExcelSyncCheckpointModel {
     required this.sourceTable,
     required this.lastSyncTimestamp,
     required this.recordCount,
+    this.lastSyncId,
     required this.updatedAt,
   });
 
@@ -97,6 +98,7 @@ class ExcelSyncCheckpointModel {
   final String sourceTable;
   final DateTime lastSyncTimestamp;
   final int recordCount;
+  final String? lastSyncId;
   final DateTime updatedAt;
 
   factory ExcelSyncCheckpointModel.fromJson(Map<String, dynamic> json) {
@@ -108,6 +110,7 @@ class ExcelSyncCheckpointModel {
               DateTime.fromMillisecondsSinceEpoch(0, isUtc: true)
           : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       recordCount: (json['record_count'] as num?)?.toInt() ?? 0,
+      lastSyncId: json['last_sync_id'] as String?,
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'] as String) ?? DateTime.now()
           : DateTime.now(),
@@ -120,12 +123,13 @@ class ExcelSyncCheckpointModel {
       'source_table': sourceTable,
       'last_sync_timestamp': lastSyncTimestamp.toIso8601String(),
       'record_count': recordCount,
+      if (lastSyncId != null) 'last_sync_id': lastSyncId,
       'updated_at': updatedAt.toIso8601String(),
     };
   }
 }
 
-/// Represents the historical export result for a single worksheet.
+/// Represents the historical/incremental export result for a single worksheet.
 @immutable
 class WorksheetExportSummaryModel {
   const WorksheetExportSummaryModel({
@@ -254,3 +258,232 @@ class HistoricalExportResultModel {
   }
 }
 
+/// Represents an immutable active workbook version from `public.excel_sync_versions`.
+@immutable
+class ExcelSyncVersionModel {
+  const ExcelSyncVersionModel({
+    required this.versionId,
+    required this.versionNumber,
+    required this.storagePath,
+    required this.fileSizeBytes,
+    required this.totalRecords,
+    required this.worksheetsSummary,
+    required this.publishedAt,
+    required this.syncId,
+  });
+
+  final String versionId;
+  final int versionNumber;
+  final String storagePath;
+  final int fileSizeBytes;
+  final int totalRecords;
+  final List<WorksheetExportSummaryModel> worksheetsSummary;
+  final DateTime publishedAt;
+  final String syncId;
+
+  double get fileSizeMegabytes => fileSizeBytes / (1024 * 1024);
+
+  factory ExcelSyncVersionModel.fromJson(Map<String, dynamic> json) {
+    final summariesRaw = json['worksheetsSummary'] as List<dynamic>? ??
+        json['worksheets_summary'] as List<dynamic>? ??
+        const [];
+
+    return ExcelSyncVersionModel(
+      versionId: json['versionId'] as String? ??
+          json['version_id'] as String? ??
+          json['id'] as String? ??
+          '',
+      versionNumber: (json['versionNumber'] as num? ??
+              json['version_number'] as num?)
+          ?.toInt() ??
+          1,
+      storagePath: json['storagePath'] as String? ??
+          json['storage_path'] as String? ??
+          '',
+      fileSizeBytes: (json['fileSizeBytes'] as num? ??
+              json['file_size_bytes'] as num?)
+          ?.toInt() ??
+          0,
+      totalRecords: (json['totalRecords'] as num? ??
+              json['total_records'] as num?)
+          ?.toInt() ??
+          0,
+      worksheetsSummary: summariesRaw
+          .map((e) =>
+              WorksheetExportSummaryModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      publishedAt: json['publishedAt'] != null
+          ? DateTime.tryParse(json['publishedAt'] as String) ?? DateTime.now()
+          : json['published_at'] != null
+              ? DateTime.tryParse(json['published_at'] as String) ??
+                  DateTime.now()
+              : DateTime.now(),
+      syncId: json['syncId'] as String? ?? json['sync_id'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'versionId': versionId,
+      'versionNumber': versionNumber,
+      'storagePath': storagePath,
+      'fileSizeBytes': fileSizeBytes,
+      'totalRecords': totalRecords,
+      'worksheetsSummary': worksheetsSummary.map((w) => w.toJson()).toList(),
+      'publishedAt': publishedAt.toIso8601String(),
+      'syncId': syncId,
+    };
+  }
+}
+
+/// Represents the execution result of an incremental synchronization run (Sprint 9.4).
+@immutable
+class ExcelIncrementalSyncResultModel {
+  const ExcelIncrementalSyncResultModel({
+    required this.success,
+    required this.status,
+    required this.syncId,
+    this.versionId,
+    this.versionNumber,
+    this.fencingToken,
+    required this.totalRecords,
+    required this.fileSizeBytes,
+    this.storagePath,
+    required this.durationMs,
+    required this.eventsProcessed,
+    this.worksheetSummaries = const [],
+    this.errorMessage,
+  });
+
+  final bool success;
+  final String status; // 'success' | 'no_op' | 'already_running' | 'failed'
+  final String syncId;
+  final String? versionId;
+  final int? versionNumber;
+  final int? fencingToken;
+  final int totalRecords;
+  final int fileSizeBytes;
+  final String? storagePath;
+  final int durationMs;
+  final int eventsProcessed;
+  final List<WorksheetExportSummaryModel> worksheetSummaries;
+  final String? errorMessage;
+
+  bool get isSuccess => status.toLowerCase() == 'success';
+  bool get isNoOp => status.toLowerCase() == 'no_op';
+  bool get isAlreadyRunning => status.toLowerCase() == 'already_running';
+  bool get isFailed => status.toLowerCase() == 'failed' || !success;
+
+  double get fileSizeMegabytes => fileSizeBytes / (1024 * 1024);
+
+  factory ExcelIncrementalSyncResultModel.fromJson(Map<String, dynamic> json) {
+    final summariesRaw = json['worksheetSummaries'] as List<dynamic>? ??
+        json['worksheet_summaries'] as List<dynamic>? ??
+        const [];
+
+    return ExcelIncrementalSyncResultModel(
+      success: json['success'] as bool? ?? false,
+      status: json['status'] as String? ?? (json['success'] == true ? 'success' : 'failed'),
+      syncId: json['syncId'] as String? ?? json['sync_id'] as String? ?? '',
+      versionId: json['versionId'] as String? ?? json['version_id'] as String?,
+      versionNumber: (json['versionNumber'] as num? ??
+              json['version_number'] as num?)
+          ?.toInt(),
+      fencingToken: (json['fencingToken'] as num? ??
+              json['fencing_token'] as num?)
+          ?.toInt(),
+      totalRecords: (json['totalRecords'] as num? ??
+              json['total_records'] as num?)
+          ?.toInt() ??
+          0,
+      fileSizeBytes: (json['fileSizeBytes'] as num? ??
+              json['file_size_bytes'] as num?)
+          ?.toInt() ??
+          0,
+      storagePath: json['storagePath'] as String? ??
+          json['storage_path'] as String?,
+      durationMs: (json['durationMs'] as num? ??
+              json['duration_ms'] as num?)
+          ?.toInt() ??
+          0,
+      eventsProcessed: (json['eventsProcessed'] as num? ??
+              json['events_processed'] as num?)
+          ?.toInt() ??
+          0,
+      worksheetSummaries: summariesRaw
+          .map((e) =>
+              WorksheetExportSummaryModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      errorMessage: json['errorMessage'] as String? ??
+          json['error_message'] as String? ??
+          json['error'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'success': success,
+      'status': status,
+      'syncId': syncId,
+      if (versionId != null) 'versionId': versionId,
+      if (versionNumber != null) 'versionNumber': versionNumber,
+      if (fencingToken != null) 'fencingToken': fencingToken,
+      'totalRecords': totalRecords,
+      'fileSizeBytes': fileSizeBytes,
+      if (storagePath != null) 'storagePath': storagePath,
+      'durationMs': durationMs,
+      'eventsProcessed': eventsProcessed,
+      'worksheetSummaries': worksheetSummaries.map((w) => w.toJson()).toList(),
+      if (errorMessage != null) 'errorMessage': errorMessage,
+    };
+  }
+}
+
+/// Represents the distributed lease state from `public.excel_sync_leases`.
+@immutable
+class ExcelSyncLeaseModel {
+  const ExcelSyncLeaseModel({
+    required this.leaseKey,
+    required this.holderId,
+    required this.fencingToken,
+    required this.acquiredAt,
+    required this.expiresAt,
+    required this.status,
+  });
+
+  final String leaseKey;
+  final String holderId;
+  final int fencingToken;
+  final DateTime acquiredAt;
+  final DateTime expiresAt;
+  final String status;
+
+  bool get isActive => status.toLowerCase() == 'active' && DateTime.now().isBefore(expiresAt);
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+
+  factory ExcelSyncLeaseModel.fromJson(Map<String, dynamic> json) {
+    return ExcelSyncLeaseModel(
+      leaseKey: json['lease_key'] as String? ?? 'master_sync',
+      holderId: json['holder_id'] as String? ?? '',
+      fencingToken: (json['fencing_token'] as num?)?.toInt() ?? 1,
+      acquiredAt: json['acquired_at'] != null
+          ? DateTime.tryParse(json['acquired_at'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      expiresAt: json['expires_at'] != null
+          ? DateTime.tryParse(json['expires_at'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      status: json['status'] as String? ?? 'active',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'lease_key': leaseKey,
+      'holder_id': holderId,
+      'fencing_token': fencingToken,
+      'acquired_at': acquiredAt.toIso8601String(),
+      'expires_at': expiresAt.toIso8601String(),
+      'status': status,
+    };
+  }
+}

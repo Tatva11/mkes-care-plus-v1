@@ -10,6 +10,7 @@ import '../models/billing_invoice_model.dart';
 import '../models/billing_item_model.dart';
 import '../models/billing_payment_model.dart';
 import '../providers/billing_provider.dart';
+import '../repositories/billing_repository.dart';
 import '../widgets/invoice_line_items_editor.dart';
 import '../widgets/invoice_payment_section.dart';
 import '../widgets/invoice_success_dialog.dart';
@@ -18,11 +19,15 @@ import '../widgets/patient_search_selector.dart';
 class CreateInvoiceScreen extends ConsumerStatefulWidget {
   final PatientModel? initialPatient;
   final String? initialDepartment;
+  final String? initialEyeSurgeryId;
+  final List<BillingItemModel>? initialItems;
 
   const CreateInvoiceScreen({
     super.key,
     this.initialPatient,
     this.initialDepartment,
+    this.initialEyeSurgeryId,
+    this.initialItems,
   });
 
   @override
@@ -41,6 +46,11 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
 
   String? _validationError;
 
+  // Previous Outstanding Balance state
+  bool _includePreviousBalance = false;
+  List<BillingInvoiceModel> _outstandingInvoices = [];
+  bool _isLoadingOutstanding = false;
+
   @override
   void initState() {
     super.initState();
@@ -53,14 +63,52 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     }
     _invoiceDate = DateTime.now();
 
-    // Initial empty service item
-    _items = [
-      const BillingItemModel(
-        serviceName: '',
-        quantity: 1,
-        unitPrice: 0.0,
-      ),
-    ];
+    // Initial items or empty service item
+    if (widget.initialItems != null && widget.initialItems!.isNotEmpty) {
+      _items = List<BillingItemModel>.from(widget.initialItems!);
+    } else {
+      _items = [
+        const BillingItemModel(
+          serviceName: '',
+          quantity: 1,
+          unitPrice: 0.0,
+        ),
+      ];
+    }
+
+    if (_selectedPatient != null) {
+      _fetchOutstandingBalance(_selectedPatient!.id);
+    }
+  }
+
+  Future<void> _fetchOutstandingBalance(String? patientId) async {
+    if (patientId == null || patientId.trim().isEmpty) {
+      setState(() {
+        _outstandingInvoices = [];
+        _includePreviousBalance = false;
+        _isLoadingOutstanding = false;
+      });
+      return;
+    }
+
+    setState(() => _isLoadingOutstanding = true);
+    try {
+      final repo = ref.read(billingRepositoryProvider);
+      final invoices = await repo.fetchPatientOutstandingInvoices(patientId);
+      if (mounted) {
+        setState(() {
+          _outstandingInvoices = invoices;
+          _isLoadingOutstanding = false;
+          if (invoices.isEmpty) {
+            _includePreviousBalance = false;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingOutstanding = false);
+      }
+    }
   }
 
   @override
@@ -69,8 +117,16 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     super.dispose();
   }
 
-  double get _subtotal =>
+  double get _newChargesSubtotal =>
       _items.fold(0.0, (sum, item) => sum + item.totalAmount);
+
+  double get _outstandingBalance =>
+      _outstandingInvoices.fold(0.0, (sum, inv) => sum + inv.remainingAmount);
+
+  double get _previousBalanceIncluded =>
+      _includePreviousBalance ? _outstandingBalance : 0.0;
+
+  double get _subtotal => _newChargesSubtotal + _previousBalanceIncluded;
 
   double get _finalTotal => (_subtotal - _discount).clamp(0.0, double.infinity);
 
@@ -80,6 +136,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       _department = newDept;
       if (_selectedPatient?.department?.toLowerCase() != newDept) {
         _selectedPatient = null;
+        _outstandingInvoices = [];
+        _includePreviousBalance = false;
       }
       // Reset items for new department catalogue
       _items = [
@@ -177,27 +235,52 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       return;
     }
 
+    final submissionItems = List<BillingItemModel>.from(_items);
+    if (_includePreviousBalance && _outstandingBalance > 0) {
+      submissionItems.add(
+        BillingItemModel(
+          serviceName: 'Previous Outstanding Balance',
+          quantity: 1,
+          unitPrice: _outstandingBalance,
+          isCustom: true,
+        ),
+      );
+    }
+
     try {
       final notifier = ref.read(createInvoiceNotifierProvider.notifier);
       final createdInvoice = await notifier.createInvoice(
         patientId: _selectedPatient!.id,
         department: _department,
         discount: _discount,
-        items: _items,
+        items: submissionItems,
         payment: _payment,
         invoiceDate: _invoiceDate,
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
+        eyeSurgeryId: widget.initialEyeSurgeryId,
       );
 
       if (mounted && createdInvoice != null) {
+        // If previous balance was included, consolidate previous invoices atomically
+        if (_includePreviousBalance && _outstandingInvoices.isNotEmpty) {
+          await ref.read(billingRepositoryProvider).consolidateInvoices(
+            previousInvoices: _outstandingInvoices,
+            newInvoiceNumber: createdInvoice.invoiceNumber,
+            newInvoiceId: createdInvoice.id,
+          );
+          ref.invalidate(billingInvoicesProvider);
+        }
+
         final enrichedInvoice = createdInvoice.copyWith(
-          items: _items,
+          items: submissionItems,
           patientName: _selectedPatient?.name,
           patientNumber: _selectedPatient?.patientNumber,
           patientMobile: _selectedPatient?.mobile,
         );
+
+        if (!mounted) return;
 
         // Show success modal
         await showDialog<BillingInvoiceModel>(
@@ -218,6 +301,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                 _payment = null;
                 _notesController.clear();
                 _selectedPatient = null;
+                _outstandingInvoices = [];
+                _includePreviousBalance = false;
                 _validationError = null;
               });
             },
@@ -337,10 +422,17 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                           (p!.department == 'eye' || p.department == 'dental')) {
                         _department = p.department!;
                       }
+                      _includePreviousBalance = false;
                       _validationError = null;
                     });
+                    if (p != null) {
+                      _fetchOutstandingBalance(p.id);
+                    } else {
+                      _fetchOutstandingBalance(null);
+                    }
                   },
                 ),
+                _buildPreviousOutstandingBalanceSection(),
                 const SizedBox(height: AppSpacing.lg),
 
                 // Line items editor
@@ -361,6 +453,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                   subtotal: _subtotal,
                   discount: _discount,
                   finalTotal: _finalTotal,
+                  newCharges: _newChargesSubtotal,
+                  previousBalanceIncluded: _previousBalanceIncluded,
                   onDiscountChanged: (d) {
                     setState(() {
                       _discount = d;
@@ -459,6 +553,167 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPreviousOutstandingBalanceSection() {
+    if (_selectedPatient == null) {
+      return const SizedBox.shrink();
+    }
+
+    if (_isLoadingOutstanding) {
+      return const Padding(
+        padding: EdgeInsets.only(top: AppSpacing.sm),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: AppSpacing.sm),
+            Text(
+              'Checking for previous outstanding balances...',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_outstandingBalance <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: _includePreviousBalance
+            ? AppColors.primaryContainer.withValues(alpha: 0.4)
+            : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(
+          color: _includePreviousBalance
+              ? AppColors.primary
+              : AppColors.outlineVariant,
+          width: _includePreviousBalance ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                color: _includePreviousBalance ? AppColors.primary : const Color(0xFFB25E00),
+                size: 22,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Previous Outstanding Balance',
+                      style: AppTypography.bodyMd.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    Text(
+                      'Patient owes ₹${_outstandingBalance.toStringAsFixed(2)} across ${_outstandingInvoices.length} unpaid / partially paid invoice(s)',
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '₹${_outstandingBalance.toStringAsFixed(2)}',
+                style: AppTypography.bodyLg.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: _outstandingInvoices.map((inv) {
+              return Chip(
+                padding: EdgeInsets.zero,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                backgroundColor: AppColors.surfaceContainerLow,
+                side: const BorderSide(color: AppColors.outlineVariant),
+                label: Text(
+                  '${inv.invoiceNumber}: due ₹${inv.remainingAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (!_includePreviousBalance)
+                FilledButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _includePreviousBalance = true;
+                    });
+                  },
+                  icon: const Icon(Icons.add_circle_outline, size: 16),
+                  label: const Text('Add to This Invoice'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: AppColors.primary,
+                  ),
+                )
+              else ...[
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: AppColors.primary, size: 16),
+                    SizedBox(width: 4),
+                    Text(
+                      'Added to Invoice',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: AppSpacing.md),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _includePreviousBalance = false;
+                    });
+                  },
+                  icon: const Icon(Icons.remove_circle_outline, size: 16),
+                  label: const Text('Remove from Invoice'),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }

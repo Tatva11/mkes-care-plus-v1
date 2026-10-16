@@ -423,8 +423,9 @@ class ReportsRepository {
       if (status == 'completed') completed++;
       if (status == 'cancelled' || status == 'missed') cancelled++;
       if (status == 'scheduled' || status == 'confirmed') scheduled++;
-      if (status == 'waiting' || status == 'in_triage' || status == 'in triage')
+      if (status == 'waiting' || status == 'in_triage' || status == 'in triage') {
         inTriage++;
+      }
 
       final type =
           (item['appointment_type'] as String?)?.toLowerCase() ?? 'regular';
@@ -532,13 +533,14 @@ class ReportsRepository {
         .order('full_name', ascending: true);
 
     final staffProfiles = (profilesRes as List)
-        .where((p) =>
-            (p['role'] as String?) == 'staff' ||
-            (p['role'] as String?) == 'admin')
+        .where((p) => (p['role'] as String?) == 'staff')
         .toList();
     final int totalStaff = staffProfiles.length;
     final int activeStaff =
         staffProfiles.where((p) => p['is_active'] == true).length;
+
+    final Set<String> eligibleStaffIds =
+        staffProfiles.map((p) => p['id'] as String).toSet();
 
     // 2. Fetch Attendance in date range
     var attQuery = _supabase.from('staff_attendance').select('''
@@ -558,7 +560,9 @@ class ReportsRepository {
           attQuery.lte('record_date', end.toIso8601String().split('T').first);
     }
     final attRes = await attQuery;
-    final attList = attRes as List;
+    final attList = (attRes as List)
+        .where((item) => eligibleStaffIds.contains(item['staff_id']))
+        .toList();
 
     int totalAttendanceLogs = attList.length;
     int presentCount = 0;

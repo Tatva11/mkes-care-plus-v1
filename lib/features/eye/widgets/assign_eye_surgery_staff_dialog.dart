@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/eye_surgery_model.dart';
 import '../providers/eye_surgery_provider.dart';
 
@@ -14,6 +15,27 @@ Future<EyeSurgeryModel?> showAssignEyeSurgeryStaffDialog(
   WidgetRef ref,
   EyeSurgeryModel surgery,
 ) {
+  if (surgery.isDischarged) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Staff assignment is not permitted for discharged surgeries.'),
+        backgroundColor: AppColors.error,
+      ),
+    );
+    return Future.value(null);
+  }
+
+  final role = ref.read(currentUserRoleProvider).valueOrNull;
+  if (role?.toLowerCase() != 'admin') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Access restricted: Only administrators can assign staff to surgeries.'),
+        backgroundColor: AppColors.error,
+      ),
+    );
+    return Future.value(null);
+  }
+
   return showDialog<EyeSurgeryModel>(
     context: context,
     builder: (_) => _AssignEyeSurgeryStaffDialog(surgery: surgery),
@@ -42,6 +64,19 @@ class _AssignEyeSurgeryStaffDialogState
   }
 
   Future<void> _submit() async {
+    final role = ref.read(currentUserRoleProvider).valueOrNull;
+    if (role?.toLowerCase() != 'admin') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Access restricted: Only administrators can assign staff.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       final updated = await ref

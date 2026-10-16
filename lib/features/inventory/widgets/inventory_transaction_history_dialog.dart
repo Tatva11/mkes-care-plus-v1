@@ -422,6 +422,38 @@ class _InventoryTransactionHistoryDialogState
               ),
             ),
           ],
+          if (tx.departmentName != null && tx.departmentName!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                const Icon(
+                  Icons.business_outlined,
+                  size: 13,
+                  color: AppColors.secondary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Department: ',
+                  style: AppTypography.bodySm.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    tx.departmentName!,
+                    style: AppTypography.bodySm.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      color: AppColors.secondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 6),
 
           // Row 4: Performed by & Date

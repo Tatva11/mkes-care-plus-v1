@@ -278,6 +278,9 @@ class EyeSurgeryRepository {
   Future<EyeSurgeryModel> startSurgery(String id) async {
     final existing = await fetchSurgeryById(id);
     if (existing == null) throw StateError('Eye surgery not found.');
+    if (existing.status == 'in_surgery') {
+      return existing;
+    }
     if (existing.status != 'pre_op') {
       throw StateError('Surgery must be in Pre-op before entering surgery.');
     }

@@ -357,6 +357,7 @@ class CreateInvoiceNotifier extends StateNotifier<CreateInvoiceState> {
     BillingPaymentModel? payment,
     DateTime? invoiceDate,
     String? notes,
+    String? eyeSurgeryId,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
 
@@ -369,6 +370,7 @@ class CreateInvoiceNotifier extends StateNotifier<CreateInvoiceState> {
         payment: payment,
         invoiceDate: invoiceDate,
         notes: notes,
+        eyeSurgeryId: eyeSurgeryId,
       );
 
       state = CreateInvoiceState(isLoading: false, createdInvoice: invoice);
@@ -465,3 +467,12 @@ final recordPaymentNotifierProvider =
     StateNotifierProvider.autoDispose<RecordPaymentNotifier, RecordPaymentState>((ref) {
   return RecordPaymentNotifier(ref.watch(billingRepositoryProvider), ref);
 });
+
+/// Provider for outstanding unpaid invoices for a given patient ID.
+final patientOutstandingInvoicesProvider =
+    FutureProvider.autoDispose.family<List<BillingInvoiceModel>, String>((ref, patientId) async {
+  if (patientId.trim().isEmpty) return const [];
+  final repo = ref.watch(billingRepositoryProvider);
+  return repo.fetchPatientOutstandingInvoices(patientId);
+});
+

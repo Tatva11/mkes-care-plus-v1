@@ -1,6 +1,6 @@
 // supabase/functions/sync-excel-workbook/types.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// Type definitions for Central Excel Workbook Synchronization
+// Type definitions for Central Excel Workbook Synchronization (Sprint 9.4)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ExcelDataFormat =
@@ -21,6 +21,12 @@ export interface ExcelColumnDefinition {
   transform?: (val: any, row: Record<string, any>) => any;
 }
 
+export interface ExcelSortClause {
+  column: string;
+  ascending: boolean;
+  nullsFirst?: boolean;
+}
+
 export interface ExcelWorksheetDefinition {
   name: string;
   sourceTable: string;
@@ -29,6 +35,7 @@ export interface ExcelWorksheetDefinition {
   columns: ExcelColumnDefinition[];
   selectQuery: string;
   orderByField?: string;
+  sortClauses?: ExcelSortClause[];
   sensitiveExcludedFields?: string[];
 }
 
@@ -37,6 +44,7 @@ export interface ExcelSyncCheckpoint {
   source_table: string;
   last_sync_timestamp: string;
   record_count: number;
+  last_sync_id?: string;
   updated_at: string;
 }
 
@@ -54,14 +62,22 @@ export interface ExcelSyncState {
   triggered_by?: string;
 }
 
-export interface SyncExecutionResult {
-  success: boolean;
-  syncId: string;
-  recordsProcessed: number;
-  worksheetsUpdated: string[];
-  fileSizeBytes: number;
-  durationMs: number;
-  errorMessage?: string;
+export interface ExcelSyncLease {
+  acquired: boolean;
+  fencing_token: number;
+  current_holder: string;
+  expires_at: string;
+}
+
+export interface ExcelSyncVersion {
+  version_id: string;
+  version_number: number;
+  storage_path: string;
+  file_size_bytes: number;
+  total_records: number;
+  worksheets_summary: WorksheetExportSummary[];
+  published_at: string;
+  sync_id: string;
 }
 
 export interface WorksheetExportSummary {
@@ -84,3 +100,29 @@ export interface HistoricalExportResult {
   errorMessage?: string;
 }
 
+export interface IncrementalSyncResult {
+  success: boolean;
+  status: "success" | "no_op" | "already_running" | "failed";
+  syncId: string;
+  versionId?: string;
+  versionNumber?: number;
+  fencingToken?: number;
+  totalRecords: number;
+  fileSizeBytes: number;
+  storagePath?: string;
+  durationMs: number;
+  eventsProcessed: number;
+  worksheetSummaries?: WorksheetExportSummary[];
+  errorMessage?: string;
+}
+
+export interface SingleWorksheetExportResult {
+  success: boolean;
+  worksheetName: string;
+  fileName: string;
+  storagePath: string;
+  recordCount: number;
+  fileSizeBytes: number;
+  downloadUrl?: string;
+  errorMessage?: string;
+}

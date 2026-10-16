@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../inventory/models/inventory_item.dart';
 import '../../inventory/providers/inventory_provider.dart';
+import '../../department/providers/departments_provider.dart';
 import '../models/clinical_inventory_usage_model.dart';
 import '../providers/clinical_inventory_provider.dart';
 
@@ -39,6 +40,7 @@ class _ClinicalInventoryConsumptionDialogState
   final _formKey = GlobalKey<FormState>();
 
   InventoryItem? _selectedItem;
+  String? _selectedDepartmentId;
   final _quantityController = TextEditingController();
   final _remarksController = TextEditingController();
 
@@ -82,6 +84,9 @@ class _ClinicalInventoryConsumptionDialogState
       _errorMessage = null;
     });
 
+    final idempotencyKey =
+        'clin_use_${widget.recordType}_${widget.recordId}_${_selectedItem!.id}_${qty}_${DateTime.now().millisecondsSinceEpoch ~/ 15000}';
+
     try {
       final usage = await ref
           .read(clinicalInventoryControllerProvider.notifier)
@@ -94,6 +99,8 @@ class _ClinicalInventoryConsumptionDialogState
             remarks: _remarksController.text.trim().isEmpty
                 ? null
                 : _remarksController.text.trim(),
+            departmentId: _selectedDepartmentId,
+            idempotencyKey: idempotencyKey,
           );
 
       if (mounted) {
@@ -245,6 +252,71 @@ class _ClinicalInventoryConsumptionDialogState
                   ),
                   const SizedBox(height: AppSpacing.md),
                 ],
+
+                // Department selector
+                Text(
+                  'Responsible Department *',
+                  style: AppTypography.bodyMd.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final deptsAsync = ref.watch(departmentsProvider);
+                    return deptsAsync.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (e, _) => Text(
+                        'Failed to load departments: $e',
+                        style: AppTypography.bodySm.copyWith(color: AppColors.error),
+                      ),
+                      data: (depts) {
+                        if (depts.isEmpty) return const SizedBox.shrink();
+                        if (_selectedDepartmentId == null) {
+                          if (widget.recordType == 'eye_examination' ||
+                              widget.recordType == 'eye_surgery') {
+                            final match = depts.firstWhere(
+                              (d) => d.name.toLowerCase() == 'eye',
+                              orElse: () => depts.first,
+                            );
+                            _selectedDepartmentId = match.id;
+                          } else if (widget.recordType == 'dental_treatment') {
+                            final match = depts.firstWhere(
+                              (d) => d.name.toLowerCase() == 'dental',
+                              orElse: () => depts.first,
+                            );
+                            _selectedDepartmentId = match.id;
+                          } else {
+                            _selectedDepartmentId = depts.first.id;
+                          }
+                        }
+                        return DropdownButtonFormField<String>(
+                          initialValue: _selectedDepartmentId,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.corporate_fare_outlined),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                          ),
+                          items: depts.map((d) {
+                            return DropdownMenuItem<String>(
+                              value: d.id,
+                              child: Text(d.name, style: AppTypography.bodyMd),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() => _selectedDepartmentId = val);
+                          },
+                          validator: (val) =>
+                              val == null ? 'Please select a department.' : null,
+                        );
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
 
                 // Item selector
                 Text(

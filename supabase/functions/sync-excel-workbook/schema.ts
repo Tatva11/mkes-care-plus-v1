@@ -1,11 +1,11 @@
 // supabase/functions/sync-excel-workbook/schema.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// Master Workbook & Worksheet Schema Definitions (Sprint 9.2)
+// Master Workbook & Worksheet Schema Definitions (Sprint 9.5)
 // Defines all normalized worksheets, column mappings, stable IDs, formatting,
-// and sensitive field redaction rules.
+// sensitive field redaction rules, and deterministic date-wise sorting clauses.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { ExcelWorksheetDefinition } from "./types.ts";
+import { ExcelWorksheetDefinition, ExcelSortClause } from "./types.ts";
 
 export const MASTER_WORKBOOK_FILENAME = "MKES_CARE_Plus_Master.xlsx";
 export const STORAGE_BUCKET_NAME = "clinic-excel-sync";
@@ -75,6 +75,10 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "patients",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, patient_number, name, dob, address, mobile, department, reference, visit_date, created_at, updated_at",
     columns: [
       { header: "Patient ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -97,8 +101,11 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "profiles",
     stableIdKey: "id",
     timestampKey: "updated_at",
-    // salary is strictly excluded to protect compensation privacy
     sensitiveExcludedFields: ["salary"],
+    sortClauses: [
+      { column: "full_name", ascending: true },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, full_name, email, phone_number, designation, role, is_active, assigned_shift, next_shift, shift_effective_date, joining_date, departments(name), created_at, updated_at",
     columns: [
       { header: "Staff ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -124,6 +131,11 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "staff_attendance",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "record_date", ascending: false },
+      { column: "check_in_time", ascending: false, nullsFirst: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, staff_id, record_date, check_in_time, check_out_time, status, is_late, working_hours, late_minutes, shift, notes, profiles(full_name, email), created_at, updated_at",
     columns: [
       { header: "Record ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -148,6 +160,11 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "leave_requests",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "start_date", ascending: false },
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, staff_id, start_date, end_date, leave_days, reason, status, approved_at, rejection_reason, applicant:profiles!leave_requests_staff_id_fkey(full_name), approver:profiles!leave_requests_approved_by_fkey(full_name), created_at, updated_at",
     columns: [
       { header: "Leave ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -170,6 +187,11 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "tasks",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "due_date", ascending: false, nullsFirst: false },
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, title, description, assigned_to, assigned_by, due_date, priority, status, completed_at, assignee:profiles!tasks_assigned_to_fkey(full_name), assigner:profiles!tasks_assigned_by_fkey(full_name), created_at, updated_at",
     columns: [
       { header: "Task ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -191,6 +213,10 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "task_history",
     stableIdKey: "id",
     timestampKey: "created_at",
+    sortClauses: [
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, task_id, changed_by, old_status, new_status, note, changer:profiles(full_name), created_at",
     columns: [
       { header: "History ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -209,6 +235,11 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "appointments",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "appointment_date", ascending: false },
+      { column: "appointment_time", ascending: false, nullsFirst: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, patient_id, department, doctor_id, appointment_date, appointment_time, appointment_type, status, notes, ai_booked, patients(patient_number, name), doctor:profiles(full_name), created_at, updated_at",
     columns: [
       { header: "Appointment ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -233,6 +264,10 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "inventory",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "name", ascending: true },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, name, category, department, sku, quantity, minimum_stock, unit, price, is_active, vendors(name), created_at, updated_at",
     columns: [
       { header: "Item ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -257,6 +292,11 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "inventory_batches",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "received_date", ascending: false, nullsFirst: false },
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, inventory_id, batch_number, received_quantity, remaining_quantity, unit_price, total_amount, expiry_date, received_date, inventory(name, sku), purchase_orders(purchase_order_number), created_at, updated_at",
     columns: [
       { header: "Batch ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -280,14 +320,18 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "inventory_transactions",
     stableIdKey: "id",
     timestampKey: "created_at",
-    selectQuery: "id, inventory_id, transaction_type, quantity, remarks, created_at, inventory(name), profiles(full_name)",
+    sortClauses: [
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
+    selectQuery: "id, inventory_id, transaction_type, quantity, remarks, created_at, inventory(name), performer:profiles!performed_by(full_name), creator:profiles!created_by(full_name)",
     columns: [
       { header: "Transaction ID", key: "id", width: 36, format: "text", sourceField: "id" },
       { header: "Timestamp", key: "created_at", width: 18, format: "datetime", sourceField: "created_at", transform: formatDateTime },
       { header: "Item Name", key: "item_name", width: 28, format: "text", sourceField: "inventory", transform: (v) => (v && v.name ? v.name : "-") },
       { header: "Transaction Type", key: "transaction_type", width: 18, format: "text", sourceField: "transaction_type", transform: (v) => (v ? String(v).toUpperCase() : "-") },
       { header: "Quantity", key: "quantity", width: 14, format: "number", sourceField: "quantity", transform: (v) => formatNumber(v, 1) },
-      { header: "Performed By", key: "performer", width: 24, format: "text", sourceField: "profiles", transform: (v) => (v && v.full_name ? v.full_name : "-") },
+      { header: "Performed By", key: "performer", width: 24, format: "text", sourceField: "performer", transform: (v, r) => (v && v.full_name ? v.full_name : (r && r.creator && r.creator.full_name ? r.creator.full_name : (r && r.profiles && r.profiles.full_name ? r.profiles.full_name : "-"))) },
       { header: "Remarks", key: "remarks", width: 32, format: "text", sourceField: "remarks", defaultValue: "-" },
     ],
   },
@@ -298,15 +342,19 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "department_inventory",
     stableIdKey: "id",
     timestampKey: "updated_at",
-    selectQuery: "id, department, current_stock, minimum_stock, updated_at, inventory(name, sku, unit)",
+    sortClauses: [
+      { column: "updated_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
+    selectQuery: "id, department_id, quantity, minimum_stock, updated_at, departments(name), inventory(name, sku, unit)",
     columns: [
       { header: "Dept Stock ID", key: "id", width: 36, format: "text", sourceField: "id" },
-      { header: "Department", key: "department", width: 16, format: "text", sourceField: "department", transform: (v) => (v ? String(v).toUpperCase() : "-") },
-      { header: "Item Name", key: "item_name", width: 28, format: "text", sourceField: "inventory", transform: (v) => (v && v.name ? v.name : "-") },
-      { header: "SKU", key: "sku", width: 16, format: "text", sourceField: "inventory", transform: (v) => (v && v.sku ? v.sku : "-") },
-      { header: "Current Stock", key: "current_stock", width: 15, format: "number", sourceField: "current_stock", transform: (v) => formatNumber(v, 1) },
+      { header: "Department", key: "department", width: 16, format: "text", sourceField: "departments", transform: (v, r) => (v && v.name ? v.name : (r.department || "-")) },
+      { header: "Item Name", key: "item_name", width: 28, format: "text", sourceField: "inventory", transform: (v, r) => (v && v.name ? v.name : (r.item_name || r.name || "-")) },
+      { header: "SKU", key: "sku", width: 16, format: "text", sourceField: "inventory", transform: (v, r) => (v && v.sku ? v.sku : (r.sku || "-")) },
+      { header: "Current Stock", key: "current_stock", width: 15, format: "number", sourceField: "quantity", transform: (v, r) => formatNumber(v !== undefined ? v : r.current_stock, 1) },
       { header: "Min Stock", key: "minimum_stock", width: 14, format: "number", sourceField: "minimum_stock", transform: (v) => formatNumber(v, 1) },
-      { header: "Unit", key: "unit", width: 12, format: "text", sourceField: "inventory", transform: (v) => (v && v.unit ? v.unit : "units") },
+      { header: "Unit", key: "unit", width: 12, format: "text", sourceField: "inventory", transform: (v, r) => (v && v.unit ? v.unit : (r.unit || "units")) },
       { header: "Updated At", key: "updated_at", width: 18, format: "datetime", sourceField: "updated_at", transform: formatDateTime },
     ],
   },
@@ -317,14 +365,18 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "stock_requests",
     stableIdKey: "id",
     timestampKey: "updated_at",
-    selectQuery: "id, request_number, department, status, notes, profiles(full_name), created_at, updated_at",
+    sortClauses: [
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
+    selectQuery: "id, request_number, department_id, status, request_notes, requested_by, created_at, updated_at, departments(name)",
     columns: [
       { header: "Request ID", key: "id", width: 36, format: "text", sourceField: "id" },
       { header: "Request Number", key: "request_number", width: 20, format: "text", sourceField: "request_number" },
-      { header: "Department", key: "department", width: 16, format: "text", sourceField: "department", transform: (v) => (v ? String(v).toUpperCase() : "-") },
-      { header: "Requested By", key: "requester", width: 24, format: "text", sourceField: "profiles", transform: (v) => (v && v.full_name ? v.full_name : "-") },
+      { header: "Department", key: "department", width: 16, format: "text", sourceField: "departments", transform: (v, r) => (v && v.name ? v.name : (r.department || "-")) },
+      { header: "Requested By", key: "requester", width: 24, format: "text", sourceField: "requester", transform: (v, r) => (v && v.full_name ? v.full_name : (r && r.requester_name ? r.requester_name : "-")) },
       { header: "Status", key: "status", width: 16, format: "text", sourceField: "status", transform: (v) => (v ? String(v).toUpperCase() : "PENDING") },
-      { header: "Notes", key: "notes", width: 30, format: "text", sourceField: "notes", defaultValue: "-" },
+      { header: "Notes", key: "notes", width: 30, format: "text", sourceField: "request_notes", transform: (v, r) => (v || r.notes || "-") },
       { header: "Created At", key: "created_at", width: 18, format: "datetime", sourceField: "created_at", transform: formatDateTime },
       { header: "Updated At", key: "updated_at", width: 18, format: "datetime", sourceField: "updated_at", transform: formatDateTime },
     ],
@@ -336,6 +388,10 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "vendors",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "name", ascending: true },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, name, contact_person, phone, email, address, products_supplied, remarks, created_at, updated_at",
     columns: [
       { header: "Vendor ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -356,7 +412,12 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "purchase_orders",
     stableIdKey: "id",
     timestampKey: "updated_at",
-    selectQuery: "id, purchase_order_number, vendor_id, order_date, expected_delivery_date, actual_delivery_date, status, subtotal, total_amount, notes, vendors(name), creator:profiles!purchase_orders_created_by_fkey(full_name), orderer:profiles!purchase_orders_ordered_by_fkey(full_name), created_at, updated_at",
+    sortClauses: [
+      { column: "order_date", ascending: false },
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
+    selectQuery: "id, purchase_order_number, vendor_id, order_date, expected_delivery_date, actual_delivery_date, status, subtotal, total_amount, notes, created_by, ordered_by, created_at, updated_at, vendors(name)",
     columns: [
       { header: "PO ID", key: "id", width: 36, format: "text", sourceField: "id" },
       { header: "PO Number", key: "purchase_order_number", width: 22, format: "text", sourceField: "purchase_order_number" },
@@ -367,8 +428,8 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
       { header: "Status", key: "status", width: 18, format: "text", sourceField: "status", transform: (v) => (v ? String(v).toUpperCase() : "DRAFT") },
       { header: "Subtotal (INR)", key: "subtotal", width: 16, format: "currency", sourceField: "subtotal", transform: formatCurrency },
       { header: "Total Amount (INR)", key: "total_amount", width: 18, format: "currency", sourceField: "total_amount", transform: formatCurrency },
-      { header: "Created By", key: "creator", width: 22, format: "text", sourceField: "creator", transform: (v) => (v && v.full_name ? v.full_name : "-") },
-      { header: "Ordered By", key: "orderer", width: 22, format: "text", sourceField: "orderer", transform: (v) => (v && v.full_name ? v.full_name : "-") },
+      { header: "Created By", key: "creator", width: 22, format: "text", sourceField: "creator", transform: (v, r) => (v && v.full_name ? v.full_name : (r && r.creator_name ? r.creator_name : "-")) },
+      { header: "Ordered By", key: "orderer", width: 22, format: "text", sourceField: "orderer", transform: (v, r) => (v && v.full_name ? v.full_name : (r && r.orderer_name ? r.orderer_name : "-")) },
       { header: "Notes", key: "notes", width: 30, format: "text", sourceField: "notes", defaultValue: "-" },
       { header: "Updated At", key: "updated_at", width: 18, format: "datetime", sourceField: "updated_at", transform: formatDateTime },
     ],
@@ -380,6 +441,10 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "purchase_order_items",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, purchase_order_id, inventory_id, quantity, unit_price, total_amount, received_quantity, purchase_orders(purchase_order_number), inventory(name, sku, unit), created_at, updated_at",
     columns: [
       { header: "Item ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -402,7 +467,12 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "sales",
     stableIdKey: "id",
     timestampKey: "created_at",
-    selectQuery: "id, sale_number, patient_id, frame_brand, frame_name, quantity, amount, sale_date, sold_by, patients(name), profiles(full_name), created_at",
+    sortClauses: [
+      { column: "sale_date", ascending: false },
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
+    selectQuery: "id, sale_number, patient_id, frame_brand, frame_name, quantity, amount, sale_date, sold_by, created_at, patients(name)",
     columns: [
       { header: "Sale ID", key: "id", width: 36, format: "text", sourceField: "id" },
       { header: "Sale Number", key: "sale_number", width: 18, format: "text", sourceField: "sale_number" },
@@ -412,7 +482,7 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
       { header: "Frame Model", key: "frame_name", width: 22, format: "text", sourceField: "frame_name", defaultValue: "-" },
       { header: "Quantity", key: "quantity", width: 12, format: "number", sourceField: "quantity", defaultValue: 1 },
       { header: "Amount (INR)", key: "amount", width: 16, format: "currency", sourceField: "amount", transform: formatCurrency },
-      { header: "Sold By", key: "seller", width: 22, format: "text", sourceField: "profiles", transform: (v) => (v && v.full_name ? v.full_name : "-") },
+      { header: "Sold By", key: "seller", width: 22, format: "text", sourceField: "seller", transform: (v, r) => (v && v.full_name ? v.full_name : (r && r.sold_by_name ? r.sold_by_name : (r && r.profiles && r.profiles.full_name ? r.profiles.full_name : "-"))) },
       { header: "Created At", key: "created_at", width: 18, format: "datetime", sourceField: "created_at", transform: formatDateTime },
     ],
   },
@@ -423,6 +493,10 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "optical_orders",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, order_number, patient_id, order_type, prescription_details, frame_details, lens_details, order_status, delivery_date, payment_status, total_amount, patients(name, patient_number), created_at, updated_at",
     columns: [
       { header: "Order ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -448,6 +522,11 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "dental_lab",
     stableIdKey: "id",
     timestampKey: "updated_at",
+    sortClauses: [
+      { column: "sent_date", ascending: false, nullsFirst: false },
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
     selectQuery: "id, case_number, patient_id, case_type, status, sent_date, ready_date, delivered_date, remarks, patients(name, patient_number), created_at, updated_at",
     columns: [
       { header: "Case ID", key: "id", width: 36, format: "text", sourceField: "id" },
@@ -470,23 +549,27 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "billing",
     stableIdKey: "id",
     timestampKey: "updated_at",
-    selectQuery: "id, invoice_number, patient_id, department, invoice_date, subtotal, discount, tax_amount, total_amount, paid_amount, balance_amount, status, payment_method, notes, patients(name, patient_number), profiles(full_name), created_at, updated_at",
+    sortClauses: [
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
+    selectQuery: "id, invoice_number, patient_id, department, subtotal, discount, total_amount, amount_paid, payment_status, payment_mode, notes, billed_by, created_at, updated_at, patients(name, patient_number)",
     columns: [
       { header: "Invoice ID", key: "id", width: 36, format: "text", sourceField: "id" },
       { header: "Invoice Number", key: "invoice_number", width: 22, format: "text", sourceField: "invoice_number" },
-      { header: "Patient Number", key: "patient_number", width: 18, format: "text", sourceField: "patients", transform: (v) => (v && v.patient_number ? v.patient_number : "-") },
-      { header: "Patient Name", key: "patient_name", width: 24, format: "text", sourceField: "patients", transform: (v) => (v && v.name ? v.name : "-") },
+      { header: "Patient Number", key: "patient_number", width: 18, format: "text", sourceField: "patients", transform: (v, r) => (v && v.patient_number ? v.patient_number : (r.patient_number || "-")) },
+      { header: "Patient Name", key: "patient_name", width: 24, format: "text", sourceField: "patients", transform: (v, r) => (v && v.name ? v.name : (r.patient_name || "-")) },
       { header: "Department", key: "department", width: 14, format: "text", sourceField: "department", transform: (v) => (v ? String(v).toUpperCase() : "-") },
-      { header: "Invoice Date", key: "invoice_date", width: 14, format: "date", sourceField: "invoice_date", transform: formatDateOnly },
+      { header: "Invoice Date", key: "invoice_date", width: 14, format: "date", sourceField: "created_at", transform: (v, r) => formatDateOnly(r.invoice_date || v) },
       { header: "Subtotal (INR)", key: "subtotal", width: 16, format: "currency", sourceField: "subtotal", transform: formatCurrency },
       { header: "Discount (INR)", key: "discount", width: 16, format: "currency", sourceField: "discount", transform: formatCurrency },
-      { header: "Tax (INR)", key: "tax_amount", width: 14, format: "currency", sourceField: "tax_amount", transform: formatCurrency },
+      { header: "Tax (INR)", key: "tax_amount", width: 14, format: "currency", sourceField: "tax_amount", defaultValue: 0.0, transform: formatCurrency },
       { header: "Total Amount (INR)", key: "total_amount", width: 18, format: "currency", sourceField: "total_amount", transform: formatCurrency },
-      { header: "Paid Amount (INR)", key: "paid_amount", width: 18, format: "currency", sourceField: "paid_amount", transform: formatCurrency },
-      { header: "Balance (INR)", key: "balance_amount", width: 16, format: "currency", sourceField: "balance_amount", transform: formatCurrency },
-      { header: "Status", key: "status", width: 14, format: "text", sourceField: "status", transform: (v) => (v ? String(v).toUpperCase() : "PENDING") },
-      { header: "Payment Mode", key: "payment_method", width: 16, format: "text", sourceField: "payment_method", transform: (v) => (v ? String(v).toUpperCase() : "-") },
-      { header: "Billed By", key: "billed_by", width: 22, format: "text", sourceField: "profiles", transform: (v) => (v && v.full_name ? v.full_name : "-") },
+      { header: "Paid Amount (INR)", key: "paid_amount", width: 18, format: "currency", sourceField: "amount_paid", transform: (v, r) => formatCurrency(v !== undefined ? v : r.paid_amount) },
+      { header: "Balance (INR)", key: "balance_amount", width: 16, format: "currency", sourceField: "total_amount", transform: (_v, r) => formatCurrency(Math.max(0, (r.total_amount || 0) - (r.amount_paid !== undefined ? r.amount_paid : (r.paid_amount || 0)))) },
+      { header: "Status", key: "status", width: 14, format: "text", sourceField: "payment_status", transform: (v, r) => (v || r.status ? String(v || r.status).toUpperCase() : "PENDING") },
+      { header: "Payment Mode", key: "payment_method", width: 16, format: "text", sourceField: "payment_mode", transform: (v, r) => (v || r.payment_method ? String(v || r.payment_method).toUpperCase() : "-") },
+      { header: "Billed By", key: "billed_by", width: 22, format: "text", sourceField: "billed_by", transform: (v, r) => (v && v.full_name ? v.full_name : (r && r.billed_by_name ? r.billed_by_name : (r && r.profiles && r.profiles.full_name ? r.profiles.full_name : "-"))) },
       { header: "Updated At", key: "updated_at", width: 18, format: "datetime", sourceField: "updated_at", transform: formatDateTime },
     ],
   },
@@ -497,15 +580,19 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "billing_items",
     stableIdKey: "id",
     timestampKey: "created_at",
-    selectQuery: "id, billing_id, item_type, item_name, quantity, unit_price, total_price, billing(invoice_number), created_at",
+    sortClauses: [
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
+    selectQuery: "id, billing_id, service_id, service_name, quantity, unit_price, total_amount, is_custom, created_at, billing(invoice_number)",
     columns: [
       { header: "Line Item ID", key: "id", width: 36, format: "text", sourceField: "id" },
-      { header: "Invoice Number", key: "invoice_number", width: 22, format: "text", sourceField: "billing", transform: (v) => (v && v.invoice_number ? v.invoice_number : "-") },
-      { header: "Item Type", key: "item_type", width: 14, format: "text", sourceField: "item_type", transform: (v) => (v ? String(v).toUpperCase() : "SERVICE") },
-      { header: "Item / Service Name", key: "item_name", width: 30, format: "text", sourceField: "item_name" },
+      { header: "Invoice Number", key: "invoice_number", width: 22, format: "text", sourceField: "billing", transform: (v, r) => (v && v.invoice_number ? v.invoice_number : (r.invoice_number || "-")) },
+      { header: "Item Type", key: "item_type", width: 14, format: "text", sourceField: "is_custom", transform: (v, r) => (r.item_type ? String(r.item_type).toUpperCase() : (v === true ? "CUSTOM" : "SERVICE")) },
+      { header: "Item / Service Name", key: "item_name", width: 30, format: "text", sourceField: "service_name", transform: (v, r) => (v || r.item_name || "-") },
       { header: "Quantity", key: "quantity", width: 12, format: "number", sourceField: "quantity", transform: (v) => formatNumber(v, 1) },
       { header: "Unit Rate (INR)", key: "unit_price", width: 16, format: "currency", sourceField: "unit_price", transform: formatCurrency },
-      { header: "Total Amount (INR)", key: "total_price", width: 18, format: "currency", sourceField: "total_price", transform: formatCurrency },
+      { header: "Total Amount (INR)", key: "total_price", width: 18, format: "currency", sourceField: "total_amount", transform: (v, r) => formatCurrency(v !== undefined ? v : r.total_price) },
       { header: "Created At", key: "created_at", width: 18, format: "datetime", sourceField: "created_at", transform: formatDateTime },
     ],
   },
@@ -516,17 +603,88 @@ export const MASTER_WORKSHEETS: ExcelWorksheetDefinition[] = [
     sourceTable: "billing_payments",
     stableIdKey: "id",
     timestampKey: "created_at",
-    selectQuery: "id, billing_id, payment_date, amount, payment_method, transaction_reference, notes, billing(invoice_number), profiles(full_name), created_at",
+    sortClauses: [
+      { column: "paid_at", ascending: false, nullsFirst: false },
+      { column: "created_at", ascending: false },
+      { column: "id", ascending: true },
+    ],
+    selectQuery: "id, billing_id, amount, payment_mode, payment_reference, paid_at, recorded_by, notes, created_at, billing(invoice_number)",
     columns: [
       { header: "Payment ID", key: "id", width: 36, format: "text", sourceField: "id" },
-      { header: "Invoice Number", key: "invoice_number", width: 22, format: "text", sourceField: "billing", transform: (v) => (v && v.invoice_number ? v.invoice_number : "-") },
-      { header: "Payment Date", key: "payment_date", width: 18, format: "datetime", sourceField: "payment_date", transform: formatDateTime },
+      { header: "Invoice Number", key: "invoice_number", width: 22, format: "text", sourceField: "billing", transform: (v, r) => (v && v.invoice_number ? v.invoice_number : (r.invoice_number || "-")) },
+      { header: "Payment Date", key: "payment_date", width: 18, format: "datetime", sourceField: "paid_at", transform: (v, r) => formatDateTime(v || r.payment_date) },
       { header: "Amount Paid (INR)", key: "amount", width: 18, format: "currency", sourceField: "amount", transform: formatCurrency },
-      { header: "Payment Method", key: "payment_method", width: 16, format: "text", sourceField: "payment_method", transform: (v) => (v ? String(v).toUpperCase() : "CASH") },
-      { header: "Transaction Ref", key: "transaction_reference", width: 24, format: "text", sourceField: "transaction_reference", defaultValue: "-" },
-      { header: "Received By", key: "received_by", width: 22, format: "text", sourceField: "profiles", transform: (v) => (v && v.full_name ? v.full_name : "-") },
+      { header: "Payment Method", key: "payment_method", width: 16, format: "text", sourceField: "payment_mode", transform: (v, r) => (v || r.payment_method ? String(v || r.payment_method).toUpperCase() : "CASH") },
+      { header: "Transaction Ref", key: "transaction_reference", width: 24, format: "text", sourceField: "payment_reference", defaultValue: "-", transform: (v, r) => (v || r.transaction_reference || "-") },
+      { header: "Received By", key: "received_by", width: 22, format: "text", sourceField: "received_by", transform: (v, r) => (v && v.full_name ? v.full_name : (r && r.received_by_name ? r.received_by_name : (r && r.profiles && r.profiles.full_name ? r.profiles.full_name : "-"))) },
       { header: "Notes", key: "notes", width: 28, format: "text", sourceField: "notes", defaultValue: "-" },
       { header: "Recorded At", key: "created_at", width: 18, format: "datetime", sourceField: "created_at", transform: formatDateTime },
     ],
   },
 ];
+
+/**
+ * In-memory chronological sort helper.
+ * Sorts an array of records according to the worksheet's sortClauses.
+ * Handles null/undefined date values safely (nulls last for descending sorts).
+ * Uses ISO timestamp parsing for date comparisons and deterministic string/number
+ * secondary tie-breakers.
+ */
+export function sortRecordsForWorksheet(
+  sheetName: string,
+  records: Record<string, any>[]
+): Record<string, any>[] {
+  const sheetDef = MASTER_WORKSHEETS.find((w) => w.name === sheetName);
+  if (!sheetDef || !sheetDef.sortClauses || sheetDef.sortClauses.length === 0) {
+    return records;
+  }
+
+  const clauses = sheetDef.sortClauses;
+
+  return [...records].sort((a, b) => {
+    for (const clause of clauses) {
+      const col = clause.column;
+      const asc = clause.ascending;
+      const valA = a[col];
+      const valB = b[col];
+
+      // Handle null / undefined
+      if (valA === valB) continue;
+      if (valA === null || valA === undefined || valA === "") {
+        return clause.nullsFirst ? -1 : 1;
+      }
+      if (valB === null || valB === undefined || valB === "") {
+        return clause.nullsFirst ? 1 : -1;
+      }
+
+      // Check if values can be parsed as numbers
+      if (typeof valA === "number" && typeof valB === "number") {
+        if (valA !== valB) {
+          return asc ? valA - valB : valB - valA;
+        }
+        continue;
+      }
+
+      // Check if values are dates or ISO strings
+      const isDateA = typeof valA === "string" && (valA.includes("-") || !isNaN(Date.parse(valA)));
+      const isDateB = typeof valB === "string" && (valB.includes("-") || !isNaN(Date.parse(valB)));
+      if (isDateA && isDateB) {
+        const timeA = Date.parse(valA);
+        const timeB = Date.parse(valB);
+        if (!isNaN(timeA) && !isNaN(timeB)) {
+          if (timeA !== timeB) {
+            return asc ? timeA - timeB : timeB - timeA;
+          }
+          continue;
+        }
+      }
+
+      // Fallback string locale comparison
+      const cmp = String(valA).localeCompare(String(valB));
+      if (cmp !== 0) {
+        return asc ? cmp : -cmp;
+      }
+    }
+    return 0;
+  });
+}

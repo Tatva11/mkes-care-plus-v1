@@ -18,6 +18,7 @@ import '../../admin/screens/admin_task_screen.dart';
 import '../../admin/screens/admin_performance_attendance_screens.dart';
 import '../../admin/screens/shift_management_screen.dart';
 import '../../admin/providers/users_provider.dart';
+import '../providers/attendance_provider.dart';
 
 class StaffManagementScreen extends StatelessWidget {
   const StaffManagementScreen({super.key});
@@ -234,8 +235,19 @@ class _StatRow extends ConsumerWidget {
     final users = (usersState.valueOrNull ?? const [])
       .where((user) => user.role == 'staff')
       .toList();
-    final activeCount = users.where((user) => user.isActive).length;
-    final inactiveCount = users.length - activeCount;
+    final inactiveCount = users.where((user) => !user.isActive).length;
+
+    final today = DateTime.now();
+    final summaryAsync = ref.watch(
+      adminAttendanceSummaryProvider(
+        DateTime(today.year, today.month, today.day),
+      ),
+    );
+    final presentCount = summaryAsync.when(
+      data: (s) => (s['present'] ?? 0) + (s['late'] ?? 0),
+      loading: () => null,
+      error: (_, __) => 0,
+    );
 
     return Row(
       children: [
@@ -250,7 +262,7 @@ class _StatRow extends ConsumerWidget {
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: StaffStatCard(
-            value: usersState.isLoading ? '...' : '$activeCount',
+            value: summaryAsync.isLoading ? '...' : '${presentCount ?? 0}',
             label: 'Present',
             valueColor: AppColors.primary,
             icon: Icons.check_circle_outline,

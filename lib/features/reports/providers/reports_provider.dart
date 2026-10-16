@@ -104,3 +104,18 @@ final excelSyncCheckpointsProvider =
   return service.fetchSyncCheckpoints();
 });
 
+/// Async provider for the authoritative active Excel workbook version (Sprint 9.4).
+final activeExcelSyncVersionProvider =
+    FutureProvider.autoDispose<ExcelSyncVersionModel?>((ref) async {
+  final service = ref.watch(excelHistoricalExportServiceProvider);
+  return service.fetchActiveVersion();
+});
+
+/// Async provider for pending mutation events in the change-capture outbox (Sprint 9.4).
+final excelPendingOutboxCountProvider =
+    FutureProvider.autoDispose<int>((ref) async {
+  final service = ref.watch(excelHistoricalExportServiceProvider);
+  return service.fetchPendingOutboxCount();
+});
+
+

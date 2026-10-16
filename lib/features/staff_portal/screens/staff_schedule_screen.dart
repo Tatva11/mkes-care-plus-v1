@@ -7,6 +7,9 @@ import '../../../core/theme/app_typography.dart';
 import '../../appointments/models/appointment_model.dart';
 import '../../appointments/providers/appointment_provider.dart';
 import '../../appointments/widgets/appointment_form_dialog.dart';
+import '../../billing/models/billing_invoice_model.dart';
+import '../../billing/screens/create_invoice_screen.dart';
+import '../../patients/models/patient_model.dart';
 
 class StaffScheduleScreen extends ConsumerStatefulWidget {
   const StaffScheduleScreen({super.key});
@@ -17,8 +20,32 @@ class StaffScheduleScreen extends ConsumerStatefulWidget {
 }
 
 class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
-  void _handleStatusChange(AppointmentModel appointment, String newStatus) {
-    ref
+  Future<void> _handleStatusChange(
+      AppointmentModel appointment, String newStatus) async {
+    if (newStatus.toLowerCase() == 'completed') {
+      if (!appointment.isPresent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Cannot complete visit: Patient must be marked present first.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+      if (!appointment.isBilled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Cannot complete visit: Please create a Billing invoice or confirm as a No-Charge visit first.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    }
+
+    await ref
         .read(appointmentsNotifierProvider.notifier)
         .updateStatus(appointment.id, newStatus);
 
@@ -26,6 +53,142 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
         newStatus.toLowerCase() == 'cancelled') {
       _promptScheduleNextAppointment(appointment, newStatus);
     }
+  }
+
+  Future<void> _handleMarkPresent(AppointmentModel appointment) async {
+    if (appointment.isPresent) return;
+
+    await ref
+        .read(appointmentsNotifierProvider.notifier)
+        .updateStatus(appointment.id, 'waiting');
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '${appointment.patientName ?? "Patient"} marked present. Ready for Billing.'),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleOpenBilling(AppointmentModel appointment) async {
+    final patient = appointment.patient ??
+        (appointment.patientId != null
+            ? PatientModel(
+                id: appointment.patientId!,
+                patientNumber: appointment.patientNumber ?? '',
+                name: appointment.patientName ?? 'Patient',
+                department: appointment.department,
+                createdAt: appointment.createdAt,
+                updatedAt: appointment.updatedAt,
+              )
+            : null);
+
+    final createdInvoice =
+        await Navigator.of(context).push<BillingInvoiceModel>(
+      MaterialPageRoute(
+        builder: (_) => CreateInvoiceScreen(
+          initialPatient: patient,
+          initialDepartment: appointment.department,
+        ),
+      ),
+    );
+
+    if (createdInvoice != null && mounted) {
+      final currentNotes = appointment.notes ?? '';
+      final tag = '[BILLED: ${createdInvoice.invoiceNumber}]';
+      final updatedNotes =
+          currentNotes.isEmpty ? tag : '$currentNotes | $tag';
+
+      await ref.read(appointmentsNotifierProvider.notifier).updateAppointment(
+        appointment.id,
+        {'notes': updatedNotes},
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Invoice ${createdInvoice.invoiceNumber} recorded for ${appointment.patientName ?? "Patient"}. Visit can now be completed.'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleMarkNoCharge(AppointmentModel appointment) async {
+    final reasonController =
+        TextEditingController(text: 'Routine Consultation / Follow-up');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm No-Charge Visit'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Confirm that no billing charge is required for ${appointment.patientName ?? "Patient"}:',
+              style: AppTypography.bodySm,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason for No-Charge',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm No-Charge'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final reason = reasonController.text.trim();
+      final currentNotes = appointment.notes ?? '';
+      final tag =
+          '[NO_CHARGE: ${reason.isEmpty ? "No-Charge Visit" : reason}]';
+      final updatedNotes =
+          currentNotes.isEmpty ? tag : '$currentNotes | $tag';
+
+      await ref.read(appointmentsNotifierProvider.notifier).updateAppointment(
+        appointment.id,
+        {'notes': updatedNotes},
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Marked as no-charge visit for ${appointment.patientName ?? "Patient"}. Visit can now be completed.'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    }
+  }
+
+  void _handleReschedule(AppointmentModel appointment) {
+    showDialog(
+      context: context,
+      builder: (_) => AppointmentFormDialog(
+        existingAppointment: appointment,
+      ),
+    );
   }
 
   void _openNewAppointmentDialog({
@@ -640,18 +803,51 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: item.statusColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          item.statusLabel,
-                          style: AppTypography.labelCaps
-                              .copyWith(color: item.statusColor),
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: item.statusColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              item.statusLabel,
+                              style: AppTypography.labelCaps
+                                  .copyWith(color: item.statusColor),
+                            ),
+                          ),
+                          if (item.isBilled) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade300),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.receipt_outlined,
+                                      size: 10, color: Colors.green.shade800),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    item.billingReference ?? 'Billed',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -659,16 +855,19 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                   const Divider(height: 1),
                   const SizedBox(height: AppSpacing.xs),
 
-                  // Actions Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // Actions Row - Patient Visit Workflow: Mark Present -> Billing -> Mark Completed
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (item.isVisitingDoctor)
                         OutlinedButton.icon(
                           onPressed: () => _showWhatsAppReminderModal(item),
                           icon: const Icon(Icons.message,
                               size: 14, color: Color(0xFF128C7E)),
-                          label: const Text('WhatsApp Reminder (Auto Context)'),
+                          label: const Text('WhatsApp Reminder'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF128C7E),
                             side: const BorderSide(color: Color(0xFF25D366)),
@@ -680,37 +879,168 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                         )
                       else
                         Text(
-                          'Actions:',
+                          'Visit Flow:',
                           style: AppTypography.labelCaps
                               .copyWith(color: AppColors.outline),
                         ),
-                      Row(
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          if (item.status.toLowerCase() != 'completed')
-                            TextButton.icon(
-                              onPressed: () =>
-                                  _handleStatusChange(item, 'completed'),
-                              icon: const Icon(Icons.check_circle,
-                                  size: 16, color: AppColors.primaryContainer),
-                              label: const Text('Mark Completed'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.primaryContainer,
+                          // STEP 1: Mark Present
+                          if (!item.isPresent &&
+                              item.status.toLowerCase() != 'completed' &&
+                              item.status.toLowerCase() != 'cancelled')
+                            FilledButton.tonalIcon(
+                              onPressed: () => _handleMarkPresent(item),
+                              icon: const Icon(Icons.person_pin_circle_outlined,
+                                  size: 14),
+                              label: const Text('Mark Present'),
+                              style: FilledButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
                             ),
-                          if (item.status.toLowerCase() != 'cancelled') ...[
-                            const SizedBox(width: 4),
+
+                          // STEP 2: Billing (Revealed after marked present)
+                          if (item.isPresent &&
+                              item.status.toLowerCase() != 'completed' &&
+                              item.status.toLowerCase() != 'cancelled') ...[
+                            if (!item.isBilled) ...[
+                              FilledButton.icon(
+                                onPressed: () => _handleOpenBilling(item),
+                                icon: const Icon(Icons.receipt_long_outlined,
+                                    size: 14),
+                                label: const Text('Bill Patient'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                              OutlinedButton(
+                                onPressed: () => _handleMarkNoCharge(item),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('No-Charge Visit'),
+                              ),
+                            ] else ...[
+                              OutlinedButton.icon(
+                                onPressed: () => _handleOpenBilling(item),
+                                icon: const Icon(Icons.check_circle,
+                                    size: 14, color: Colors.green),
+                                label: Text(
+                                  'Billed (${item.billingReference ?? "Recorded"})',
+                                  style: TextStyle(
+                                      color: Colors.green.shade800,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side:
+                                      BorderSide(color: Colors.green.shade400),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                            ],
+                          ],
+
+                          // STEP 3: Mark as Completed
+                          if (item.status.toLowerCase() != 'completed' &&
+                              item.status.toLowerCase() != 'cancelled')
+                            TextButton.icon(
+                              onPressed: (item.isPresent && item.isBilled)
+                                  ? () => _handleStatusChange(item, 'completed')
+                                  : () {
+                                      final missingStep = !item.isPresent
+                                          ? 'Mark patient present first'
+                                          : 'Create an invoice or confirm no-charge first';
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              'Cannot complete visit: $missingStep.'),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                    },
+                              icon: Icon(
+                                Icons.check_circle,
+                                size: 14,
+                                color: (item.isPresent && item.isBilled)
+                                    ? AppColors.primaryContainer
+                                    : AppColors.outlineVariant,
+                              ),
+                              label: Text(
+                                'Mark Completed',
+                                style: TextStyle(
+                                  color: (item.isPresent && item.isBilled)
+                                      ? AppColors.primaryContainer
+                                      : AppColors.outline,
+                                  fontWeight: (item.isPresent && item.isBilled)
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+
+                          // Reschedule & Cancel
+                          if (item.status.toLowerCase() != 'completed' &&
+                              item.status.toLowerCase() != 'cancelled') ...[
+                            TextButton.icon(
+                              onPressed: () => _handleReschedule(item),
+                              icon: const Icon(Icons.edit_calendar, size: 14),
+                              label: const Text('Reschedule'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.onSurfaceVariant,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
                             TextButton.icon(
                               onPressed: () =>
                                   _handleStatusChange(item, 'cancelled'),
                               icon: const Icon(Icons.cancel,
-                                  size: 16, color: AppColors.error),
+                                  size: 14, color: AppColors.error),
                               label: const Text('Cancel'),
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.error,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ],
+                          if (item.status.toLowerCase() == 'missed') ...[
+                            FilledButton.tonalIcon(
+                              onPressed: () => _handleReschedule(item),
+                              icon: const Icon(Icons.replay, size: 14),
+                              label: const Text('Reschedule Missed'),
+                              style: FilledButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
                                 minimumSize: Size.zero,

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../admin/providers/users_provider.dart';
+import '../providers/attendance_provider.dart';
 import 'staff_member_tile.dart';
 
 class StaffRosterCard extends ConsumerStatefulWidget {
@@ -265,11 +266,23 @@ class _StaffRosterCardState extends ConsumerState<StaffRosterCard> {
                   );
                 }
 
+                final today = DateTime.now();
+                final attendanceAsync = ref.watch(
+                  adminAttendanceForDateProvider(
+                    DateTime(today.year, today.month, today.day),
+                  ),
+                );
+                final attendanceMap = {
+                  for (final rec in (attendanceAsync.valueOrNull ?? const []))
+                    rec.staffId: rec,
+                };
+
                 return Column(
                   children: [
                     for (var i = 0; i < staff.length; i++)
                       StaffMemberTile(
                         user: staff[i],
+                        todayAttendance: attendanceMap[staff[i].id],
                         showDivider: i < staff.length - 1,
                       ),
                   ],

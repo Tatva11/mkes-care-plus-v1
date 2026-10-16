@@ -61,8 +61,10 @@ class EyeSurgeryModel {
     'pre_op',
     'in_surgery',
     'post_op',
+    'billing',
     'discharged',
     'cancelled',
+    'missed',
   ];
 
   static const checklistItems = <String, String>{
@@ -80,7 +82,8 @@ class EyeSurgeryModel {
     'scheduled': 'pre_op',
     'pre_op': 'in_surgery',
     'in_surgery': 'post_op',
-    'post_op': 'discharged',
+    'post_op': 'billing',
+    'billing': 'discharged',
   };
 
   static bool isValidStatus(String status) => statuses.contains(status);
@@ -93,6 +96,13 @@ class EyeSurgeryModel {
   bool get isPreOpChecklistComplete => checklistItems.keys.every(
         (key) => preOpChecklist[key] == true,
       );
+
+  /// Whether the surgery has reached the Billing stage or Discharged stage,
+  /// making Billing & Insurance accessible.
+  bool get canAccessBilling => status == 'billing' || status == 'discharged';
+
+  /// Whether the surgery is in final discharged status.
+  bool get isDischarged => status == 'discharged';
 
   bool isMissedAt([DateTime? referenceTime]) {
     if (status != 'scheduled' && status != 'pre_op' && status != 'missed') {
@@ -209,8 +219,9 @@ class EyeSurgeryModel {
   static bool canTransition(String from, String to) {
     if (!isValidStatus(from) || !isValidStatus(to) || from == to) return false;
     if (_nextStatus[from] == to) return true;
+    if (from == 'post_op' && to == 'discharged') return true;
     return to == 'cancelled' &&
-        const {'scheduled', 'pre_op', 'in_surgery', 'post_op'}.contains(from);
+        const {'scheduled', 'pre_op', 'in_surgery', 'post_op', 'billing'}.contains(from);
   }
 
   static String? validateStatusTransition({

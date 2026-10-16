@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../staff/providers/attendance_provider.dart';
 
-class StaffAttendanceCard extends StatelessWidget {
+class StaffAttendanceCard extends ConsumerWidget {
   const StaffAttendanceCard({super.key});
 
   static const _errorContainer = Color(0xFFFFDAD6);
   static const _secondaryFixed = Color(0xFFFFD8EB);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
@@ -82,26 +84,44 @@ class StaffAttendanceCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatTile(
-                    value: '42',
-                    label: 'Present',
-                    valueColor: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _StatTile(
-                    value: '3',
-                    label: 'On Leave',
-                    valueColor: AppColors.secondary,
-                    backgroundColor: _errorContainer.withValues(alpha: 0.2),
-                    borderColor: _errorContainer,
-                  ),
-                ),
-              ],
+            Builder(
+              builder: (context) {
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+                final summaryAsync = ref.watch(adminAttendanceSummaryProvider(today));
+                final presentCount = summaryAsync.when(
+                  data: (s) => '${(s['present'] ?? 0) + (s['late'] ?? 0)}',
+                  loading: () => '...',
+                  error: (_, __) => '0',
+                );
+                final leaveCount = summaryAsync.when(
+                  data: (s) => '${s['leave'] ?? 0}',
+                  loading: () => '...',
+                  error: (_, __) => '0',
+                );
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _StatTile(
+                        value: presentCount,
+                        label: 'Present',
+                        valueColor: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: _StatTile(
+                        value: leaveCount,
+                        label: 'On Leave',
+                        valueColor: AppColors.secondary,
+                        backgroundColor: _errorContainer.withValues(alpha: 0.2),
+                        borderColor: _errorContainer,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.md),
             _TableHeader(),

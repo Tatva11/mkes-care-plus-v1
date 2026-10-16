@@ -47,7 +47,12 @@ export class MasterWorkbookBuilder {
   private workbook: ExcelJS.Workbook;
 
   constructor(clinicName = "MKES CARE+ Clinical Management Platform") {
-    this.workbook = new ExcelJS.Workbook();
+    const WorkbookConstructor =
+      (ExcelJS as any)?.Workbook ||
+      (ExcelJS as any)?.default?.Workbook ||
+      (ExcelJS as any)?.default ||
+      (ExcelJS as any);
+    this.workbook = new WorkbookConstructor();
     this.workbook.creator = clinicName;
     this.workbook.lastModifiedBy = "MKES CARE+ Automated Synchronizer";
     this.workbook.created = new Date();
@@ -63,6 +68,17 @@ export class MasterWorkbookBuilder {
       this.createWorksheet(sheetDef, options);
     }
     return this.workbook;
+  }
+
+  /**
+   * Initializes a single worksheet for individual sheet download.
+   */
+  public initializeWorksheet(sheetName: string, options: WorkbookBuildOptions = {}): ExcelJS.Worksheet {
+    const sheetDef = MASTER_WORKSHEETS.find((w) => w.name === sheetName);
+    if (!sheetDef) {
+      throw new Error(`Worksheet definition not found for name: ${sheetName}`);
+    }
+    return this.createWorksheet(sheetDef, options);
   }
 
   /**

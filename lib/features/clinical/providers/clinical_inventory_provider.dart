@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../inventory/providers/inventory_provider.dart';
+import '../../inventory/providers/department_inventory_provider.dart';
 import '../models/clinical_inventory_usage_model.dart';
 import '../repositories/clinical_inventory_repository.dart';
 
@@ -41,6 +42,8 @@ class ClinicalInventoryController extends AsyncNotifier<void> {
     required String inventoryId,
     required double quantity,
     String? remarks,
+    String? departmentId,
+    String? idempotencyKey,
   }) async {
     state = const AsyncLoading();
     try {
@@ -52,6 +55,8 @@ class ClinicalInventoryController extends AsyncNotifier<void> {
         inventoryId: inventoryId,
         quantity: quantity,
         remarks: remarks,
+        departmentId: departmentId,
+        idempotencyKey: idempotencyKey,
       );
 
       // Invalidate record-specific and patient-wide usage providers
@@ -60,6 +65,10 @@ class ClinicalInventoryController extends AsyncNotifier<void> {
         recordId: recordId,
       )));
       ref.invalidate(clinicalInventoryUsageForPatientProvider(patientId));
+
+      // Invalidate department inventory items so allocation views update
+      ref.invalidate(departmentInventoryItemsProvider);
+      ref.invalidate(stockRequestsListProvider);
 
       // Refresh global inventory provider so stock counts update everywhere
       try {

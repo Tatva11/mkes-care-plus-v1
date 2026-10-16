@@ -52,6 +52,48 @@ class AppointmentFormDialog extends ConsumerStatefulWidget {
     return raw.trim();
   }
 
+  static TimeOfDay calculateSuggestedTime({
+    required DateTime selectedDate,
+    DateTime? currentTime,
+    int intervalMinutes = 15,
+    int openingHour = 9,
+    int closingHour = 20,
+  }) {
+    final now = currentTime ?? DateTime.now();
+    final isToday = selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day;
+
+    if (!isToday) {
+      return TimeOfDay(hour: openingHour, minute: 0);
+    }
+
+    if (now.hour < openingHour) {
+      return TimeOfDay(hour: openingHour, minute: 0);
+    }
+
+    int minute = ((now.minute / intervalMinutes).ceil()) * intervalMinutes;
+    int hour = now.hour;
+    if (minute >= 60) {
+      hour += 1;
+      minute = 0;
+    }
+
+    if (hour >= closingHour) {
+      return TimeOfDay(hour: openingHour, minute: 0);
+    }
+
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  static bool hasValidSlotsRemainingToday({
+    DateTime? currentTime,
+    int closingHour = 20,
+  }) {
+    final now = currentTime ?? DateTime.now();
+    return now.hour < closingHour;
+  }
+
   @override
   ConsumerState<AppointmentFormDialog> createState() =>
       _AppointmentFormDialogState();
@@ -115,6 +157,9 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       _selectedPatientId = widget.initialPatientId;
       _selectedPatientName = widget.initialPatientName;
       _notesController = TextEditingController();
+      _selectedTime = AppointmentFormDialog.calculateSuggestedTime(
+        selectedDate: _selectedDate,
+      );
     }
   }
 
@@ -250,6 +295,31 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final now = DateTime.now();
+    final isToday = _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+    if (isToday) {
+      final slotDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _selectedTime.hour,
+        _selectedTime.minute,
+      );
+      if (slotDateTime.isBefore(now.subtract(const Duration(minutes: 1)))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Cannot book an appointment in the past. Please select an upcoming valid time slot.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     try {
       if (widget.isEditing && widget.existingAppointment != null) {
@@ -701,6 +771,37 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                       const SizedBox(height: AppSpacing.md),
 
                       // 5. Date & Time Selection
+                      if (_selectedDate.year == DateTime.now().year &&
+                          _selectedDate.month == DateTime.now().month &&
+                          _selectedDate.day == DateTime.now().day &&
+                          !AppointmentFormDialog.hasValidSlotsRemainingToday()) ...[
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.errorContainer,
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusSm),
+                            border: Border.all(color: AppColors.error),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline,
+                                  color: AppColors.onErrorContainer, size: 18),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  'Clinic hours have ended for today. Please select another date for this booking.',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.onErrorContainer,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
                       Row(
                         children: [
                           Expanded(
@@ -715,7 +816,13 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                                       .add(const Duration(days: 365)),
                                 );
                                 if (picked != null) {
-                                  setState(() => _selectedDate = picked);
+                                  setState(() {
+                                    _selectedDate = picked;
+                                    _selectedTime = AppointmentFormDialog
+                                        .calculateSuggestedTime(
+                                      selectedDate: picked,
+                                    );
+                                  });
                                 }
                               },
                               child: InputDecorator(

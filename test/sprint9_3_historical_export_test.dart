@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mkes_care/features/reports/models/excel_sync_state_model.dart';
@@ -351,6 +353,289 @@ void main() {
       for (int i = 1; i <= 21; i++) {
         expect(text, contains('xl/worksheets/sheet$i.xml'));
       }
+    });
+
+    test('HistoricalExportValidationReport validates a complete 21-sheet export package', () {
+      final dummyData = <String, List<Map<String, dynamic>>>{};
+      for (final sheet in ExcelWorkbookSchema.worksheets) {
+        dummyData[sheet.name] = [
+          {sheet.stableIdKey: 'rec-1', sheet.timestampKey: '2026-10-14T10:00:00Z', 'name': 'Item 1'}
+        ];
+      }
+
+      final service = ExcelHistoricalExportService();
+      final output = service.generateLocalHistoricalWorkbook(recordsByWorksheet: dummyData);
+
+      final report = ExcelHistoricalExportService.validateExportIntegrity(
+        result: output.result,
+        bytes: output.bytes,
+      );
+
+      expect(report.isValid, isTrue);
+      expect(report.errors, isEmpty);
+      expect(report.totalRecords, equals(21));
+      expect(report.worksheetCount, equals(21));
+      expect(report.hasValidZipHeader, isTrue);
+      expect(report.hasAll21Worksheets, isTrue);
+      expect(report.hasAllOpenXmlParts, isTrue);
+    });
+
+    test('HistoricalExportValidationReport flags corrupted zip header and count mismatches', () {
+      // 1. Corrupted zip magic header
+      final badZipResult = const HistoricalExportResultModel(
+        success: true,
+        syncId: 'sync-bad-zip',
+        totalRecords: 0,
+        fileSizeBytes: 10,
+        storagePath: 'clinic-excel-sync/MKES_CARE_Plus_Master.xlsx',
+        durationMs: 10,
+        worksheetSummaries: [],
+      );
+
+      final badReport = ExcelHistoricalExportService.validateExportIntegrity(
+        result: badZipResult,
+        bytes: Uint8List.fromList([0x00, 0x00, 0x00, 0x00]),
+      );
+
+      expect(badReport.isValid, isFalse);
+      expect(badReport.hasValidZipHeader, isFalse);
+      expect(badReport.errors, anyElement(contains('PK zip magic header')));
+      expect(badReport.errors, anyElement(contains('Expected 21 worksheet summaries')));
+
+      // 2. Summary count reconciliation mismatch
+      final mismatchedSummaries = List.generate(
+        21,
+        (i) => WorksheetExportSummaryModel(
+          worksheetName: ExcelWorkbookSchema.worksheets[i].name,
+          sourceTable: ExcelWorkbookSchema.worksheets[i].sourceTable,
+          recordCount: 5, // 21 * 5 = 105
+          highWaterMark: '2026-10-14T00:00:00Z',
+          status: 'success',
+        ),
+      );
+
+      final countMismatchResult = HistoricalExportResultModel(
+        success: true,
+        syncId: 'sync-count-mismatch',
+        totalRecords: 999, // Mismatched (expected 105)
+        fileSizeBytes: 5000,
+        storagePath: 'clinic-excel-sync/MKES_CARE_Plus_Master.xlsx',
+        durationMs: 50,
+        worksheetSummaries: mismatchedSummaries,
+      );
+
+      final dummyBytes = builder.buildWorkbook();
+      final mismatchReport = ExcelHistoricalExportService.validateExportIntegrity(
+        result: countMismatchResult,
+        bytes: dummyBytes,
+      );
+
+      expect(mismatchReport.isValid, isFalse);
+      expect(mismatchReport.errors, anyElement(contains('Total records mismatch')));
+    });
+
+    test('Relational joins and null foreign keys format cleanly with fallback -', () {
+      final recordsWithJoinsAndNulls = <String, List<Map<String, dynamic>>>{
+        'Appointments': [
+          // Row 1: Valid joined patient and doctor objects
+          {
+            'id': 'app-001',
+            'department': 'eye',
+            'appointment_date': '2026-10-14',
+            'appointment_time': '10:00',
+            'appointment_type': 'regular',
+            'status': 'scheduled',
+            'ai_booked': true,
+            'patients': {'patient_number': 'PAT-0099', 'name': 'Anita Desai'},
+            'doctor': {'full_name': 'Dr. Rajiv Menon'},
+            'created_at': '2026-10-14T08:00:00Z',
+            'updated_at': '2026-10-14T08:00:00Z',
+          },
+          // Row 2: Null joined patient and doctor (walk-in or unassigned doctor)
+          {
+            'id': 'app-002',
+            'department': 'dental',
+            'appointment_date': '2026-10-14',
+            'appointment_time': '11:00',
+            'appointment_type': 'walk_in',
+            'status': 'waiting',
+            'ai_booked': false,
+            'patients': null,
+            'doctor': null,
+            'created_at': '2026-10-14T08:30:00Z',
+            'updated_at': '2026-10-14T08:30:00Z',
+          },
+        ],
+      };
+
+      final bytes = builder.buildWorkbook(recordsByWorksheet: recordsWithJoinsAndNulls);
+      final text = String.fromCharCodes(bytes);
+
+      // Verify row 1 joined data present
+      expect(text, contains('PAT-0099'));
+      expect(text, contains('Anita Desai'));
+      expect(text, contains('Dr. Rajiv Menon'));
+
+      // Verify row 2 nulls rendered safely without crash
+      expect(text, contains('app-002'));
+    });
+
+    test('PostgreSQL database column aliases resolve accurately for Department_Stock, Stock_Requests, and Billing', () {
+      final rawDbRecords = <String, List<Map<String, dynamic>>>{
+        'Department_Stock': [
+          {
+            'id': 'dept-stock-1',
+            'department_id': 'd-1',
+            'departments': {'name': 'Ophthalmology'},
+            'inventory': {'name': 'IOL Lens Model A', 'sku': 'IOL-A1', 'unit': 'pieces'},
+            'quantity': 45.0, // DB column: quantity -> maps to Current Stock
+            'minimum_stock': 10.0,
+            'updated_at': '2026-10-14T10:00:00Z',
+          },
+        ],
+        'Stock_Requests': [
+          {
+            'id': 'sr-001',
+            'request_number': 'REQ-2026-001',
+            'department_id': 'd-1',
+            'departments': {'name': 'Dental Clinic'},
+            'requester': {'full_name': 'Nurse Meena'},
+            'status': 'pending',
+            'request_notes': 'Urgent requirement for disposable syringes', // DB column: request_notes -> Notes
+            'created_at': '2026-10-14T09:00:00Z',
+            'updated_at': '2026-10-14T09:00:00Z',
+          },
+        ],
+        'Billing_Invoices': [
+          {
+            'id': 'inv-001',
+            'invoice_number': '1/26-27',
+            'patient_id': 'p-1',
+            'department': 'eye',
+            'subtotal': 5000.0,
+            'discount': 500.0,
+            'total_amount': 4500.0,
+            'amount_paid': 2000.0, // DB column: amount_paid -> Paid Amount; Balance = 2500.0
+            'payment_status': 'partially_paid', // DB column: payment_status -> Status
+            'payment_mode': 'upi', // DB column: payment_mode -> Payment Mode
+            'notes': 'Consultation & drops',
+            'created_at': '2026-10-14T11:00:00Z',
+            'updated_at': '2026-10-14T11:00:00Z',
+            'patients': {'name': 'Kavita Roy', 'patient_number': 'P-501'},
+            'profiles': {'full_name': 'Cashier Suresh'},
+          },
+        ],
+        'Billing_Line_Items': [
+          {
+            'id': 'item-001',
+            'billing_id': 'inv-001',
+            'service_name': 'Slit Lamp Examination', // DB column: service_name -> Item / Service Name
+            'quantity': 1,
+            'unit_price': 500.0,
+            'total_amount': 500.0, // DB column: total_amount -> Total Amount
+            'is_custom': false,
+            'billing': {'invoice_number': '1/26-27'},
+            'created_at': '2026-10-14T11:00:00Z',
+          },
+        ],
+        'Billing_Payments': [
+          {
+            'id': 'pay-001',
+            'billing_id': 'inv-001',
+            'amount': 2000.0,
+            'payment_mode': 'upi', // DB column: payment_mode -> Payment Method
+            'payment_reference': 'UPI-REF-998877', // DB column: payment_reference -> Transaction Ref
+            'paid_at': '2026-10-14T11:05:00Z', // DB column: paid_at -> Payment Date
+            'notes': 'First payment',
+            'created_at': '2026-10-14T11:05:00Z',
+            'billing': {'invoice_number': '1/26-27'},
+            'profiles': {'full_name': 'Cashier Suresh'},
+          },
+        ],
+      };
+
+      final bytes = builder.buildWorkbook(recordsByWorksheet: rawDbRecords);
+      final text = String.fromCharCodes(bytes);
+
+      // Dept stock validations
+      expect(text, contains('Ophthalmology'));
+      expect(text, contains('IOL Lens Model A'));
+      expect(text, contains('IOL-A1'));
+      expect(text, contains('<v>45.0</v>'));
+
+      // Stock requests validations
+      expect(text, contains('REQ-2026-001'));
+      expect(text, contains('Dental Clinic'));
+      expect(text, contains('Nurse Meena'));
+      expect(text, contains('Urgent requirement for disposable syringes'));
+
+      // Billing invoice validations
+      expect(text, contains('1/26-27'));
+      expect(text, contains('Kavita Roy'));
+      expect(text, contains('P-501'));
+      expect(text, contains('<v>5000.0</v>'));
+      expect(text, contains('<v>4500.0</v>'));
+      expect(text, contains('<v>2000.0</v>')); // amount_paid
+      expect(text, contains('<v>2500.0</v>')); // calculated balance
+      expect(text, contains('PARTIALLY_PAID'));
+
+      // Billing line items validations
+      expect(text, contains('Slit Lamp Examination'));
+
+      // Billing payments validations
+      expect(text, contains('UPI-REF-998877'));
+    });
+
+    test('High-water mark timestamp tracks maximum timestamp across unordered records', () {
+      final unorderedPatients = [
+        {'id': 'p-1', 'updated_at': '2026-10-10T12:00:00Z', 'patient_number': 'P-1'},
+        {'id': 'p-2', 'updated_at': '2026-10-14T18:00:00Z', 'patient_number': 'P-2'}, // Max
+        {'id': 'p-3', 'updated_at': '2026-10-12T09:00:00Z', 'patient_number': 'P-3'},
+      ];
+
+      final service = ExcelHistoricalExportService();
+      final output = service.generateLocalHistoricalWorkbook(
+        recordsByWorksheet: {'Patients': unorderedPatients},
+      );
+
+      final patientSummary = output.result.worksheetSummaries
+          .firstWhere((s) => s.worksheetName == 'Patients');
+
+      expect(patientSummary.highWaterMark, equals('2026-10-14T18:00:00Z'));
+      expect(patientSummary.recordCount, equals(3));
+    });
+
+    test('Partial export failure reporting preserves completed worksheets and error detail', () {
+      final partialFailureJson = {
+        'success': false,
+        'syncId': 'sync-partial-456',
+        'error': 'Worksheet [Dental_Lab_Cases] query failed on table [dental_lab]: connection timeout',
+        'worksheetsCompleted': [
+          'Patients',
+          'Staff_Directory',
+          'Staff_Attendance',
+          'Leave_Requests',
+          'Tasks',
+          'Task_History',
+          'Appointments',
+          'Inventory_Catalog',
+          'Inventory_Batches',
+          'Stock_Transactions',
+          'Department_Stock',
+          'Stock_Requests',
+          'Vendors',
+          'Purchase_Orders',
+          'Purchase_Order_Items',
+          'Optical_Sales',
+          'Optical_Orders',
+        ],
+      };
+
+      final failedResult = HistoricalExportResultModel.fromJson(partialFailureJson);
+      expect(failedResult.success, isFalse);
+      expect(failedResult.syncId, equals('sync-partial-456'));
+      expect(failedResult.errorMessage, contains('Dental_Lab_Cases'));
+      expect(failedResult.errorMessage, contains('connection timeout'));
     });
   });
 }

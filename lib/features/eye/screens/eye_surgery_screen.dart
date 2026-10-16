@@ -15,6 +15,8 @@ import '../providers/eye_surgery_provider.dart';
 import '../widgets/eye_surgery_form_dialog.dart';
 import '../widgets/eye_surgery_item_dialogs.dart';
 import '../widgets/assign_eye_surgery_staff_dialog.dart';
+import '../widgets/eye_surgery_detail_dialog.dart';
+import '../widgets/eye_surgery_discharge_dialog.dart';
 
 class EyeSurgeryScreen extends ConsumerStatefulWidget {
   const EyeSurgeryScreen({super.key});
@@ -33,6 +35,7 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
     'pre_op',
     'in_surgery',
     'post_op',
+    'billing',
     'discharged',
     'cancelled',
     'missed',
@@ -50,6 +53,20 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
     if (saved == true) {
       ref.invalidate(eyeSurgeriesForPatientProvider(surgery.patientId));
     }
+  }
+
+  Future<void> _showDetails(
+    BuildContext context,
+    EyeSurgeryModel surgery, [
+    int initialTab = 0,
+  ]) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => EyeSurgeryDetailDialog(
+        surgery: surgery,
+        initialTabIndex: initialTab,
+      ),
+    );
   }
 
   Future<void> _changeStatus(
@@ -83,9 +100,21 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
       await _showChecklist(context, ref, surgery, highlightIncomplete: true);
       return;
     }
+    if (nextStatus == 'discharged') {
+      final discharged = await showDialog<bool>(
+        context: context,
+        builder: (_) => EyeSurgeryDischargeDialog(surgery: surgery),
+      );
+      if (discharged == true && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Surgery marked as Discharged.')),
+        );
+      }
+      return;
+    }
     final remarksController =
         TextEditingController(text: surgery.remarks ?? '');
-    final needsRemarks = nextStatus == 'post_op' || nextStatus == 'discharged';
+    final needsRemarks = nextStatus == 'post_op';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -708,6 +737,10 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
                                           surgery.id == selectedSurgery.id,
                                       onSelect: () => setState(() =>
                                           _selectedSurgeryId = surgery.id),
+                                      onDetails: () =>
+                                          _showDetails(context, surgery, 0),
+                                      onBilling: () =>
+                                          _showDetails(context, surgery, 1),
                                       onEdit: () =>
                                           _editSurgery(context, ref, surgery),
                                       onAssignStaff: () =>
@@ -770,6 +803,10 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
                             role: role,
                             isDesktop: false,
                             isSelected: false,
+                            onDetails: () =>
+                                _showDetails(context, surgery, 0),
+                            onBilling: () =>
+                                _showDetails(context, surgery, 1),
                             onEdit: () => _editSurgery(context, ref, surgery),
                             onAssignStaff: () =>
                                 showAssignEyeSurgeryStaffDialog(context, ref, surgery),
@@ -933,6 +970,8 @@ class _SurgeryCard extends StatelessWidget {
     this.isSelected = false,
     this.onSelect,
     required this.onEdit,
+    this.onDetails,
+    this.onBilling,
     required this.onAssignStaff,
     required this.onChecklist,
     required this.onItems,
@@ -949,6 +988,8 @@ class _SurgeryCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback? onSelect;
   final VoidCallback onEdit;
+  final VoidCallback? onDetails;
+  final VoidCallback? onBilling;
   final VoidCallback onAssignStaff;
   final VoidCallback onChecklist;
   final VoidCallback onItems;
@@ -1004,8 +1045,10 @@ class _SurgeryCard extends StatelessWidget {
                 PopupMenuButton<String>(
                   tooltip: 'Surgery actions',
                   onSelected: (action) {
+                    if (action == 'details') onDetails?.call();
+                    if (action == 'billing') onBilling?.call();
                     if (action == 'edit') onEdit();
-                    if (action == 'assign_staff') onAssignStaff();
+                    if (action == 'assign_staff' && isAdmin && !surgery.isDischarged) onAssignStaff();
                     if (action == 'checklist') onChecklist();
                     if (action == 'items' || action == 'customize_items') {
                       onItems();
@@ -1016,30 +1059,45 @@ class _SurgeryCard extends StatelessWidget {
                     if (action == 'reschedule') onReschedule();
                     if (action == 'delete' && onDelete != null) onDelete!();
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                        value: 'edit', child: Text('Edit surgery')),
-                    const PopupMenuItem(
-                        value: 'assign_staff', child: Text('Assign staff')),
-                    const PopupMenuItem(
-                        value: 'checklist', child: Text('Pre-op checklist')),
-                    const PopupMenuItem(
-                        value: 'items', child: Text('Customize items')),
+                  itemBuilder: (context) {
+                    // Critical UI requirement (Section 5): Discharged surgery exposes EXACTLY two actions
+                    if (surgery.isDischarged) {
+                      return const [
+                        PopupMenuItem(
+                          value: 'follow_up',
+                          child: Text('Schedule follow-up appointment'),
+                        ),
+                        PopupMenuItem(
+                          value: 'billing',
+                          child: Text('Billing & Insurance'),
+                        ),
+                      ];
+                    }
+                    return [
+                      const PopupMenuItem(
+                          value: 'details', child: Text('Surgery details')),
+                      if (surgery.canAccessBilling)
+                        const PopupMenuItem(
+                            value: 'billing', child: Text('Billing & Insurance')),
+                      const PopupMenuItem(
+                          value: 'edit', child: Text('Edit surgery')),
+                      if (isAdmin && !surgery.isDischarged)
+                        const PopupMenuItem(
+                            value: 'assign_staff', child: Text('Assign staff')),
+                      const PopupMenuItem(
+                          value: 'checklist', child: Text('Pre-op checklist')),
+                      const PopupMenuItem(
+                          value: 'items', child: Text('Customize items')),
                       if (next != null)
                         PopupMenuItem(
                             value: 'advance',
                             child: Text('Advance to ${_label(next)}')),
-                      if (surgery.status == 'discharged')
-                        const PopupMenuItem(
-                          value: 'follow_up',
-                          child: Text('Schedule follow-up appointment'),
-                        ),
                       if (surgery.isMissed)
                         const PopupMenuItem(
                           value: 'reschedule',
                           child: Text('Reschedule surgery'),
                         ),
-                      if (const {'scheduled', 'pre_op', 'in_surgery', 'post_op'}
+                      if (const {'scheduled', 'pre_op', 'in_surgery', 'post_op', 'billing'}
                           .contains(surgery.status))
                         const PopupMenuItem(
                             value: 'cancel', child: Text('Cancel surgery')),
@@ -1051,40 +1109,103 @@ class _SurgeryCard extends StatelessWidget {
                             style: TextStyle(color: AppColors.error),
                           ),
                         ),
-                    ],
-                    icon: const Icon(Icons.more_vert),
+                    ];
+                  },
+                  icon: const Icon(Icons.more_vert),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
+              child: Text(surgery.patientNumber ?? surgery.patientId,
+                  style: AppTypography.bodySm
+                      .copyWith(color: AppColors.onSurfaceVariant)),
+            ),
+            Text(surgery.displaySurgeryType,
+                style:
+                    AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.md,
+              runSpacing: AppSpacing.xs,
+              children: [
+                _InfoValue(
+                    icon: Icons.visibility_outlined,
+                    label: _label(surgery.eyeSide)),
+                _InfoValue(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Surgery $date'),
+                if (time != null)
+                  _InfoValue(icon: Icons.access_time_outlined, label: time),
+                _InfoValue(
+                    icon: Icons.person_outline,
+                    label: surgery.assignedStaffName ?? 'Staff unassigned'),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            // Action Buttons Area
+            if (surgery.isDischarged) ...[
+              // Section 5 requirement: Exactly Two Actions for Discharged Surgeries
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  if (surgery.followUpAppointmentId == null)
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      ),
+                      onPressed: onScheduleFollowUp,
+                      icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                      label: const Text(
+                        'Schedule Follow-up Appointment',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    )
+                  else
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        foregroundColor: Colors.green.shade800,
+                        side: BorderSide(color: Colors.green.shade600),
+                      ),
+                      onPressed: onScheduleFollowUp,
+                      icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+                      label: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Follow-up Scheduled',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            ' · Edit',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    ),
+                    onPressed: onBilling ?? onDetails,
+                    icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                    label: const Text(
+                      'Billing & Insurance',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 2, bottom: AppSpacing.sm),
-                child: Text(surgery.patientNumber ?? surgery.patientId,
-                    style: AppTypography.bodySm
-                        .copyWith(color: AppColors.onSurfaceVariant)),
-              ),
-              Text(surgery.displaySurgeryType,
-                  style:
-                      AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.md,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  _InfoValue(
-                      icon: Icons.visibility_outlined,
-                      label: _label(surgery.eyeSide)),
-                  _InfoValue(
-                      icon: Icons.calendar_today_outlined,
-                      label: 'Surgery $date'),
-                  if (time != null)
-                    _InfoValue(icon: Icons.access_time_outlined, label: time),
-                  _InfoValue(
-                      icon: Icons.person_outline,
-                      label: surgery.assignedStaffName ?? 'Staff unassigned'),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              // Action Buttons (Pre-op Checklist & Quick Assign Staff)
+            ] else ...[
+              // Active / Pre-discharge surgery workflow actions
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.xs,
@@ -1115,23 +1236,74 @@ class _SurgeryCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    ),
-                    onPressed: onAssignStaff,
-                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
-                    label: Text(
-                      surgery.assignedStaffName == null ? 'Assign Staff' : 'Reassign Staff',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                  if (surgery.canAccessBilling)
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      ),
+                      onPressed: onBilling ?? onDetails,
+                      icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                      label: const Text(
+                        'Billing & Insurance',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
+                  if (isAdmin && !surgery.isDischarged)
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      ),
+                      onPressed: onAssignStaff,
+                      icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                      label: Text(
+                        surgery.assignedStaffName == null ? 'Assign Staff' : 'Reassign Staff',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                 ],
               ),
+              // Stage Advance: Post-Op to Billing
+              if (surgery.status == 'post_op') ...[
+                const SizedBox(height: AppSpacing.xs),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: Colors.blue.shade50,
+                      foregroundColor: Colors.blue.shade900,
+                    ),
+                    onPressed: () => onAdvance('billing'),
+                    icon: const Icon(Icons.receipt_long, size: 16),
+                    label: const Text('Proceed to Billing'),
+                  ),
+                ),
+              ],
+              // Stage Advance: Billing to Discharged
+              if (surgery.status == 'billing') ...[
+                const SizedBox(height: AppSpacing.xs),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: Colors.amber.shade50,
+                      foregroundColor: Colors.amber.shade900,
+                    ),
+                    onPressed: () => onAdvance('discharged'),
+                    icon: const Icon(Icons.exit_to_app, size: 16),
+                    label: const Text('Discharge Patient (Review Billing & Insurance)'),
+                  ),
+                ),
+              ],
               // Missed Surgery handling
               if (surgery.isMissed) ...[
                 const SizedBox(height: AppSpacing.xs),
@@ -1149,73 +1321,29 @@ class _SurgeryCard extends StatelessWidget {
                   ),
                 ),
               ],
-              // Follow-up Appointment (ONLY when Discharged)
-              if (surgery.status == 'discharged') ...[
-                const SizedBox(height: AppSpacing.xs),
-                if (surgery.followUpAppointmentId == null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      onPressed: onScheduleFollowUp,
-                      icon: const Icon(Icons.calendar_month_outlined, size: 16),
-                      label: const Text('Schedule Follow-up Appointment'),
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.green.shade600),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
-                        const SizedBox(width: AppSpacing.xs),
-                        const Text(
-                          'Follow-up Scheduled',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        InkWell(
-                          onTap: onScheduleFollowUp,
-                          child: const Text('· Edit', style: TextStyle(fontSize: 12, color: AppColors.primary)),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-              if (surgery.iolDetails?.isNotEmpty == true ||
-                  surgery.remarks?.isNotEmpty == true) ...[
-                const SizedBox(height: AppSpacing.xs),
-                if (surgery.iolDetails?.isNotEmpty == true)
-                  Text('IOL: ${surgery.iolDetails}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.bodySm),
-                if (surgery.remarks?.isNotEmpty == true)
-                  Text('Remarks: ${surgery.remarks}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.bodySm),
-              ],
-              // On mobile / narrow screens, show inline expandable supplies preview
-              if (!isDesktop) ...[
-                const SizedBox(height: AppSpacing.xs),
-                _SurgeryCardSuppliesPreview(
-                  surgery: surgery,
-                  onCustomize: onItems,
-                ),
-              ],
+            ],
+            if (surgery.iolDetails?.isNotEmpty == true ||
+                surgery.remarks?.isNotEmpty == true) ...[
+              const SizedBox(height: AppSpacing.xs),
+              if (surgery.iolDetails?.isNotEmpty == true)
+                Text('IOL: ${surgery.iolDetails}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodySm),
+              if (surgery.remarks?.isNotEmpty == true)
+                Text('Remarks: ${surgery.remarks}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodySm),
+            ],
+            // On mobile / narrow screens, show inline expandable supplies preview (only before discharge)
+            if (!isDesktop && !surgery.isDischarged) ...[
+              const SizedBox(height: AppSpacing.xs),
+              _SurgeryCardSuppliesPreview(
+                surgery: surgery,
+                onCustomize: onItems,
+              ),
+            ],
             ],
           ),
         ),
@@ -1226,7 +1354,8 @@ class _SurgeryCard extends StatelessWidget {
         'scheduled': 'pre_op',
         'pre_op': 'in_surgery',
         'in_surgery': 'post_op',
-        'post_op': 'discharged',
+        'post_op': 'billing',
+        'billing': 'discharged',
       }[status];
 
   static String _label(String value) => value
@@ -1348,6 +1477,26 @@ class _StatusTag extends StatelessWidget {
           'MISSED',
           style: TextStyle(
             color: Colors.red.shade900,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      );
+    }
+    if (status == 'billing') {
+      return Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.amber.shade100,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          border: Border.all(color: Colors.amber.shade700),
+        ),
+        child: Text(
+          'BILLING',
+          style: TextStyle(
+            color: Colors.amber.shade900,
             fontSize: 10,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.5,
@@ -1790,17 +1939,18 @@ class _EyeSurgeryRightSidePanel extends ConsumerWidget {
                     ],
                   ),
                 ),
-                FilledButton.tonalIcon(
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                if (!surgery.isDischarged)
+                  FilledButton.tonalIcon(
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    ),
+                    onPressed: onCustomize,
+                    icon: const Icon(Icons.tune, size: 15),
+                    label:
+                        const Text('Customize', style: TextStyle(fontSize: 12)),
                   ),
-                  onPressed: onCustomize,
-                  icon: const Icon(Icons.tune, size: 15),
-                  label:
-                      const Text('Customize', style: TextStyle(fontSize: 12)),
-                ),
               ],
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -1856,18 +2006,22 @@ class _EyeSurgeryRightSidePanel extends ConsumerWidget {
                               fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
-                          'Click Customize to assign items from the surgical preset or catalog.',
-                          style: TextStyle(
+                        Text(
+                          surgery.isDischarged
+                              ? 'Surgery has been discharged.'
+                              : 'Click Customize to assign items from the surgical preset or catalog.',
+                          style: const TextStyle(
                               fontSize: 11, color: AppColors.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        OutlinedButton.icon(
-                          onPressed: onCustomize,
-                          icon: const Icon(Icons.add, size: 14),
-                          label: const Text('Add Surgery Items'),
-                        ),
+                        if (!surgery.isDischarged) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          OutlinedButton.icon(
+                            onPressed: onCustomize,
+                            icon: const Icon(Icons.add, size: 14),
+                            label: const Text('Add Surgery Items'),
+                          ),
+                        ],
                       ],
                     ),
                   );

@@ -4,33 +4,67 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 
+import '../models/attendance_record.dart';
 import '../../admin/models/user_profile.dart';
 import '../screens/staff_profile_detail_screen.dart';
 
-enum StaffStatus { present, onLeave, offDuty }
+enum StaffStatus { present, late, checkedOut, onLeave, absent, notCheckedIn, offDuty }
 
 class StaffMemberTile extends StatelessWidget {
   const StaffMemberTile({
     super.key,
     required this.user,
+    this.todayAttendance,
     this.showDivider = true,
   });
 
   final UserProfile user;
+  final AttendanceRecord? todayAttendance;
   final bool showDivider;
 
   static const _errorContainer = Color(0xFFFFDAD6);
   static const _secondaryFixed = Color(0xFFFFD8EB);
 
-  StaffStatus get _status =>
-      user.isActive ? StaffStatus.present : StaffStatus.offDuty;
+  StaffStatus get _status {
+    if (!user.isActive) {
+      return StaffStatus.offDuty;
+    }
+    final att = todayAttendance;
+    if (att == null) {
+      return StaffStatus.notCheckedIn;
+    }
+    final st = att.status.toLowerCase();
+    if (st == 'leave') {
+      return StaffStatus.onLeave;
+    }
+    if (st == 'absent') {
+      return StaffStatus.absent;
+    }
+    if (att.checkOutTime != null) {
+      return StaffStatus.checkedOut;
+    }
+    if (att.checkInTime != null) {
+      if (att.isLate || st == 'late') {
+        return StaffStatus.late;
+      }
+      return StaffStatus.present;
+    }
+    return StaffStatus.notCheckedIn;
+  }
 
   Color get _statusBg {
     switch (_status) {
       case StaffStatus.present:
         return AppColors.surfaceContainerLow;
+      case StaffStatus.late:
+        return _secondaryFixed.withValues(alpha: 0.35);
+      case StaffStatus.checkedOut:
+        return AppColors.surfaceContainerHigh;
       case StaffStatus.onLeave:
         return _errorContainer.withValues(alpha: 0.25);
+      case StaffStatus.absent:
+        return _errorContainer.withValues(alpha: 0.35);
+      case StaffStatus.notCheckedIn:
       case StaffStatus.offDuty:
         return AppColors.surfaceContainerHigh;
     }
@@ -40,8 +74,16 @@ class StaffMemberTile extends StatelessWidget {
     switch (_status) {
       case StaffStatus.present:
         return AppColors.primaryContainer;
+      case StaffStatus.late:
+        return AppColors.secondary;
+      case StaffStatus.checkedOut:
+        return AppColors.onSurfaceVariant;
       case StaffStatus.onLeave:
         return AppColors.secondary;
+      case StaffStatus.absent:
+        return AppColors.error;
+      case StaffStatus.notCheckedIn:
+        return AppColors.onSurfaceVariant;
       case StaffStatus.offDuty:
         return AppColors.onSurfaceVariant;
     }
@@ -51,8 +93,16 @@ class StaffMemberTile extends StatelessWidget {
     switch (_status) {
       case StaffStatus.present:
         return AppColors.primaryContainer;
+      case StaffStatus.late:
+        return AppColors.secondary;
+      case StaffStatus.checkedOut:
+        return AppColors.outline;
       case StaffStatus.onLeave:
         return AppColors.secondary;
+      case StaffStatus.absent:
+        return AppColors.error;
+      case StaffStatus.notCheckedIn:
+        return AppColors.outlineVariant;
       case StaffStatus.offDuty:
         return AppColors.onSurfaceVariant;
     }
@@ -61,9 +111,17 @@ class StaffMemberTile extends StatelessWidget {
   String get _statusLabel {
     switch (_status) {
       case StaffStatus.present:
-        return 'Active';
+        return 'Present';
+      case StaffStatus.late:
+        return 'Late';
+      case StaffStatus.checkedOut:
+        return 'Checked Out';
       case StaffStatus.onLeave:
         return 'On Leave';
+      case StaffStatus.absent:
+        return 'Absent';
+      case StaffStatus.notCheckedIn:
+        return 'Not Checked In';
       case StaffStatus.offDuty:
         return 'Inactive';
     }

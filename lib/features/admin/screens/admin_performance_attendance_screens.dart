@@ -934,10 +934,19 @@ class _AttendanceView extends ConsumerWidget {
                   for (final user in users) user.id: user,
                 };
 
-                final rows = records.map((record) {
-                  final staff = staffMap[record.staffId];
-                  final name =
-                      staff?.fullName ?? record.staffName ?? 'Unknown staff';
+                final staffRecords = records
+                    .where((record) => staffMap.containsKey(record.staffId))
+                    .toList();
+
+                if (staffRecords.isEmpty) {
+                  return const Center(
+                    child: Text('No staff attendance records found for this date.'),
+                  );
+                }
+
+                final rows = staffRecords.map((record) {
+                  final staff = staffMap[record.staffId]!;
+                  final name = staff.fullName;
                   final statusColor = _attendanceStatusColor(record.status);
                   return Container(
                     margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -956,7 +965,7 @@ class _AttendanceView extends ConsumerWidget {
                               Text(name, style: AppTypography.headlineMd),
                               const SizedBox(height: AppSpacing.xs),
                               Text(
-                                staff?.designation ?? 'Staff member',
+                                staff.designation ?? 'Staff member',
                                 style: AppTypography.bodySm.copyWith(
                                   color: AppColors.onSurfaceVariant,
                                 ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/providers/supabase_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -10,9 +11,147 @@ import '../models/inventory_reports_model.dart';
 import '../models/reports_filter_model.dart';
 import '../providers/reports_provider.dart';
 import '../services/reports_export_service.dart';
+import '../widgets/excel_sync_manager_dialog.dart';
 import '../widgets/reports_chart_painters.dart';
 import '../widgets/reports_filter_toolbar.dart';
 import '../widgets/reports_metric_card.dart';
+
+/// State provider tracking whether an Excel report is actively being generated and downloaded.
+final reportsIsExportingProvider = StateProvider.autoDispose<bool>((ref) => false);
+
+/// Central download handler for standalone Excel report exports.
+Future<void> _handleDownloadReport(
+  BuildContext context,
+  WidgetRef ref,
+  ReportsSection activeSection,
+  AdminReportsFilter filter,
+) async {
+  if (ref.read(reportsIsExportingProvider)) return;
+
+  final fileName = filter.getReportFileName(activeSection);
+  ref.read(reportsIsExportingProvider.notifier).state = true;
+
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      duration: const Duration(seconds: 2),
+      content: Row(
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text('Generating "$fileName"...'),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  try {
+    dynamic sectionData;
+    switch (activeSection) {
+      case ReportsSection.overview:
+        sectionData = ref.read(overviewReportsProvider).valueOrNull ??
+            await ref.read(overviewReportsProvider.future);
+        break;
+      case ReportsSection.patients:
+        sectionData = ref.read(patientReportsProvider).valueOrNull ??
+            await ref.read(patientReportsProvider.future);
+        break;
+      case ReportsSection.appointments:
+        sectionData = ref.read(appointmentReportsProvider).valueOrNull ??
+            await ref.read(appointmentReportsProvider.future);
+        break;
+      case ReportsSection.staff:
+        sectionData = ref.read(staffReportsProvider).valueOrNull ??
+            await ref.read(staffReportsProvider.future);
+        break;
+      case ReportsSection.clinical:
+        sectionData = ref.read(clinicalReportsProvider).valueOrNull ??
+            await ref.read(clinicalReportsProvider.future);
+        break;
+      case ReportsSection.financial:
+        sectionData = ref.read(financialReportsProvider).valueOrNull ??
+            await ref.read(financialReportsProvider.future);
+        break;
+      case ReportsSection.inventory:
+        sectionData = ref.read(inventoryReportsProvider).valueOrNull ??
+            await ref.read(inventoryReportsProvider.future);
+        break;
+    }
+
+    final supabase = ref.read(supabaseProvider);
+    final result = await ReportsExportService.exportReportToExcel(
+      section: activeSection,
+      filter: filter,
+      sectionData: sectionData,
+      supabase: supabase,
+    );
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.primary,
+          duration: const Duration(seconds: 5),
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, color: Colors.white, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Downloaded "$fileName" (${result.formattedSize}). Check your device Downloads folder.',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 5),
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Failed to export $fileName: ${result.errorMessage ?? "Unknown error"}',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 5),
+          content: Text('Failed to generate $fileName: $e'),
+        ),
+      );
+    }
+  } finally {
+    ref.read(reportsIsExportingProvider.notifier).state = false;
+  }
+}
 
 class AdminReportsScreen extends ConsumerWidget {
   const AdminReportsScreen({super.key});
@@ -20,6 +159,8 @@ class AdminReportsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeSection = ref.watch(adminReportsSectionProvider);
+    final filter = ref.watch(adminReportsFilterProvider);
+    final isExporting = ref.watch(reportsIsExportingProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final roleAsync = ref.watch(currentUserRoleProvider);
     final role = roleAsync.valueOrNull?.toLowerCase();
@@ -148,65 +289,41 @@ class AdminReportsScreen extends ConsumerWidget {
               ref.invalidate(inventoryReportsProvider);
             },
           ),
-          // Export actions
-          PopupMenuButton<String>(
-            tooltip: 'Export report',
-            icon: const Icon(Icons.file_download_outlined),
-            onSelected: (val) async {
-              if (activeSection == ReportsSection.inventory) {
-                final invData = ref.read(inventoryReportsProvider).valueOrNull;
-                if (invData == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Inventory data is still loading...')),
-                  );
-                  return;
-                }
-                if (val == 'csv') {
-                  await ReportsExportService.exportInventoryToCsv(
-                    data: invData,
-                    filter: ref.read(adminReportsFilterProvider),
-                  );
-                } else if (val == 'html') {
-                  await ReportsExportService.exportInventoryToPrintableHtml(
-                    data: invData,
-                    filter: ref.read(adminReportsFilterProvider),
-                  );
-                }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        '${val == 'csv' ? 'Excel' : 'Print/PDF'} export for ${activeSection.displayName} is being formatted.'),
-                  ),
-                );
-              }
+          IconButton(
+            tooltip: 'Master Excel Synchronization',
+            icon: const Icon(Icons.cloud_sync_outlined),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const ExcelSyncManagerDialog(),
+              );
             },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'csv',
-                child: Row(
-                  children: [
-                    Icon(Icons.table_chart_outlined,
-                        size: 20, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    const Text('Export Excel (CSV)'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'html',
-                child: Row(
-                  children: [
-                    Icon(Icons.print_outlined,
-                        size: 20, color: AppColors.secondary),
-                    const SizedBox(width: 10),
-                    const Text('Print / PDF Report'),
-                  ],
-                ),
-              ),
-            ],
           ),
+          // Repurposed Download button: Downloads standalone Excel (.xlsx) report
+          // for the currently active section and filter period
+          isExporting
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                )
+              : IconButton(
+                  key: const Key('reports_download_excel_button'),
+                  tooltip: 'Download Excel Report (${filter.getReportFileName(activeSection)})',
+                  icon: const Icon(Icons.file_download_outlined),
+                  onPressed: () => _handleDownloadReport(
+                    context,
+                    ref,
+                    activeSection,
+                    filter,
+                  ),
+                ),
           const SizedBox(width: 8),
         ],
       ),
@@ -1578,17 +1695,18 @@ class _InventoryReportsView extends ConsumerWidget {
                   children: [
                     OutlinedButton.icon(
                       icon: const Icon(Icons.table_chart_outlined, size: 16),
-                      label: const Text('Excel (CSV)'),
+                      label: const Text('Excel (.xlsx)'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: BorderSide(color: AppColors.primary),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                       ),
-                      onPressed: () =>
-                          ReportsExportService.exportInventoryToCsv(
-                        data: data,
-                        filter: ref.read(adminReportsFilterProvider),
+                      onPressed: () => _handleDownloadReport(
+                        context,
+                        ref,
+                        ReportsSection.inventory,
+                        ref.read(adminReportsFilterProvider),
                       ),
                     ),
                     const SizedBox(width: 8),

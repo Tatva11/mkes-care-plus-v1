@@ -14,6 +14,7 @@ class BillingInvoiceModel {
   final double amountPaid;
   final String? billedBy;
   final String? notes;
+  final String? eyeSurgeryId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -37,6 +38,7 @@ class BillingInvoiceModel {
     this.amountPaid = 0.0,
     this.billedBy,
     this.notes,
+    this.eyeSurgeryId,
     required this.createdAt,
     required this.updatedAt,
     this.patientName,
@@ -76,6 +78,7 @@ class BillingInvoiceModel {
       amountPaid: (json['amount_paid'] as num?)?.toDouble() ?? 0.0,
       billedBy: json['billed_by'] as String?,
       notes: json['notes'] as String?,
+      eyeSurgeryId: json['eye_surgery_id'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
@@ -104,6 +107,7 @@ class BillingInvoiceModel {
       'amount_paid': amountPaid,
       'billed_by': billedBy,
       'notes': notes,
+      if (eyeSurgeryId != null) 'eye_surgery_id': eyeSurgeryId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       if (patientName != null) 'patient_name': patientName,
@@ -125,6 +129,7 @@ class BillingInvoiceModel {
     double? amountPaid,
     String? billedBy,
     String? notes,
+    String? eyeSurgeryId,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? patientName,
@@ -146,6 +151,7 @@ class BillingInvoiceModel {
       amountPaid: amountPaid ?? this.amountPaid,
       billedBy: billedBy ?? this.billedBy,
       notes: notes ?? this.notes,
+      eyeSurgeryId: eyeSurgeryId ?? this.eyeSurgeryId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       patientName: patientName ?? this.patientName,

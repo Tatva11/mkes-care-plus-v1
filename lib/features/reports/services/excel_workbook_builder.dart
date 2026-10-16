@@ -48,12 +48,229 @@ class ExcelWorkbookBuilder {
     // 6. xl/worksheets/sheet1.xml .. sheetN.xml
     for (int i = 0; i < worksheets.length; i++) {
       final sheetSpec = worksheets[i];
-      final rows = recordsByWorksheet[sheetSpec.name] ?? const [];
+      final rawRows = recordsByWorksheet[sheetSpec.name] ?? const [];
+      final rows = _sortWorksheetRecords(sheetSpec, rawRows);
       final sheetXml = _generateWorksheetXml(sheetSpec, rows);
       zipWriter.addFile('xl/worksheets/sheet${i + 1}.xml', utf8.encode(sheetXml));
     }
 
     return zipWriter.finalize();
+  }
+
+  /// Builds a valid .xlsx binary package containing only the specified worksheet.
+  ///
+  /// Preserves header styling, frozen panes, custom widths, cell formatting,
+  /// date-wise sorting, and sensitive field redaction rules.
+  Uint8List buildSingleWorksheetWorkbook({
+    required ExcelWorksheetSpec sheetSpec,
+    List<Map<String, dynamic>> records = const [],
+  }) {
+    final zipWriter = _SimpleZipWriter();
+
+    // 1. [Content_Types].xml for 1 sheet
+    final contentTypesXml = _generateContentTypesXml(1);
+    zipWriter.addFile('[Content_Types].xml', utf8.encode(contentTypesXml));
+
+    // 2. _rels/.rels
+    final rootRelsXml = _generateRootRelsXml();
+    zipWriter.addFile('_rels/.rels', utf8.encode(rootRelsXml));
+
+    // 3. xl/workbook.xml with 1 sheet named after sheetSpec.name
+    final workbookXml = _generateWorkbookXml([sheetSpec]);
+    zipWriter.addFile('xl/workbook.xml', utf8.encode(workbookXml));
+
+    // 4. xl/_rels/workbook.xml.rels for 1 sheet
+    final workbookRelsXml = _generateWorkbookRelsXml(1);
+    zipWriter.addFile('xl/_rels/workbook.xml.rels', utf8.encode(workbookRelsXml));
+
+    // 5. xl/styles.xml
+    final stylesXml = _generateStylesXml();
+    zipWriter.addFile('xl/styles.xml', utf8.encode(stylesXml));
+
+    // 6. xl/worksheets/sheet1.xml
+    final sortedRows = _sortWorksheetRecords(sheetSpec, records);
+    final sheetXml = _generateWorksheetXml(sheetSpec, sortedRows);
+    zipWriter.addFile('xl/worksheets/sheet1.xml', utf8.encode(sheetXml));
+
+    return zipWriter.finalize();
+  }
+
+  /// Builds a valid standalone .xlsx binary package containing custom report worksheets.
+  ///
+  /// Used for individual section reports (e.g., Overview, Patients, Appointments, Staff,
+  /// Clinical, Billing, Inventory) without including the entire 21-worksheet master workbook.
+  Uint8List buildCustomWorkbook({
+    required List<ExcelWorksheetSpec> worksheets,
+    required Map<String, List<Map<String, dynamic>>> recordsByWorksheet,
+  }) {
+    final zipWriter = _SimpleZipWriter();
+
+    // 1. [Content_Types].xml
+    final contentTypesXml = _generateContentTypesXml(worksheets.length);
+    zipWriter.addFile('[Content_Types].xml', utf8.encode(contentTypesXml));
+
+    // 2. _rels/.rels
+    final rootRelsXml = _generateRootRelsXml();
+    zipWriter.addFile('_rels/.rels', utf8.encode(rootRelsXml));
+
+    // 3. xl/workbook.xml
+    final workbookXml = _generateWorkbookXml(worksheets);
+    zipWriter.addFile('xl/workbook.xml', utf8.encode(workbookXml));
+
+    // 4. xl/_rels/workbook.xml.rels
+    final workbookRelsXml = _generateWorkbookRelsXml(worksheets.length);
+    zipWriter.addFile('xl/_rels/workbook.xml.rels', utf8.encode(workbookRelsXml));
+
+    // 5. xl/styles.xml
+    final stylesXml = _generateStylesXml();
+    zipWriter.addFile('xl/styles.xml', utf8.encode(stylesXml));
+
+    // 6. xl/worksheets/sheet1.xml .. sheetN.xml
+    for (int i = 0; i < worksheets.length; i++) {
+      final sheetSpec = worksheets[i];
+      final rawRows = recordsByWorksheet[sheetSpec.name] ?? const [];
+      final rows = _sortWorksheetRecords(sheetSpec, rawRows);
+      final sheetXml = _generateWorksheetXml(sheetSpec, rows);
+      zipWriter.addFile('xl/worksheets/sheet${i + 1}.xml', utf8.encode(sheetXml));
+    }
+
+    return zipWriter.finalize();
+  }
+
+  /// Chronologically sorts records according to the worksheet specifications.
+  ///
+  /// - Date-driven activity worksheets sort newest first (DESC).
+  /// - Current state catalogs (e.g. inventory, vendors, staff directory) sort by name/title (ASC).
+  /// - Secondary deterministic tiebreaker uses the stable ID key (ASC).
+  /// - Date comparisons use parsed DateTime timestamps rather than formatted strings.
+  /// - Safely handles null or missing dates (nulls placed at end for DESC sort).
+  List<Map<String, dynamic>> _sortWorksheetRecords(
+    ExcelWorksheetSpec sheet,
+    List<Map<String, dynamic>> rows,
+  ) {
+    if (rows.length <= 1) return rows;
+
+    final sorted = List<Map<String, dynamic>>.from(rows);
+    final rules = sheet.sortRules.isNotEmpty
+        ? sheet.sortRules
+        : _getDefaultSortRules(sheet);
+
+    sorted.sort((a, b) {
+      for (final rule in rules) {
+        final valA = a[rule.field];
+        final valB = b[rule.field];
+
+        if (valA == valB) continue;
+        if (valA == null) return rule.nullsLast ? 1 : -1;
+        if (valB == null) return rule.nullsLast ? -1 : 1;
+
+        // Numeric comparison
+        if (valA is num && valB is num) {
+          final diff = valA.compareTo(valB);
+          if (diff != 0) {
+            return rule.descending ? -diff : diff;
+          }
+          continue;
+        }
+
+        // DateTime comparison
+        DateTime? dtA;
+        DateTime? dtB;
+        if (valA is DateTime) {
+          dtA = valA;
+        } else if (valA is String && (valA.contains('-') || valA.contains('/'))) {
+          dtA = DateTime.tryParse(valA);
+        }
+        if (valB is DateTime) {
+          dtB = valB;
+        } else if (valB is String && (valB.contains('-') || valB.contains('/'))) {
+          dtB = DateTime.tryParse(valB);
+        }
+
+        if (dtA != null && dtB != null) {
+          final diff = dtA.compareTo(dtB);
+          if (diff != 0) {
+            return rule.descending ? -diff : diff;
+          }
+          continue;
+        }
+
+        // Fallback string locale comparison
+        final diff = valA.toString().compareTo(valB.toString());
+        if (diff != 0) {
+          return rule.descending ? -diff : diff;
+        }
+      }
+
+      // Deterministic secondary tiebreaker: stableIdKey ASC
+      final idA = a[sheet.stableIdKey];
+      final idB = b[sheet.stableIdKey];
+      if (idA != null && idB != null) {
+        return idA.toString().compareTo(idB.toString());
+      }
+      return 0;
+    });
+
+    return sorted;
+  }
+
+  List<ExcelSortRule> _getDefaultSortRules(ExcelWorksheetSpec sheet) {
+    switch (sheet.name) {
+      case 'Staff_Directory':
+        return const [ExcelSortRule(field: 'full_name', descending: false)];
+      case 'Inventory_Catalog':
+      case 'Vendors':
+        return const [ExcelSortRule(field: 'name', descending: false)];
+      case 'Staff_Attendance':
+        return const [
+          ExcelSortRule(field: 'record_date', descending: true),
+          ExcelSortRule(field: 'check_in_time', descending: true),
+        ];
+      case 'Leave_Requests':
+        return const [
+          ExcelSortRule(field: 'start_date', descending: true),
+          ExcelSortRule(field: 'created_at', descending: true),
+        ];
+      case 'Tasks':
+        return const [
+          ExcelSortRule(field: 'due_date', descending: true),
+          ExcelSortRule(field: 'created_at', descending: true),
+        ];
+      case 'Appointments':
+        return const [
+          ExcelSortRule(field: 'appointment_date', descending: true),
+          ExcelSortRule(field: 'appointment_time', descending: true),
+        ];
+      case 'Inventory_Batches':
+        return const [
+          ExcelSortRule(field: 'received_date', descending: true),
+          ExcelSortRule(field: 'created_at', descending: true),
+        ];
+      case 'Purchase_Orders':
+        return const [
+          ExcelSortRule(field: 'order_date', descending: true),
+          ExcelSortRule(field: 'created_at', descending: true),
+        ];
+      case 'Optical_Sales':
+        return const [
+          ExcelSortRule(field: 'sale_date', descending: true),
+          ExcelSortRule(field: 'created_at', descending: true),
+        ];
+      case 'Dental_Lab_Cases':
+        return const [
+          ExcelSortRule(field: 'sent_date', descending: true),
+          ExcelSortRule(field: 'created_at', descending: true),
+        ];
+      case 'Billing_Payments':
+        return const [
+          ExcelSortRule(field: 'paid_at', descending: true),
+          ExcelSortRule(field: 'created_at', descending: true),
+        ];
+      case 'Department_Stock':
+        return const [ExcelSortRule(field: 'updated_at', descending: true)];
+      default:
+        return const [ExcelSortRule(field: 'created_at', descending: true)];
+    }
   }
 
   // ── XML GENERATORS ────────────────────────────────────────────────────────
@@ -205,12 +422,13 @@ class ExcelWorkbookBuilder {
 
         // Redaction enforcement: ensure salary is NEVER written
         if (sheet.sensitiveExcludedFields.contains(col.sourceField) ||
-            col.sourceField.toLowerCase().contains('salary')) {
+            col.sourceField.toLowerCase().contains('salary') ||
+            col.header.toLowerCase().contains('salary')) {
           buffer.write('      <c r="$cellRef" t="inlineStr" s="0"><is><t>-</t></is></c>\n');
           continue;
         }
 
-        final rawValue = record[col.sourceField];
+        final rawValue = _extractFieldValue(record, col);
         final cellContent = _formatCellValue(col, rawValue);
 
         if (cellContent.isNumeric) {
@@ -232,6 +450,133 @@ class ExcelWorkbookBuilder {
     buffer.write('  </sheetData>\n');
     buffer.write('</worksheet>');
     return buffer.toString();
+  }
+
+  dynamic _extractFieldValue(Map<String, dynamic> record, ExcelColumnSpec col) {
+    // 1. Direct field match if explicitly provided and not null
+    if (record.containsKey(col.sourceField) && record[col.sourceField] != null) {
+      return record[col.sourceField];
+    }
+
+    // 2. Intelligent aliases and relational joins fallback
+    switch (col.sourceField) {
+      case 'department':
+        final dept = record['departments'];
+        if (dept is Map && dept['name'] != null) return dept['name'];
+        return record['department_name'] ?? record['dept_name'];
+
+      case 'current_stock':
+        return record['quantity'];
+
+      case 'item_name':
+        final inv = record['inventory'];
+        if (inv is Map && inv['name'] != null) return inv['name'];
+        return record['service_name'] ?? record['inventory_name'] ?? record['name'];
+
+      case 'sku':
+        final inv = record['inventory'];
+        if (inv is Map && inv['sku'] != null) return inv['sku'];
+        return record['inventory_sku'];
+
+      case 'unit':
+        final inv = record['inventory'];
+        if (inv is Map && inv['unit'] != null) return inv['unit'];
+        return record['inventory_unit'];
+
+      case 'vendor':
+      case 'vendor_name':
+        final v = record['vendors'];
+        if (v is Map && v['name'] != null) return v['name'];
+        return record['vendor_name'];
+
+      case 'patient_number':
+        final p = record['patients'];
+        if (p is Map && p['patient_number'] != null) return p['patient_number'];
+        return null;
+
+      case 'patient_name':
+        final p = record['patients'];
+        if (p is Map && p['name'] != null) return p['name'];
+        return null;
+
+      case 'doctor':
+      case 'doctor_name':
+        final d = record['doctor'] ?? record['profiles'];
+        if (d is Map && d['full_name'] != null) return d['full_name'];
+        return null;
+
+      case 'staff_name':
+      case 'applicant':
+      case 'assignee':
+      case 'changer':
+      case 'performer':
+      case 'performer_name':
+      case 'billed_by_name':
+      case 'received_by_name':
+      case 'creator':
+        final pr = record['performer'] ?? record['profiles'] ?? record['creator'] ?? record['assignee'] ?? record['applicant'] ?? record['changer'];
+        if (pr is Map && pr['full_name'] != null) return pr['full_name'];
+        return record['full_name'];
+
+      case 'staff_email':
+        final pr = record['profiles'];
+        if (pr is Map && pr['email'] != null) return pr['email'];
+        return record['email'];
+
+      case 'requester_name':
+        final req = record['requester'] ?? record['profiles'];
+        if (req is Map && req['full_name'] != null) return req['full_name'];
+        return null;
+
+      case 'orderer':
+        final ord = record['orderer'];
+        if (ord is Map && ord['full_name'] != null) return ord['full_name'];
+        return null;
+
+      case 'po_number':
+        final po = record['purchase_orders'];
+        if (po is Map && po['purchase_order_number'] != null) return po['purchase_order_number'];
+        return record['purchase_order_number'];
+
+      case 'invoice_number':
+        final b = record['billing'];
+        if (b is Map && b['invoice_number'] != null) return b['invoice_number'];
+        return null;
+
+      case 'invoice_date':
+        return record['created_at'];
+
+      case 'paid_amount':
+        return record['amount_paid'];
+
+      case 'balance_amount':
+        final total = num.tryParse(record['total_amount']?.toString() ?? '') ?? 0.0;
+        final paid = num.tryParse(record['amount_paid']?.toString() ?? '') ?? 0.0;
+        return (total - paid).clamp(0.0, double.infinity);
+
+      case 'status':
+        final s = record['payment_status'] ?? record['order_status'];
+        return s?.toString().toUpperCase();
+
+      case 'payment_method':
+        final m = record['payment_mode'];
+        return m?.toString().toUpperCase();
+
+      case 'total_price':
+        return record['total_amount'];
+
+      case 'payment_date':
+        return record['paid_at'];
+
+      case 'transaction_reference':
+        return record['payment_reference'];
+
+      case 'notes':
+        return record['request_notes'] ?? record['remarks'];
+
+      default:
+        return null;
+    }
   }
 
   _CellContent _formatCellValue(ExcelColumnSpec col, dynamic value) {

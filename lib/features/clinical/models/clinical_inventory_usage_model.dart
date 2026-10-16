@@ -22,6 +22,8 @@ class ClinicalInventoryUsageModel {
     this.patientName,
     this.patientNumber,
     this.createdByName,
+    this.departmentId,
+    this.departmentName,
   });
 
   final String id;
@@ -44,6 +46,8 @@ class ClinicalInventoryUsageModel {
   final String? patientName;
   final String? patientNumber;
   final String? createdByName;
+  final String? departmentId;
+  final String? departmentName;
 
   String get formattedConsumedAt =>
       DateFormat('dd MMM yyyy, hh:mm a').format(consumedAt);
@@ -52,6 +56,7 @@ class ClinicalInventoryUsageModel {
     final inventoryMap = _asStringMap(json['inventory']);
     final patientMap = _asStringMap(json['patients']);
     final profileMap = _asStringMap(json['profiles']);
+    final deptMap = _asStringMap(json['departments']);
 
     return ClinicalInventoryUsageModel(
       id: _stringValue(json['id']) ?? '',
@@ -79,6 +84,9 @@ class ClinicalInventoryUsageModel {
           _stringValue(json['patient_number']),
       createdByName: _stringValue(profileMap?['full_name']) ??
           _stringValue(json['created_by_name']),
+      departmentId: _stringValue(json['department_id']),
+      departmentName: _stringValue(deptMap?['name']) ??
+          _stringValue(json['department_name']),
     );
   }
 
@@ -98,6 +106,7 @@ class ClinicalInventoryUsageModel {
         'created_by': createdBy,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
+        if (departmentId != null) 'department_id': departmentId,
       };
 
   static String? _stringValue(Object? value) {

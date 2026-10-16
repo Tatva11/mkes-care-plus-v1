@@ -10,6 +10,8 @@ class InvoicePaymentSection extends StatefulWidget {
   final double subtotal;
   final double discount;
   final double finalTotal;
+  final double newCharges;
+  final double previousBalanceIncluded;
   final ValueChanged<double> onDiscountChanged;
   final BillingPaymentModel? payment;
   final ValueChanged<BillingPaymentModel?> onPaymentChanged;
@@ -19,6 +21,8 @@ class InvoicePaymentSection extends StatefulWidget {
     required this.subtotal,
     required this.discount,
     required this.finalTotal,
+    this.newCharges = 0.0,
+    this.previousBalanceIncluded = 0.0,
     required this.onDiscountChanged,
     required this.payment,
     required this.onPaymentChanged,
@@ -148,12 +152,49 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
           ),
           const Divider(height: AppSpacing.lg),
 
+          if (widget.previousBalanceIncluded > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.history_toggle_off, size: 16, color: Colors.amber),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Previous Outstanding Balance Included',
+                        style: AppTypography.bodySm.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.amber.shade900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '+ ₹${widget.previousBalanceIncluded.toStringAsFixed(2)}',
+                    style: AppTypography.bodySm.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Subtotal, Discount, Final Total
           Row(
             children: [
               Expanded(
                 child: _SummaryBox(
-                  label: 'Subtotal',
+                  label: widget.previousBalanceIncluded > 0 ? 'Combined Subtotal' : 'Subtotal',
                   amount: '₹${widget.subtotal.toStringAsFixed(2)}',
                   color: AppColors.onSurface,
                 ),
@@ -191,7 +232,7 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _SummaryBox(
-                  label: 'Final Total',
+                  label: 'Payable Total',
                   amount: '₹${widget.finalTotal.toStringAsFixed(2)}',
                   color: AppColors.primary,
                   isBold: true,

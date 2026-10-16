@@ -1,17 +1,1046 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../billing/models/billing_reports_model.dart';
+import '../models/appointment_reports_model.dart';
+import '../models/clinical_reports_model.dart';
 import '../models/inventory_reports_model.dart';
+import '../models/overview_reports_model.dart';
+import '../models/patient_reports_model.dart';
 import '../models/reports_filter_model.dart';
+import '../models/staff_reports_model.dart';
+import 'excel_workbook_builder.dart';
+import 'excel_workbook_schema.dart';
 
-/// Service providing export capabilities (Excel-compatible CSV & Print-to-PDF HTML)
-/// for MKES CARE+ Admin Reports without requiring external native dependencies.
+/// Result object for an Excel report export operation.
+class ExportReportResult {
+  final bool success;
+  final String fileName;
+  final int fileSizeBytes;
+  final String? signedUrl;
+  final bool launched;
+  final String? errorMessage;
+
+  const ExportReportResult({
+    required this.success,
+    required this.fileName,
+    this.fileSizeBytes = 0,
+    this.signedUrl,
+    this.launched = false,
+    this.errorMessage,
+  });
+
+  String get formattedSize {
+    if (fileSizeBytes <= 0) return '0 KB';
+    final kb = fileSizeBytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(2)} MB';
+  }
+}
+
+/// Service providing export capabilities (Standalone OpenXML .xlsx, CSV & HTML)
+/// for MKES CARE+ Admin Reports with full support for Android downloading.
 class ReportsExportService {
   static final NumberFormat _currencyFormat =
       NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
   static final DateFormat _dateFormat = DateFormat('dd-MM-yyyy hh:mm a');
+  static final DateFormat _shortDateFormat = DateFormat('dd-MM-yyyy');
+
+  static const String storageBucket = 'clinic-excel-sync';
+
+  // ── 1. STANDALONE OPENXML (.XLSX) BUILDERS BY SECTION ───────────────────────
+
+  /// Generates a standalone .xlsx workbook containing Overview metrics & activity trends.
+  static Uint8List generateOverviewReportWorkbook(
+    OverviewReportsData data, [
+    AdminReportsFilter filter = const AdminReportsFilter(),
+  ]) {
+    final builder = ExcelWorkbookBuilder();
+
+    final metricsSheet = ExcelWorksheetSpec(
+      name: 'Overview_Metrics',
+      sourceTable: 'overview_metrics',
+      stableIdKey: 'metric',
+      timestampKey: 'timestamp',
+      description: 'Key performance indicators and operational health summary',
+      columns: const [
+        ExcelColumnSpec(header: 'Category', sourceField: 'category', width: 22),
+        ExcelColumnSpec(header: 'Metric', sourceField: 'metric', width: 34),
+        ExcelColumnSpec(header: 'Value', sourceField: 'value', width: 24),
+      ],
+    );
+
+    final trendsSheet = ExcelWorksheetSpec(
+      name: 'Activity_Trends',
+      sourceTable: 'activity_trends',
+      stableIdKey: 'date',
+      timestampKey: 'date',
+      description: 'Periodic patient, appointment, procedure, and sales trends',
+      columns: const [
+        ExcelColumnSpec(header: 'Date', sourceField: 'date', width: 14, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Period Label', sourceField: 'label', width: 18),
+        ExcelColumnSpec(header: 'New Patients', sourceField: 'patients', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Appointments', sourceField: 'appointments', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Procedures', sourceField: 'procedures', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Sales Amount (INR)', sourceField: 'sales', width: 18, type: ExcelColumnType.currency),
+      ],
+    );
+
+    final metricsRows = <Map<String, dynamic>>[
+      {'category': 'Patient Activity', 'metric': 'Total Registered Patients', 'value': data.totalPatients.toString()},
+      {'category': 'Patient Activity', 'metric': 'New Registrations in Period', 'value': data.newPatients.toString()},
+      {'category': 'Patient Activity', 'metric': 'Eye Clinic Patients', 'value': '${data.eyePatients} (${data.eyePercentage.toStringAsFixed(1)}%)'},
+      {'category': 'Patient Activity', 'metric': 'Dental Clinic Patients', 'value': '${data.dentalPatients} (${data.dentalPercentage.toStringAsFixed(1)}%)'},
+      {'category': 'Appointments', 'metric': 'Total Appointments', 'value': data.totalAppointments.toString()},
+      {'category': 'Appointments', 'metric': 'Completed Appointments', 'value': data.completedAppointments.toString()},
+      {'category': 'Appointments', 'metric': 'Eye Appointments', 'value': data.eyeAppointments.toString()},
+      {'category': 'Appointments', 'metric': 'Dental Appointments', 'value': data.dentalAppointments.toString()},
+      {'category': 'Clinical Procedures', 'metric': 'Total Procedures', 'value': data.totalProcedures.toString()},
+      {'category': 'Clinical Procedures', 'metric': 'Eye Procedures', 'value': data.eyeProcedures.toString()},
+      {'category': 'Clinical Procedures', 'metric': 'Dental Procedures', 'value': data.dentalProcedures.toString()},
+      {'category': 'Financial Sales', 'metric': 'Total Invoiced Sales', 'value': _currencyFormat.format(data.totalSales)},
+      {'category': 'Financial Sales', 'metric': 'Revenue Collected', 'value': _currencyFormat.format(data.totalRevenue)},
+      {'category': 'Financial Sales', 'metric': 'Outstanding Balance', 'value': _currencyFormat.format(data.totalOutstanding)},
+      {'category': 'Financial Sales', 'metric': 'Eye Department Sales', 'value': _currencyFormat.format(data.eyeSales)},
+      {'category': 'Financial Sales', 'metric': 'Dental Department Sales', 'value': _currencyFormat.format(data.dentalSales)},
+      {'category': 'Inventory & Stock', 'metric': 'Total Stock Valuation', 'value': _currencyFormat.format(data.totalInventoryValuation)},
+      {'category': 'Inventory & Stock', 'metric': 'Low Stock Alert Items', 'value': data.lowStockCount.toString()},
+      {'category': 'Inventory & Stock', 'metric': 'Expired Batches', 'value': data.expiredBatchesCount.toString()},
+    ];
+
+    final trendsRows = data.trendPoints.map((p) => {
+      'date': p.date,
+      'label': p.label,
+      'patients': p.patientCount,
+      'appointments': p.appointmentCount,
+      'procedures': p.procedureCount,
+      'sales': p.salesAmount,
+    }).toList();
+
+    return builder.buildCustomWorkbook(
+      worksheets: [metricsSheet, trendsSheet],
+      recordsByWorksheet: {
+        'Overview_Metrics': metricsRows,
+        'Activity_Trends': trendsRows,
+      },
+    );
+  }
+
+  /// Generates a standalone .xlsx workbook containing Patients registry & summary.
+  static Uint8List generatePatientsReportWorkbook(
+    PatientReportsData data, [
+    AdminReportsFilter filter = const AdminReportsFilter(),
+  ]) {
+    final builder = ExcelWorkbookBuilder();
+
+    final registrySheet = ExcelWorksheetSpec(
+      name: 'Patients_Registry',
+      sourceTable: 'patients',
+      stableIdKey: 'id',
+      timestampKey: 'created_at',
+      description: 'Patient records matching active date and department filters',
+      columns: const [
+        ExcelColumnSpec(header: 'Patient ID', sourceField: 'id', width: 36),
+        ExcelColumnSpec(header: 'Patient Number', sourceField: 'patient_number', width: 18),
+        ExcelColumnSpec(header: 'Full Name', sourceField: 'name', width: 26),
+        ExcelColumnSpec(header: 'Contact Mobile', sourceField: 'mobile', width: 16),
+        ExcelColumnSpec(header: 'Date of Birth', sourceField: 'dob', width: 14, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Department', sourceField: 'department', width: 14),
+        ExcelColumnSpec(header: 'Address', sourceField: 'address', width: 30),
+        ExcelColumnSpec(header: 'Reference Source', sourceField: 'reference', width: 20),
+        ExcelColumnSpec(header: 'First Visit Date', sourceField: 'visit_date', width: 16, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Created At', sourceField: 'created_at', width: 18, type: ExcelColumnType.datetime),
+      ],
+    );
+
+    final summarySheet = ExcelWorksheetSpec(
+      name: 'Patient_Summary',
+      sourceTable: 'patient_summary',
+      stableIdKey: 'metric',
+      timestampKey: 'metric',
+      description: 'Aggregated patient counts and department distribution',
+      columns: const [
+        ExcelColumnSpec(header: 'Metric', sourceField: 'metric', width: 32),
+        ExcelColumnSpec(header: 'Count', sourceField: 'count', width: 16),
+        ExcelColumnSpec(header: 'Share Percentage', sourceField: 'percentage', width: 18),
+      ],
+    );
+
+    final trendsSheet = ExcelWorksheetSpec(
+      name: 'Registration_Trends',
+      sourceTable: 'registration_trends',
+      stableIdKey: 'date',
+      timestampKey: 'date',
+      description: 'Daily registration volume over the selected reporting period',
+      columns: const [
+        ExcelColumnSpec(header: 'Date', sourceField: 'date', width: 14, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Period Label', sourceField: 'label', width: 18),
+        ExcelColumnSpec(header: 'New Registrations', sourceField: 'count', width: 18, type: ExcelColumnType.number),
+      ],
+    );
+
+    final registryRows = data.recentPatients.map((p) => {
+      'id': p.id,
+      'patient_number': p.patientNumber,
+      'name': p.name,
+      'mobile': p.mobile,
+      'dob': p.dob != null ? _shortDateFormat.format(p.dob!) : '-',
+      'department': p.department ?? 'General',
+      'address': p.address ?? '-',
+      'reference': p.reference ?? '-',
+      'visit_date': p.visitDate != null ? _shortDateFormat.format(p.visitDate!) : '-',
+      'created_at': p.createdAt.toIso8601String(),
+    }).toList();
+
+    final summaryRows = <Map<String, dynamic>>[
+      {'metric': 'Total Patient Base', 'count': data.totalPatients.toString(), 'percentage': '100%'},
+      {'metric': 'New Registrations in Period', 'count': data.newPatients.toString(), 'percentage': data.totalPatients > 0 ? '${((data.newPatients / data.totalPatients) * 100).toStringAsFixed(1)}%' : '-'},
+      {'metric': 'Returning Patients', 'count': data.returningPatients.toString(), 'percentage': data.totalPatients > 0 ? '${((data.returningPatients / data.totalPatients) * 100).toStringAsFixed(1)}%' : '-'},
+      {'metric': 'Eye Clinic Patients', 'count': data.eyePatients.toString(), 'percentage': '${data.eyePercentage.toStringAsFixed(1)}%'},
+      {'metric': 'Dental Clinic Patients', 'count': data.dentalPatients.toString(), 'percentage': '${data.dentalPercentage.toStringAsFixed(1)}%'},
+    ];
+
+    final trendsRows = data.registrationTrends.map((t) => {
+      'date': t.date,
+      'label': t.label,
+      'count': t.count,
+    }).toList();
+
+    return builder.buildCustomWorkbook(
+      worksheets: [registrySheet, summarySheet, trendsSheet],
+      recordsByWorksheet: {
+        'Patients_Registry': registryRows,
+        'Patient_Summary': summaryRows,
+        'Registration_Trends': trendsRows,
+      },
+    );
+  }
+
+  /// Generates a standalone .xlsx workbook containing Appointments data & doctor metrics.
+  static Uint8List generateAppointmentsReportWorkbook(
+    AppointmentReportsData data, [
+    AdminReportsFilter filter = const AdminReportsFilter(),
+  ]) {
+    final builder = ExcelWorkbookBuilder();
+
+    final doctorSheet = ExcelWorksheetSpec(
+      name: 'Doctor_Performance',
+      sourceTable: 'doctor_performance',
+      stableIdKey: 'doctor_name',
+      timestampKey: 'doctor_name',
+      description: 'Appointment workload and completion rates by clinical practitioner',
+      columns: const [
+        ExcelColumnSpec(header: 'Doctor Name', sourceField: 'doctor_name', width: 26),
+        ExcelColumnSpec(header: 'Department', sourceField: 'department', width: 16),
+        ExcelColumnSpec(header: 'Total Appointments', sourceField: 'total', width: 18, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Completed', sourceField: 'completed', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Cancelled', sourceField: 'cancelled', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Completion Rate', sourceField: 'completion_rate', width: 16),
+      ],
+    );
+
+    final summarySheet = ExcelWorksheetSpec(
+      name: 'Appointment_Summary',
+      sourceTable: 'appointment_summary',
+      stableIdKey: 'metric',
+      timestampKey: 'metric',
+      description: 'Operational status, triage and department breakdown',
+      columns: const [
+        ExcelColumnSpec(header: 'Metric', sourceField: 'metric', width: 30),
+        ExcelColumnSpec(header: 'Count', sourceField: 'count', width: 16, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Share / Rate', sourceField: 'percentage', width: 18),
+      ],
+    );
+
+    final trendsSheet = ExcelWorksheetSpec(
+      name: 'Appointment_Trends',
+      sourceTable: 'appointment_trends',
+      stableIdKey: 'date',
+      timestampKey: 'date',
+      description: 'Daily appointment scheduling and completion trends',
+      columns: const [
+        ExcelColumnSpec(header: 'Date', sourceField: 'date', width: 14, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Period Label', sourceField: 'label', width: 18),
+        ExcelColumnSpec(header: 'Total Appointments', sourceField: 'total', width: 18, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Completed', sourceField: 'completed', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Cancelled', sourceField: 'cancelled', width: 14, type: ExcelColumnType.number),
+      ],
+    );
+
+    final doctorRows = data.doctorStats.map((d) => {
+      'doctor_name': d.doctorName,
+      'department': d.department,
+      'total': d.totalAppointments,
+      'completed': d.completedAppointments,
+      'cancelled': d.cancelledAppointments,
+      'completion_rate': '${d.completionRate.toStringAsFixed(1)}%',
+    }).toList();
+
+    final summaryRows = <Map<String, dynamic>>[
+      {'metric': 'Total Appointments', 'count': data.totalAppointments, 'percentage': '100%'},
+      {'metric': 'Completed Appointments', 'count': data.completedAppointments, 'percentage': '${data.completionRate.toStringAsFixed(1)}%'},
+      {'metric': 'Cancelled Appointments', 'count': data.cancelledAppointments, 'percentage': '${data.cancellationRate.toStringAsFixed(1)}%'},
+      {'metric': 'Currently Scheduled', 'count': data.scheduledAppointments, 'percentage': '-'},
+      {'metric': 'In Triage', 'count': data.inTriageAppointments, 'percentage': '-'},
+      {'metric': 'Eye Clinic Appointments', 'count': data.eyeAppointments, 'percentage': '${data.eyePercentage.toStringAsFixed(1)}%'},
+      {'metric': 'Dental Clinic Appointments', 'count': data.dentalAppointments, 'percentage': '${data.dentalPercentage.toStringAsFixed(1)}%'},
+      {'metric': 'Regular Bookings', 'count': data.regularAppointments, 'percentage': '-'},
+      {'metric': 'Walk-in Patients', 'count': data.walkInAppointments, 'percentage': '-'},
+      {'metric': 'Follow-up Visits', 'count': data.followUpAppointments, 'percentage': '-'},
+    ];
+
+    final trendsRows = data.appointmentTrends.map((t) => {
+      'date': t.date,
+      'label': t.label,
+      'total': t.total,
+      'completed': t.completed,
+      'cancelled': t.cancelled,
+    }).toList();
+
+    return builder.buildCustomWorkbook(
+      worksheets: [doctorSheet, summarySheet, trendsSheet],
+      recordsByWorksheet: {
+        'Doctor_Performance': doctorRows,
+        'Appointment_Summary': summaryRows,
+        'Appointment_Trends': trendsRows,
+      },
+    );
+  }
+
+  /// Generates a standalone .xlsx workbook containing Staff performance & attendance analytics.
+  static Uint8List generateStaffReportWorkbook(
+    StaffReportsData data, [
+    AdminReportsFilter filter = const AdminReportsFilter(),
+  ]) {
+    final builder = ExcelWorkbookBuilder();
+
+    final staffSheet = ExcelWorksheetSpec(
+      name: 'Staff_Performance',
+      sourceTable: 'staff_performance',
+      stableIdKey: 'staff_id',
+      timestampKey: 'staff_id',
+      description: 'Individual employee attendance consistency and task fulfillment',
+      columns: const [
+        ExcelColumnSpec(header: 'Staff Name', sourceField: 'staff_name', width: 24),
+        ExcelColumnSpec(header: 'Designation', sourceField: 'designation', width: 18),
+        ExcelColumnSpec(header: 'Department', sourceField: 'department', width: 16),
+        ExcelColumnSpec(header: 'Attendance Logs', sourceField: 'attendance_logs', width: 16, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Present Days', sourceField: 'present_days', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Late Days', sourceField: 'late_days', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Leave Days', sourceField: 'leave_days', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Attendance Rate', sourceField: 'attendance_rate', width: 16),
+        ExcelColumnSpec(header: 'Total Tasks', sourceField: 'total_tasks', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Completed Tasks', sourceField: 'completed_tasks', width: 16, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Pending Tasks', sourceField: 'pending_tasks', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Overdue Tasks', sourceField: 'overdue_tasks', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Task Completion Rate', sourceField: 'task_completion_rate', width: 20),
+      ],
+    );
+
+    final trendsSheet = ExcelWorksheetSpec(
+      name: 'Attendance_Trends',
+      sourceTable: 'attendance_trends',
+      stableIdKey: 'date',
+      timestampKey: 'date',
+      description: 'Daily staff attendance, late arrivals, and leave trends',
+      columns: const [
+        ExcelColumnSpec(header: 'Date', sourceField: 'date', width: 14, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Period Label', sourceField: 'label', width: 18),
+        ExcelColumnSpec(header: 'Present Staff', sourceField: 'present', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Late Arrivals', sourceField: 'late', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'On Leave', sourceField: 'leave', width: 14, type: ExcelColumnType.number),
+      ],
+    );
+
+    final summarySheet = ExcelWorksheetSpec(
+      name: 'Staff_KPI_Summary',
+      sourceTable: 'staff_kpi_summary',
+      stableIdKey: 'metric',
+      timestampKey: 'metric',
+      description: 'High-level workforce headcount, attendance and task KPIs',
+      columns: const [
+        ExcelColumnSpec(header: 'Workforce KPI', sourceField: 'metric', width: 32),
+        ExcelColumnSpec(header: 'Value', sourceField: 'value', width: 20),
+      ],
+    );
+
+    final staffRows = data.staffStats.map((s) => {
+      'staff_id': s.staffId,
+      'staff_name': s.staffName,
+      'designation': s.designation ?? '-',
+      'department': s.department ?? '-',
+      'attendance_logs': s.attendanceLogs,
+      'present_days': s.presentDays,
+      'late_days': s.lateDays,
+      'leave_days': s.leaveDays,
+      'attendance_rate': '${s.attendancePercentage.toStringAsFixed(1)}%',
+      'total_tasks': s.totalTasks,
+      'completed_tasks': s.completedTasks,
+      'pending_tasks': s.pendingTasks,
+      'overdue_tasks': s.overdueTasks,
+      'task_completion_rate': '${s.taskCompletionPercentage.toStringAsFixed(1)}%',
+    }).toList();
+
+    final trendsRows = data.attendanceTrends.map((t) => {
+      'date': t.date,
+      'label': t.label,
+      'present': t.present,
+      'late': t.late,
+      'leave': t.leave,
+    }).toList();
+
+    final summaryRows = <Map<String, dynamic>>[
+      {'metric': 'Total Staff Headcount', 'value': data.totalStaff.toString()},
+      {'metric': 'Active Staff Accounts', 'value': data.activeStaff.toString()},
+      {'metric': 'Total Attendance Logs in Period', 'value': data.totalAttendanceLogs.toString()},
+      {'metric': 'On-Time / Present Shifts', 'value': data.presentCount.toString()},
+      {'metric': 'Late Check-in Incidents', 'value': data.lateCount.toString()},
+      {'metric': 'Approved Leaves Count', 'value': data.leaveCount.toString()},
+      {'metric': 'Overall Attendance Consistency Rate', 'value': '${data.overallAttendanceRate.toStringAsFixed(1)}%'},
+      {'metric': 'Total Assigned Tasks', 'value': data.totalTasks.toString()},
+      {'metric': 'Completed Tasks', 'value': data.completedTasks.toString()},
+      {'metric': 'In-Progress Tasks', 'value': data.inProgressTasks.toString()},
+      {'metric': 'Pending Tasks', 'value': data.pendingTasks.toString()},
+      {'metric': 'Overdue Tasks', 'value': data.overdueTasks.toString()},
+      {'metric': 'Overall Task Completion Rate', 'value': '${data.taskCompletionRate.toStringAsFixed(1)}%'},
+    ];
+
+    return builder.buildCustomWorkbook(
+      worksheets: [staffSheet, trendsSheet, summarySheet],
+      recordsByWorksheet: {
+        'Staff_Performance': staffRows,
+        'Attendance_Trends': trendsRows,
+        'Staff_KPI_Summary': summaryRows,
+      },
+    );
+  }
+
+  /// Generates a standalone .xlsx workbook containing Clinical & Procedure statistics.
+  static Uint8List generateClinicalReportWorkbook(
+    ClinicalReportsData data, [
+    AdminReportsFilter filter = const AdminReportsFilter(),
+  ]) {
+    final builder = ExcelWorkbookBuilder();
+
+    final leaderboardSheet = ExcelWorksheetSpec(
+      name: 'Procedure_Leaderboard',
+      sourceTable: 'procedure_leaderboard',
+      stableIdKey: 'procedure_name',
+      timestampKey: 'procedure_name',
+      description: 'Most frequently performed treatments and clinical interventions',
+      columns: const [
+        ExcelColumnSpec(header: 'Procedure Name', sourceField: 'procedure_name', width: 32),
+        ExcelColumnSpec(header: 'Department', sourceField: 'department', width: 16),
+        ExcelColumnSpec(header: 'Procedures Performed', sourceField: 'count', width: 22, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Total Revenue (INR)', sourceField: 'revenue', width: 20, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Average Fee (INR)', sourceField: 'avg_price', width: 18, type: ExcelColumnType.currency),
+      ],
+    );
+
+    final trendsSheet = ExcelWorksheetSpec(
+      name: 'Procedure_Trends',
+      sourceTable: 'procedure_trends',
+      stableIdKey: 'date',
+      timestampKey: 'date',
+      description: 'Daily procedure volume trends across Eye and Dental specialties',
+      columns: const [
+        ExcelColumnSpec(header: 'Date', sourceField: 'date', width: 14, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Period Label', sourceField: 'label', width: 18),
+        ExcelColumnSpec(header: 'Eye Procedures', sourceField: 'eye_count', width: 16, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Dental Procedures', sourceField: 'dental_count', width: 18, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Total Procedures', sourceField: 'total_count', width: 16, type: ExcelColumnType.number),
+      ],
+    );
+
+    final summarySheet = ExcelWorksheetSpec(
+      name: 'Clinical_Summary',
+      sourceTable: 'clinical_summary',
+      stableIdKey: 'metric',
+      timestampKey: 'metric',
+      description: 'Departmental procedure share and gross clinical volume valuation',
+      columns: const [
+        ExcelColumnSpec(header: 'Clinical Metric', sourceField: 'metric', width: 30),
+        ExcelColumnSpec(header: 'Value', sourceField: 'value', width: 22),
+      ],
+    );
+
+    final leaderboardRows = data.topProcedures.map((p) => {
+      'procedure_name': p.procedureName,
+      'department': p.department,
+      'count': p.count,
+      'revenue': p.totalRevenue,
+      'avg_price': p.averagePrice,
+    }).toList();
+
+    final trendsRows = data.procedureTrends.map((t) => {
+      'date': t.date,
+      'label': t.label,
+      'eye_count': t.eyeCount,
+      'dental_count': t.dentalCount,
+      'total_count': t.totalCount,
+    }).toList();
+
+    final summaryRows = <Map<String, dynamic>>[
+      {'metric': 'Total Procedures Performed', 'value': data.totalProcedures.toString()},
+      {'metric': 'Total Procedure Clinical Value', 'value': _currencyFormat.format(data.totalProceduresValue)},
+      {'metric': 'Eye Clinic Procedures', 'value': '${data.eyeProcedures} (${data.eyePercentage.toStringAsFixed(1)}%)'},
+      {'metric': 'Dental Clinic Procedures', 'value': '${data.dentalProcedures} (${data.dentalPercentage.toStringAsFixed(1)}%)'},
+    ];
+
+    return builder.buildCustomWorkbook(
+      worksheets: [leaderboardSheet, trendsSheet, summarySheet],
+      recordsByWorksheet: {
+        'Procedure_Leaderboard': leaderboardRows,
+        'Procedure_Trends': trendsRows,
+        'Clinical_Summary': summaryRows,
+      },
+    );
+  }
+
+  /// Generates a standalone .xlsx workbook containing Billing & Financial reports.
+  static Uint8List generateFinancialReportWorkbook(
+    BillingReportsData data, [
+    AdminReportsFilter filter = const AdminReportsFilter(),
+  ]) {
+    final builder = ExcelWorkbookBuilder();
+
+    final summarySheet = ExcelWorksheetSpec(
+      name: 'Financial_Summary',
+      sourceTable: 'financial_summary',
+      stableIdKey: 'metric',
+      timestampKey: 'metric',
+      description: 'Executive revenue, profit, invoice, and collection snapshot',
+      columns: const [
+        ExcelColumnSpec(header: 'Financial Metric', sourceField: 'metric', width: 32),
+        ExcelColumnSpec(header: 'Value', sourceField: 'value', width: 22),
+      ],
+    );
+
+    final deptSheet = ExcelWorksheetSpec(
+      name: 'Department_Revenue',
+      sourceTable: 'department_revenue',
+      stableIdKey: 'department',
+      timestampKey: 'department',
+      description: 'Sales, collection, receivables, and profit margin by clinic department',
+      columns: const [
+        ExcelColumnSpec(header: 'Department', sourceField: 'department', width: 18),
+        ExcelColumnSpec(header: 'Invoice Count', sourceField: 'invoice_count', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Invoiced Sales (INR)', sourceField: 'sales', width: 20, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Revenue Collected (INR)', sourceField: 'collected', width: 22, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Outstanding Balance (INR)', sourceField: 'outstanding', width: 24, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Estimated Profit (INR)', sourceField: 'profit', width: 22, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Revenue Share', sourceField: 'share', width: 16),
+      ],
+    );
+
+    final paymentSheet = ExcelWorksheetSpec(
+      name: 'Payment_Modes',
+      sourceTable: 'payment_modes',
+      stableIdKey: 'mode',
+      timestampKey: 'mode',
+      description: 'Collections segmented by payment tender (UPI, Cash, Card, Insurance)',
+      columns: const [
+        ExcelColumnSpec(header: 'Payment Tender', sourceField: 'mode', width: 20),
+        ExcelColumnSpec(header: 'Transaction Count', sourceField: 'count', width: 18, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Amount Collected (INR)', sourceField: 'amount', width: 22, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Share Percentage', sourceField: 'percentage', width: 18),
+      ],
+    );
+
+    final periodicSheet = ExcelWorksheetSpec(
+      name: 'Periodic_Revenue',
+      sourceTable: 'periodic_revenue',
+      stableIdKey: 'period_label',
+      timestampKey: 'date',
+      description: 'Daily/monthly revenue collections, invoices, and profitability',
+      columns: const [
+        ExcelColumnSpec(header: 'Period Label', sourceField: 'period_label', width: 18),
+        ExcelColumnSpec(header: 'Date', sourceField: 'date', width: 14, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Invoices', sourceField: 'invoice_count', width: 12, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Total Sales (INR)', sourceField: 'sales', width: 18, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Collected (INR)', sourceField: 'collected', width: 18, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Outstanding (INR)', sourceField: 'outstanding', width: 18, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Estimated Profit (INR)', sourceField: 'profit', width: 20, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Collection Rate', sourceField: 'collection_rate', width: 16),
+      ],
+    );
+
+    final servicesSheet = ExcelWorksheetSpec(
+      name: 'Top_Services',
+      sourceTable: 'top_services',
+      stableIdKey: 'service_name',
+      timestampKey: 'service_name',
+      description: 'Highest billing clinical treatments, diagnostic items and consumables',
+      columns: const [
+        ExcelColumnSpec(header: 'Service / Procedure Name', sourceField: 'service_name', width: 32),
+        ExcelColumnSpec(header: 'Department', sourceField: 'department', width: 16),
+        ExcelColumnSpec(header: 'Quantity Dispensed', sourceField: 'quantity', width: 20, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Total Revenue (INR)', sourceField: 'revenue', width: 20, type: ExcelColumnType.currency),
+      ],
+    );
+
+    final summaryRows = <Map<String, dynamic>>[
+      {'metric': 'Gross Invoiced Sales', 'value': _currencyFormat.format(data.totalSales)},
+      {'metric': 'Revenue Collected', 'value': _currencyFormat.format(data.totalRevenue)},
+      {'metric': 'Outstanding Receivables', 'value': _currencyFormat.format(data.totalOutstanding)},
+      {'metric': 'Estimated Profit Margin', 'value': _currencyFormat.format(data.estimatedProfit)},
+      {'metric': 'Total Invoices Generated', 'value': data.totalInvoices.toString()},
+      {'metric': 'Fully Settled Invoices', 'value': data.paidInvoicesCount.toString()},
+      {'metric': 'Partially Settled Invoices', 'value': data.partiallyPaidInvoicesCount.toString()},
+      {'metric': 'Average Order Value (AOV)', 'value': _currencyFormat.format(data.averageOrderValue)},
+      {'metric': 'Collection Efficiency Rate', 'value': '${data.collectionRate.toStringAsFixed(1)}%'},
+    ];
+
+    final deptRows = <Map<String, dynamic>>[
+      {
+        'department': 'Eye Clinic',
+        'invoice_count': data.eyeSummary.invoiceCount,
+        'sales': data.eyeSummary.totalSales,
+        'collected': data.eyeSummary.revenueCollected,
+        'outstanding': data.eyeSummary.outstandingBalance,
+        'profit': data.eyeSummary.estimatedProfit,
+        'share': '${data.eyeSummary.sharePercentage.toStringAsFixed(1)}%',
+      },
+      {
+        'department': 'Dental Clinic',
+        'invoice_count': data.dentalSummary.invoiceCount,
+        'sales': data.dentalSummary.totalSales,
+        'collected': data.dentalSummary.revenueCollected,
+        'outstanding': data.dentalSummary.outstandingBalance,
+        'profit': data.dentalSummary.estimatedProfit,
+        'share': '${data.dentalSummary.sharePercentage.toStringAsFixed(1)}%',
+      },
+    ];
+
+    final paymentRows = data.paymentModes.map((p) => {
+      'mode': p.mode,
+      'count': p.transactionCount,
+      'amount': p.totalAmount,
+      'percentage': '${p.percentage.toStringAsFixed(1)}%',
+    }).toList();
+
+    final periodicRows = data.periodicBuckets.map((b) => {
+      'period_label': b.periodLabel,
+      'date': b.date,
+      'invoice_count': b.invoiceCount,
+      'sales': b.totalSales,
+      'collected': b.revenueCollected,
+      'outstanding': b.outstandingBalance,
+      'profit': b.estimatedProfit,
+      'collection_rate': '${b.collectionRate.toStringAsFixed(1)}%',
+    }).toList();
+
+    final serviceRows = data.topServices.map((s) => {
+      'service_name': s.serviceName,
+      'department': s.department,
+      'quantity': s.quantity,
+      'revenue': s.totalRevenue,
+    }).toList();
+
+    return builder.buildCustomWorkbook(
+      worksheets: [summarySheet, deptSheet, paymentSheet, periodicSheet, servicesSheet],
+      recordsByWorksheet: {
+        'Financial_Summary': summaryRows,
+        'Department_Revenue': deptRows,
+        'Payment_Modes': paymentRows,
+        'Periodic_Revenue': periodicRows,
+        'Top_Services': serviceRows,
+      },
+    );
+  }
+
+  /// Generates a standalone .xlsx workbook containing Inventory & Stock analytics.
+  static Uint8List generateInventoryReportWorkbook(
+    InventoryReportsData data, [
+    AdminReportsFilter filter = const AdminReportsFilter(),
+  ]) {
+    final builder = ExcelWorkbookBuilder();
+
+    final snapshotSheet = ExcelWorksheetSpec(
+      name: 'Inventory_Snapshot',
+      sourceTable: 'inventory_snapshot',
+      stableIdKey: 'metric',
+      timestampKey: 'metric',
+      description: 'Stock valuation, low stock alerts, and expiration risk overview',
+      columns: const [
+        ExcelColumnSpec(header: 'Inventory Metric', sourceField: 'metric', width: 34),
+        ExcelColumnSpec(header: 'Value', sourceField: 'value', width: 22),
+      ],
+    );
+
+    final categorySheet = ExcelWorksheetSpec(
+      name: 'Category_Valuation',
+      sourceTable: 'category_valuation',
+      stableIdKey: 'category',
+      timestampKey: 'category',
+      description: 'Stock holding distribution across clinical categories',
+      columns: const [
+        ExcelColumnSpec(header: 'Category', sourceField: 'category', width: 24),
+        ExcelColumnSpec(header: 'Items Count', sourceField: 'item_count', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Stock Units', sourceField: 'units', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Valuation (INR)', sourceField: 'valuation', width: 18, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Share Percentage', sourceField: 'share', width: 16),
+      ],
+    );
+
+    final lowStockSheet = ExcelWorksheetSpec(
+      name: 'Low_Stock_Alerts',
+      sourceTable: 'low_stock_items',
+      stableIdKey: 'item_name',
+      timestampKey: 'item_name',
+      description: 'Items below minimum reorder thresholds requiring purchase replenishment',
+      columns: const [
+        ExcelColumnSpec(header: 'Item Name', sourceField: 'item_name', width: 28),
+        ExcelColumnSpec(header: 'SKU', sourceField: 'sku', width: 16),
+        ExcelColumnSpec(header: 'Location', sourceField: 'location', width: 16),
+        ExcelColumnSpec(header: 'Current Stock', sourceField: 'current_stock', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Min Stock', sourceField: 'min_stock', width: 12, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Shortfall', sourceField: 'shortfall', width: 12, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Unit', sourceField: 'unit', width: 10),
+        ExcelColumnSpec(header: 'Preferred Vendor', sourceField: 'vendor_name', width: 22),
+        ExcelColumnSpec(header: 'Vendor Contact', sourceField: 'vendor_phone', width: 16),
+        ExcelColumnSpec(header: 'Last Price (INR)', sourceField: 'last_price', width: 16, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Stock Status', sourceField: 'status', width: 16),
+      ],
+    );
+
+    final expirySheet = ExcelWorksheetSpec(
+      name: 'Batch_Expiry_Risk',
+      sourceTable: 'batch_expiry',
+      stableIdKey: 'batch_number',
+      timestampKey: 'expiry_date',
+      description: 'Pharmaceutical and consumable lots nearing or past expiration',
+      columns: const [
+        ExcelColumnSpec(header: 'Batch Number', sourceField: 'batch_number', width: 18),
+        ExcelColumnSpec(header: 'Item Name', sourceField: 'item_name', width: 26),
+        ExcelColumnSpec(header: 'Category', sourceField: 'category', width: 18),
+        ExcelColumnSpec(header: 'Expiry Date', sourceField: 'expiry_date', width: 14, type: ExcelColumnType.date),
+        ExcelColumnSpec(header: 'Days Remaining', sourceField: 'days_remaining', width: 16, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Remaining Units', sourceField: 'quantity', width: 16, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Unit Cost (INR)', sourceField: 'unit_price', width: 16, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'At-Risk Value (INR)', sourceField: 'total_amount', width: 18, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Urgency Status', sourceField: 'status', width: 16),
+      ],
+    );
+
+    final auditSheet = ExcelWorksheetSpec(
+      name: 'Stock_Movement_Audit',
+      sourceTable: 'stock_movement',
+      stableIdKey: 'date',
+      timestampKey: 'date',
+      description: 'Immutable ledger of stock-in, stock-out, allocations and write-offs',
+      columns: const [
+        ExcelColumnSpec(header: 'Date & Time', sourceField: 'date', width: 18, type: ExcelColumnType.datetime),
+        ExcelColumnSpec(header: 'Item Name', sourceField: 'item_name', width: 26),
+        ExcelColumnSpec(header: 'Transaction Type', sourceField: 'type', width: 16),
+        ExcelColumnSpec(header: 'Quantity', sourceField: 'quantity', width: 12, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Stock Before', sourceField: 'stock_before', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Stock After', sourceField: 'stock_after', width: 14, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Operational Reason', sourceField: 'reason', width: 22),
+        ExcelColumnSpec(header: 'Performed By', sourceField: 'performed_by', width: 20),
+        ExcelColumnSpec(header: 'Recipient / Patient', sourceField: 'recipient', width: 20),
+        ExcelColumnSpec(header: 'Remarks', sourceField: 'remarks', width: 28),
+      ],
+    );
+
+    final fastMovingSheet = ExcelWorksheetSpec(
+      name: 'Fast_Moving_Items',
+      sourceTable: 'fast_moving_items',
+      stableIdKey: 'item_name',
+      timestampKey: 'item_name',
+      description: 'Frequently dispensed medications, supplies and consumables',
+      columns: const [
+        ExcelColumnSpec(header: 'Item Name', sourceField: 'item_name', width: 28),
+        ExcelColumnSpec(header: 'Category', sourceField: 'category', width: 18),
+        ExcelColumnSpec(header: 'Units Consumed', sourceField: 'units_consumed', width: 16, type: ExcelColumnType.number),
+        ExcelColumnSpec(header: 'Value Consumed (INR)', sourceField: 'value_consumed', width: 20, type: ExcelColumnType.currency),
+        ExcelColumnSpec(header: 'Dispense Count', sourceField: 'transaction_count', width: 16, type: ExcelColumnType.number),
+      ],
+    );
+
+    final snapshotRows = <Map<String, dynamic>>[
+      {'metric': 'Total Catalog Items', 'value': data.totalCatalogItems.toString()},
+      {'metric': 'Active Stocked SKUs', 'value': data.activeItemsCount.toString()},
+      {'metric': 'Total Physical Units in Stock', 'value': data.totalUnits.toStringAsFixed(1)},
+      {'metric': 'Total Stock Valuation', 'value': _currencyFormat.format(data.totalValuation)},
+      {'metric': 'Central Store Valuation', 'value': _currencyFormat.format(data.centralValuation)},
+      {'metric': 'Eye Clinic Valuation', 'value': _currencyFormat.format(data.eyeValuation)},
+      {'metric': 'Dental Clinic Valuation', 'value': _currencyFormat.format(data.dentalValuation)},
+      {'metric': 'Central Store Low Stock Alerts', 'value': data.centralLowStockCount.toString()},
+      {'metric': 'Department Low Stock Alerts', 'value': data.departmentLowStockCount.toString()},
+      {'metric': 'Critical Stock-Outs (0 Units)', 'value': data.stockOutCount.toString()},
+      {'metric': 'Expired Batches Detected', 'value': data.expiredBatchesCount.toString()},
+      {'metric': 'Expired Stock Value Lost', 'value': _currencyFormat.format(data.expiredValueLost)},
+      {'metric': '30-Day At-Risk Expiry Valuation', 'value': _currencyFormat.format(data.expiring30DaysValue)},
+    ];
+
+    final categoryRows = data.categoryValuations.map((c) => {
+      'category': c.category,
+      'item_count': c.itemCount,
+      'units': c.totalUnits,
+      'valuation': c.totalValuation,
+      'share': '${c.percentage.toStringAsFixed(1)}%',
+    }).toList();
+
+    final lowStockRows = data.lowStockItems.map((i) => {
+      'item_name': i.itemName,
+      'sku': i.sku ?? '-',
+      'location': i.location,
+      'current_stock': i.currentStock,
+      'min_stock': i.minimumStock,
+      'shortfall': i.shortfall,
+      'unit': i.unit,
+      'vendor_name': i.vendorName ?? '-',
+      'vendor_phone': i.vendorPhone ?? '-',
+      'last_price': i.lastPrice ?? 0.0,
+      'status': i.isStockOut ? 'DEPLETED / ZERO' : 'LOW STOCK',
+    }).toList();
+
+    final expiryRows = data.batchExpiryDetails.map((b) => {
+      'batch_number': b.batchNumber,
+      'item_name': b.itemName,
+      'category': b.category,
+      'expiry_date': b.expiryDate != null ? _shortDateFormat.format(b.expiryDate!) : '-',
+      'days_remaining': b.daysRemaining ?? 0,
+      'quantity': b.remainingQuantity,
+      'unit_price': b.unitPrice,
+      'total_amount': b.totalAmount,
+      'status': b.urgencyStatus.toUpperCase(),
+    }).toList();
+
+    final auditRows = data.auditLedger.map((tx) => {
+      'date': tx.date,
+      'item_name': tx.itemName,
+      'type': tx.transactionType.toUpperCase(),
+      'quantity': tx.quantity,
+      'stock_before': tx.stockBefore ?? 0.0,
+      'stock_after': tx.stockAfter ?? 0.0,
+      'reason': tx.reason ?? '-',
+      'performed_by': tx.performedByName ?? '-',
+      'recipient': tx.recipientInfo ?? '-',
+      'remarks': tx.remarks ?? '-',
+    }).toList();
+
+    final fastMovingRows = data.fastMovingItems.map((f) => {
+      'item_name': f.itemName,
+      'category': f.category,
+      'units_consumed': f.totalConsumedUnits,
+      'value_consumed': f.totalConsumedValue,
+      'transaction_count': f.transactionCount,
+    }).toList();
+
+    return builder.buildCustomWorkbook(
+      worksheets: [
+        snapshotSheet,
+        categorySheet,
+        lowStockSheet,
+        expirySheet,
+        auditSheet,
+        fastMovingSheet,
+      ],
+      recordsByWorksheet: {
+        'Inventory_Snapshot': snapshotRows,
+        'Category_Valuation': categoryRows,
+        'Low_Stock_Alerts': lowStockRows,
+        'Batch_Expiry_Risk': expiryRows,
+        'Stock_Movement_Audit': auditRows,
+        'Fast_Moving_Items': fastMovingRows,
+      },
+    );
+  }
+
+  // ── 2. GENERAL STANDALONE EXCEL EXPORT ORCHESTRATOR ────────────────────────
+
+  /// Builds the standalone .xlsx bytes for any given section and filter.
+  static Uint8List buildSectionWorkbookBytes({
+    required ReportsSection section,
+    required AdminReportsFilter filter,
+    required dynamic sectionData,
+  }) {
+    switch (section) {
+      case ReportsSection.overview:
+        return generateOverviewReportWorkbook(
+          sectionData is OverviewReportsData
+              ? sectionData
+              : const OverviewReportsData(
+                  totalPatients: 0,
+                  newPatients: 0,
+                  totalAppointments: 0,
+                  completedAppointments: 0,
+                  totalProcedures: 0,
+                  totalSales: 0.0,
+                  totalRevenue: 0.0,
+                  totalOutstanding: 0.0,
+                  eyePatients: 0,
+                  dentalPatients: 0,
+                  eyeAppointments: 0,
+                  dentalAppointments: 0,
+                  eyeProcedures: 0,
+                  dentalProcedures: 0,
+                  eyeSales: 0.0,
+                  dentalSales: 0.0,
+                  trendPoints: [],
+                ),
+          filter,
+        );
+      case ReportsSection.patients:
+        return generatePatientsReportWorkbook(
+          sectionData is PatientReportsData ? sectionData : PatientReportsData.empty,
+          filter,
+        );
+      case ReportsSection.appointments:
+        return generateAppointmentsReportWorkbook(
+          sectionData is AppointmentReportsData
+              ? sectionData
+              : const AppointmentReportsData(
+                  totalAppointments: 0,
+                  completedAppointments: 0,
+                  cancelledAppointments: 0,
+                  scheduledAppointments: 0,
+                  inTriageAppointments: 0,
+                  completionRate: 0.0,
+                  cancellationRate: 0.0,
+                  eyeAppointments: 0,
+                  dentalAppointments: 0,
+                  eyePercentage: 0.0,
+                  dentalPercentage: 0.0,
+                  regularAppointments: 0,
+                  walkInAppointments: 0,
+                  followUpAppointments: 0,
+                  doctorStats: [],
+                  appointmentTrends: [],
+                ),
+          filter,
+        );
+      case ReportsSection.staff:
+        return generateStaffReportWorkbook(
+          sectionData is StaffReportsData ? sectionData : StaffReportsData.empty,
+          filter,
+        );
+      case ReportsSection.clinical:
+        return generateClinicalReportWorkbook(
+          sectionData is ClinicalReportsData ? sectionData : ClinicalReportsData.empty,
+          filter,
+        );
+      case ReportsSection.financial:
+        return generateFinancialReportWorkbook(
+          sectionData is BillingReportsData
+              ? sectionData
+              : const BillingReportsData(
+                  totalSales: 0.0,
+                  totalRevenue: 0.0,
+                  totalOutstanding: 0.0,
+                  estimatedProfit: 0.0,
+                  totalInvoices: 0,
+                  paidInvoicesCount: 0,
+                  partiallyPaidInvoicesCount: 0,
+                  averageOrderValue: 0.0,
+                  collectionRate: 0.0,
+                  eyeSummary: DepartmentRevenueSummary(
+                    department: 'Eye',
+                    invoiceCount: 0,
+                    totalSales: 0.0,
+                    revenueCollected: 0.0,
+                    outstandingBalance: 0.0,
+                    estimatedProfit: 0.0,
+                    sharePercentage: 0.0,
+                  ),
+                  dentalSummary: DepartmentRevenueSummary(
+                    department: 'Dental',
+                    invoiceCount: 0,
+                    totalSales: 0.0,
+                    revenueCollected: 0.0,
+                    outstandingBalance: 0.0,
+                    estimatedProfit: 0.0,
+                    sharePercentage: 0.0,
+                  ),
+                  paymentModes: [],
+                  periodicBuckets: [],
+                  topServices: [],
+                ),
+          filter,
+        );
+      case ReportsSection.inventory:
+        return generateInventoryReportWorkbook(
+          sectionData is InventoryReportsData
+              ? sectionData
+              : InventoryReportsData.empty,
+          filter,
+        );
+    }
+  }
+
+  /// Exports the currently selected section report as a standalone .xlsx file.
+  ///
+  /// Uploads to Supabase storage (`clinic-excel-sync/reports/<fileName>`) and triggers
+  /// direct Android download via signed URL in an external browser / download manager.
+  static Future<ExportReportResult> exportReportToExcel({
+    required ReportsSection section,
+    required AdminReportsFilter filter,
+    required dynamic sectionData,
+    required SupabaseClient supabase,
+  }) async {
+    final fileName = filter.getReportFileName(section);
+
+    try {
+      // 1. Generate standalone .xlsx bytes in memory
+      final bytes = buildSectionWorkbookBytes(
+        section: section,
+        filter: filter,
+        sectionData: sectionData,
+      );
+
+      final fileSizeBytes = bytes.length;
+
+      // 2. Upload to clinic-excel-sync/reports/<fileName>
+      final storagePath = 'reports/$fileName';
+      await supabase.storage.from(storageBucket).uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType:
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ),
+          );
+
+      // 3. Generate 1-hour signed URL
+      final signedUrl = await supabase.storage
+          .from(storageBucket)
+          .createSignedUrl(storagePath, 3600);
+
+      // 4. Launch download on Android
+      bool launched = false;
+      if (signedUrl.isNotEmpty) {
+        final uri = Uri.parse(signedUrl);
+        if (await canLaunchUrl(uri)) {
+          launched =
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      }
+
+      return ExportReportResult(
+        success: true,
+        fileName: fileName,
+        fileSizeBytes: fileSizeBytes,
+        signedUrl: signedUrl,
+        launched: launched,
+      );
+    } catch (e) {
+      debugPrint('ReportsExportService export error: $e');
+      return ExportReportResult(
+        success: false,
+        fileName: fileName,
+        errorMessage: e.toString().replaceAll('Exception:', '').trim(),
+      );
+    }
+  }
+
+  // ── 3. PRESERVED SHARED CSV & HTML UTILITIES ───────────────────────────────
 
   /// Generates the complete Inventory Analytics report as an Excel-compatible CSV string.
   static String generateCsvContent(InventoryReportsData data,
@@ -348,7 +1377,6 @@ class ReportsExportService {
       if (await canLaunchUrl(uri)) {
         return await launchUrl(uri);
       } else {
-        // Fallback: launch as plain data string
         final plainUri = Uri.dataFromString(
           content,
           mimeType: mimeType,

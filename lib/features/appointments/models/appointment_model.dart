@@ -241,6 +241,27 @@ class AppointmentModel {
     return appointmentTime;
   }
 
+  bool get isPresent =>
+      status.toLowerCase() == 'waiting' ||
+      status.toLowerCase() == 'present' ||
+      status.toLowerCase() == 'in_triage' ||
+      status.toLowerCase() == 'completed';
+
+  bool get isBilled =>
+      (notes?.contains('[BILLED') ?? false) ||
+      (notes?.contains('[NO_CHARGE') ?? false);
+
+  String? get billingReference {
+    if (notes == null) return null;
+    final billedMatch = RegExp(r'\[BILLED:?\s*([^\]]+)\]').firstMatch(notes!);
+    if (billedMatch != null) return billedMatch.group(1)?.trim();
+    final noChargeMatch =
+        RegExp(r'\[NO_CHARGE:?\s*([^\]]+)\]').firstMatch(notes!);
+    if (noChargeMatch != null) return 'No-Charge: ${noChargeMatch.group(1)?.trim()}';
+    if (notes!.contains('[NO_CHARGE]')) return 'No-Charge Visit';
+    return null;
+  }
+
   String get statusLabel {
     switch (status.toLowerCase()) {
       case 'scheduled':
@@ -248,9 +269,10 @@ class AppointmentModel {
       case 'confirmed':
         return 'Confirmed';
       case 'waiting':
+      case 'present':
       case 'in_triage':
       case 'in triage':
-        return 'In Triage';
+        return 'Present (Waiting)';
       case 'completed':
         return 'Completed';
       case 'missed':

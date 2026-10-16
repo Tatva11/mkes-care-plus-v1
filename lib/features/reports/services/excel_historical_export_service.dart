@@ -28,6 +28,28 @@ class LocalHistoricalExportOutput {
   final Uint8List bytes;
 }
 
+/// Comprehensive validation report for historical export integrity.
+@immutable
+class HistoricalExportValidationReport {
+  const HistoricalExportValidationReport({
+    required this.isValid,
+    required this.errors,
+    required this.totalRecords,
+    required this.worksheetCount,
+    required this.hasValidZipHeader,
+    required this.hasAll21Worksheets,
+    required this.hasAllOpenXmlParts,
+  });
+
+  final bool isValid;
+  final List<String> errors;
+  final int totalRecords;
+  final int worksheetCount;
+  final bool hasValidZipHeader;
+  final bool hasAll21Worksheets;
+  final bool hasAllOpenXmlParts;
+}
+
 class ExcelHistoricalExportService {
   ExcelHistoricalExportService({
     SupabaseClient? supabase,
@@ -157,13 +179,340 @@ class ExcelHistoricalExportService {
     }
   }
 
-  /// Downloads the master Excel workbook from the private storage bucket.
-  Future<Uint8List> downloadMasterWorkbook() async {
+  /// Triggers a 5-minute incremental sync run via Supabase Edge Function (Sprint 9.4).
+  ///
+  /// Acquires distributed lease, claims pending outbox events, checks for no-op,
+  /// regenerates workbook, uploads immutable version, and atomically commits checkpoints.
+  Future<ExcelIncrementalSyncResultModel> triggerIncrementalSync({
+    String syncType = 'manual',
+  }) async {
+    final client = _supabase;
+    if (client == null) {
+      return const ExcelIncrementalSyncResultModel(
+        success: false,
+        status: 'failed',
+        syncId: '',
+        totalRecords: 0,
+        fileSizeBytes: 0,
+        durationMs: 0,
+        eventsProcessed: 0,
+        errorMessage: 'SupabaseClient is not configured for remote operations',
+      );
+    }
+
+    try {
+      final response = await client.functions.invoke(
+        'sync-excel-workbook',
+        body: {
+          'action': 'sync-incremental',
+          'sync_type': syncType,
+        },
+      );
+
+      final status = response.status;
+      final data = response.data;
+
+      if (status != 200 || data == null) {
+        final errorMsg = data is Map<String, dynamic>
+            ? data['error'] ?? 'Server returned status $status'
+            : 'Incremental sync request failed with status $status';
+        return ExcelIncrementalSyncResultModel(
+          success: false,
+          status: 'failed',
+          syncId: data is Map<String, dynamic> ? data['syncId'] ?? '' : '',
+          totalRecords: 0,
+          fileSizeBytes: 0,
+          durationMs: 0,
+          eventsProcessed: 0,
+          errorMessage: errorMsg.toString(),
+        );
+      }
+
+      if (data is Map<String, dynamic>) {
+        return ExcelIncrementalSyncResultModel.fromJson(data);
+      }
+
+      return const ExcelIncrementalSyncResultModel(
+        success: false,
+        status: 'failed',
+        syncId: '',
+        totalRecords: 0,
+        fileSizeBytes: 0,
+        durationMs: 0,
+        eventsProcessed: 0,
+        errorMessage: 'Unexpected server response format',
+      );
+    } catch (e) {
+      return ExcelIncrementalSyncResultModel(
+        success: false,
+        status: 'failed',
+        syncId: '',
+        totalRecords: 0,
+        fileSizeBytes: 0,
+        durationMs: 0,
+        eventsProcessed: 0,
+        errorMessage: 'Incremental sync invocation error: $e',
+      );
+    }
+  }
+
+  /// Fetches the currently active workbook version from `public.excel_sync_versions`.
+  Future<ExcelSyncVersionModel?> fetchActiveVersion() async {
+    final client = _supabase;
+    if (client == null) return null;
+    try {
+      final response = await client
+          .rpc('get_excel_sync_active_version')
+          .maybeSingle();
+
+      if (response == null) return null;
+      return ExcelSyncVersionModel.fromJson(response);
+    } catch (e) {
+      debugPrint('Error fetching active excel sync version: $e');
+      return null;
+    }
+  }
+
+  /// Fetches the current distributed lease status from `public.excel_sync_leases`.
+  Future<ExcelSyncLeaseModel?> fetchActiveLease() async {
+    final client = _supabase;
+    if (client == null) return null;
+    try {
+      final response = await client
+          .from('excel_sync_leases')
+          .select('*')
+          .eq('lease_key', 'master_sync')
+          .maybeSingle();
+
+      if (response == null) return null;
+      return ExcelSyncLeaseModel.fromJson(response);
+    } catch (e) {
+      debugPrint('Error fetching excel sync lease: $e');
+      return null;
+    }
+  }
+
+  /// Fetches the number of pending mutation events in `public.excel_sync_outbox`.
+  Future<int> fetchPendingOutboxCount() async {
+    final client = _supabase;
+    if (client == null) return 0;
+    try {
+      final response = await client
+          .from('excel_sync_outbox')
+          .select('id')
+          .eq('status', 'pending');
+
+      return (response as List<dynamic>?)?.length ?? 0;
+    } catch (e) {
+      debugPrint('Error fetching pending outbox count: $e');
+      return 0;
+    }
+  }
+
+  /// Generates a signed URL for direct browser/device download of the active workbook.
+  Future<String> getActiveWorkbookSignedUrl({int expiresIn = 3600}) async {
     final client = _supabase;
     if (client == null) {
       throw StateError('SupabaseClient is not configured');
     }
-    return client.storage.from(storageBucket).download(masterWorkbookFile);
+
+    final activeVersion = await fetchActiveVersion();
+    String relativePath = masterWorkbookFile;
+    if (activeVersion != null && activeVersion.storagePath.isNotEmpty) {
+      relativePath = activeVersion.storagePath;
+      if (relativePath.startsWith('$storageBucket/')) {
+        relativePath = relativePath.substring(storageBucket.length + 1);
+      }
+    } else {
+      throw StateError(
+        'No active master workbook has been published yet. Please run "Full Export" first to generate the initial baseline workbook.',
+      );
+    }
+
+    try {
+      return await client.storage.from(storageBucket).createSignedUrl(relativePath, expiresIn);
+    } on StorageException catch (e) {
+      if (e.statusCode == '404' || e.message.contains('not found') || e.message.contains('NoSuchKey')) {
+        throw StateError(
+          'Active workbook file was not found in storage ($relativePath). Please run "Full Export" to regenerate the baseline.',
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// Downloads the authoritative active workbook version from Storage.
+  Future<Uint8List> downloadActiveWorkbook() async {
+    final client = _supabase;
+    if (client == null) {
+      throw StateError('SupabaseClient is not configured');
+    }
+
+    final activeVersion = await fetchActiveVersion();
+    if (activeVersion != null && activeVersion.storagePath.isNotEmpty) {
+      String relativePath = activeVersion.storagePath;
+      if (relativePath.startsWith('$storageBucket/')) {
+        relativePath = relativePath.substring(storageBucket.length + 1);
+      }
+      try {
+        return await client.storage.from(storageBucket).download(relativePath);
+      } on StorageException catch (e) {
+        if (e.statusCode == '404' || e.message.contains('not found') || e.message.contains('NoSuchKey')) {
+          throw StateError(
+            'Published workbook file was not found in storage ($relativePath). Please run "Full Export" to regenerate the baseline.',
+          );
+        }
+        rethrow;
+      }
+    }
+
+    // No active version recorded: attempt canonical file or provide actionable error
+    try {
+      return await client.storage.from(storageBucket).download(masterWorkbookFile);
+    } on StorageException catch (e) {
+      if (e.statusCode == '404' || e.message.contains('not found') || e.message.contains('NoSuchKey')) {
+        throw StateError(
+          'No active master workbook has been published yet. Please run "Full Export" first to initialize the baseline workbook.',
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// Downloads the master Excel workbook from the private storage bucket.
+  Future<Uint8List> downloadMasterWorkbook() async {
+    return downloadActiveWorkbook();
+  }
+
+  /// Generates a signed URL for direct browser/device download of an individual worksheet.
+  Future<String> getSingleWorksheetSignedUrl(
+    String worksheetName, {
+    int expiresIn = 3600,
+  }) async {
+    final client = _supabase;
+    if (client == null) {
+      throw StateError('SupabaseClient is not configured');
+    }
+
+    final spec = ExcelWorkbookSchema.getWorksheet(worksheetName);
+    if (spec == null) {
+      throw ArgumentError('Worksheet "$worksheetName" is not recognized.');
+    }
+
+    try {
+      final response = await client.functions.invoke(
+        'sync-excel-workbook',
+        body: {
+          'action': 'export-worksheet',
+          'worksheet_name': spec.name,
+        },
+      );
+
+      final status = response.status;
+      final data = response.data;
+
+      if (status == 200 && data is Map<String, dynamic>) {
+        final downloadUrl = data['downloadUrl'] as String?;
+        if (downloadUrl != null && downloadUrl.isNotEmpty) {
+          return downloadUrl;
+        }
+
+        final storagePath = data['storagePath'] as String?;
+        if (storagePath != null && storagePath.isNotEmpty) {
+          String relPath = storagePath;
+          if (relPath.startsWith('$storageBucket/')) {
+            relPath = relPath.substring(storageBucket.length + 1);
+          }
+          return await client.storage
+              .from(storageBucket)
+              .createSignedUrl(relPath, expiresIn);
+        }
+      }
+
+      final errorMsg = data is Map<String, dynamic>
+          ? data['error'] ?? 'Server returned status $status'
+          : 'Export request failed with status $status';
+      throw StateError('Failed to prepare single worksheet: $errorMsg');
+    } catch (e) {
+      if (e is StateError || e is ArgumentError) rethrow;
+      throw StateError('Worksheet export request failed: $e');
+    }
+  }
+
+  /// Downloads an individual worksheet as a standalone .xlsx file.
+  Future<Uint8List> downloadSingleWorksheet(String worksheetName) async {
+    final client = _supabase;
+    if (client == null) {
+      throw StateError('SupabaseClient is not configured');
+    }
+
+    final spec = ExcelWorkbookSchema.getWorksheet(worksheetName);
+    if (spec == null) {
+      throw ArgumentError('Worksheet "$worksheetName" is not recognized.');
+    }
+
+    // 1. Attempt server-side Edge Function generation
+    try {
+      final response = await client.functions.invoke(
+        'sync-excel-workbook',
+        body: {
+          'action': 'export-worksheet',
+          'worksheet_name': spec.name,
+        },
+      );
+
+      if (response.status == 200 && response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        final storagePath = data['storagePath'] as String?;
+        if (storagePath != null && storagePath.isNotEmpty) {
+          String relPath = storagePath;
+          if (relPath.startsWith('$storageBucket/')) {
+            relPath = relPath.substring(storageBucket.length + 1);
+          }
+          return await client.storage.from(storageBucket).download(relPath);
+        }
+      }
+    } catch (e) {
+      debugPrint('Server single worksheet download fallback: $e');
+    }
+
+    // 2. Client-side fallback generation from live database query
+    try {
+      final queryRes = await client
+          .from(spec.sourceTable)
+          .select(spec.columns.map((c) => c.sourceField).toSet().join(', '))
+          .limit(1000);
+
+      final rawList = queryRes as List<dynamic>? ?? const [];
+      final rows = rawList
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+
+      final builder = ExcelWorkbookBuilder();
+      return builder.buildSingleWorksheetWorkbook(
+        sheetSpec: spec,
+        records: rows,
+      );
+    } catch (e) {
+      throw StateError('Failed to generate single worksheet "$worksheetName": $e');
+    }
+  }
+
+  /// Generates a local single-worksheet workbook in-memory.
+  Uint8List generateLocalSingleWorksheet({
+    required String worksheetName,
+    required List<Map<String, dynamic>> records,
+    String clinicName = 'MKES CARE+ Clinical Management Platform',
+  }) {
+    final spec = ExcelWorkbookSchema.getWorksheet(worksheetName);
+    if (spec == null) {
+      throw ArgumentError('Worksheet "$worksheetName" is not recognized.');
+    }
+    final builder = ExcelWorkbookBuilder(clinicName: clinicName);
+    return builder.buildSingleWorksheetWorkbook(
+      sheetSpec: spec,
+      records: records,
+    );
   }
 
   /// Generates a local historical workbook in-memory from supplied records.
@@ -223,6 +572,87 @@ class ExcelHistoricalExportService {
     return LocalHistoricalExportOutput(
       result: result,
       bytes: bytes,
+    );
+  }
+
+  /// Validates the structural, record count, and packaging integrity of an exported workbook.
+  static HistoricalExportValidationReport validateExportIntegrity({
+    required HistoricalExportResultModel result,
+    required Uint8List bytes,
+  }) {
+    final errors = <String>[];
+
+    // 1. Result status check
+    if (!result.success) {
+      errors.add(result.errorMessage ?? 'Export result indicates failure');
+    }
+
+    // 2. Worksheet count check
+    if (result.worksheetSummaries.length != ExcelWorkbookSchema.totalWorksheetCount) {
+      errors.add(
+        'Expected ${ExcelWorkbookSchema.totalWorksheetCount} worksheet summaries, but found ${result.worksheetSummaries.length}',
+      );
+    }
+
+    // 3. Record count reconciliation
+    final sumOfRecords = result.worksheetSummaries.fold<int>(
+      0,
+      (acc, s) => acc + s.recordCount,
+    );
+    if (sumOfRecords != result.totalRecords) {
+      errors.add(
+        'Total records mismatch: summaries sum to $sumOfRecords but totalRecords is ${result.totalRecords}',
+      );
+    }
+
+    // 4. Canonical worksheet presence
+    final summaryNames = result.worksheetSummaries.map((s) => s.worksheetName).toSet();
+    for (final expected in ExcelWorkbookSchema.worksheets) {
+      if (!summaryNames.contains(expected.name)) {
+        errors.add('Missing worksheet summary for [${expected.name}]');
+      }
+    }
+
+    // 5. Zip header verification
+    final hasValidZipHeader = bytes.length >= 4 &&
+        bytes[0] == 0x50 &&
+        bytes[1] == 0x4B &&
+        bytes[2] == 0x03 &&
+        bytes[3] == 0x04;
+    if (!hasValidZipHeader) {
+      errors.add('Buffer does not start with valid PK zip magic header');
+    }
+
+    // 6. OpenXML parts verification
+    final text = String.fromCharCodes(bytes);
+    final hasContentTypes = text.contains('[Content_Types].xml');
+    final hasRels = text.contains('_rels/.rels');
+    final hasWorkbook = text.contains('xl/workbook.xml');
+    final hasWorkbookRels = text.contains('xl/_rels/workbook.xml.rels');
+    final hasStyles = text.contains('xl/styles.xml');
+
+    final hasAllOpenXmlParts =
+        hasContentTypes && hasRels && hasWorkbook && hasWorkbookRels && hasStyles;
+    if (!hasAllOpenXmlParts) {
+      errors.add('Missing core OpenXML package parts');
+    }
+
+    bool hasAll21Worksheets = true;
+    for (int i = 1; i <= ExcelWorkbookSchema.totalWorksheetCount; i++) {
+      if (!text.contains('xl/worksheets/sheet$i.xml')) {
+        hasAll21Worksheets = false;
+        errors.add('Missing OpenXML sheet xml part for worksheet index $i');
+      }
+    }
+
+    return HistoricalExportValidationReport(
+      isValid: errors.isEmpty,
+      errors: errors,
+      totalRecords: result.totalRecords,
+      worksheetCount: result.worksheetSummaries.length,
+      hasValidZipHeader: hasValidZipHeader,
+      hasAll21Worksheets: hasAll21Worksheets,
+      hasAllOpenXmlParts: hasAllOpenXmlParts,
     );
   }
 }

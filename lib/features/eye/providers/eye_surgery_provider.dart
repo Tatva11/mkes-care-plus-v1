@@ -1,10 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/providers/auth_provider.dart';
+import '../../billing/models/billing_invoice_model.dart';
+import '../../billing/repositories/billing_repository.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/repositories/patient_repository.dart';
 import '../models/eye_surgery_model.dart';
 import '../models/eye_surgery_item_model.dart';
+import '../models/eye_surgery_insurance_model.dart';
 import '../repositories/eye_surgery_repository.dart';
+import '../repositories/eye_surgery_insurance_repository.dart';
 
 final eyeSurgeryRepositoryProvider = Provider<EyeSurgeryRepository>((ref) {
   return EyeSurgeryRepository();
@@ -130,6 +135,17 @@ class EyeSurgeryListNotifier extends AsyncNotifier<List<EyeSurgeryModel>> {
     String id,
     String? assignedStaffId,
   ) async {
+    final role = ref.read(currentUserRoleProvider).valueOrNull;
+    if (role != null && role.toLowerCase() != 'admin') {
+      throw StateError(
+          'Access restricted: Only administrators can assign or reassign surgery staff.');
+    }
+
+    final current = state.valueOrNull?.where((s) => s.id == id).firstOrNull;
+    if (current != null && current.isDischarged) {
+      throw StateError(
+          'Cannot assign staff: Surgery has already been discharged.');
+    }
     final updated = await ref
         .read(eyeSurgeryRepositoryProvider)
         .assignStaff(id, assignedStaffId);
@@ -214,6 +230,7 @@ final filteredEyeSurgeriesProvider = Provider<List<EyeSurgeryModel>>((ref) {
           (s == 'in_surgery' ||
               s == 'pre_op' ||
               s == 'post_op' ||
+              s == 'billing' ||
               s == 'in_progress');
       if (!isInProgress) return false;
     } else if (status != 'all' && surgery.status != status) {
@@ -273,6 +290,7 @@ final eyeSurgeryStatsProvider = Provider<EyeSurgeryStats>((ref) {
       discharged++;
     } else if (s.status == 'in_surgery' ||
         s.status == 'post_op' ||
+        s.status == 'billing' ||
         s.status == 'in_progress' ||
         (s.status == 'pre_op' && !s.isMissed)) {
       inProgress++;
@@ -397,3 +415,88 @@ final eyeSurgeryStaffCandidatesProvider =
       await ref.watch(eyeSurgeryRepositoryProvider).fetchStaffCandidates();
   return uniqueEyeSurgeryStaffCandidates(candidates);
 });
+
+class EyeSurgeryInsuranceNotifier
+    extends FamilyAsyncNotifier<EyeSurgeryInsuranceModel?, String> {
+  @override
+  Future<EyeSurgeryInsuranceModel?> build(String arg) {
+    return ref
+        .watch(eyeSurgeryInsuranceRepositoryProvider)
+        .fetchInsuranceForSurgery(arg);
+  }
+
+  Future<EyeSurgeryInsuranceModel> saveInsurance(
+      EyeSurgeryInsuranceModel insurance) async {
+    final saved = await ref
+        .read(eyeSurgeryInsuranceRepositoryProvider)
+        .saveInsurance(insurance);
+    state = AsyncData(saved);
+    return saved;
+  }
+
+  Future<EyeSurgeryInsurancePaymentModel> recordPayment(
+      EyeSurgeryInsurancePaymentModel payment) async {
+    final recorded = await ref
+        .read(eyeSurgeryInsuranceRepositoryProvider)
+        .recordInsurancePayment(payment);
+    final updated = await ref
+        .read(eyeSurgeryInsuranceRepositoryProvider)
+        .fetchInsuranceForSurgery(arg);
+    state = AsyncData(updated);
+    return recorded;
+  }
+
+  Future<EyeSurgeryInsuranceModel> updateClaimStatus({
+    required EyeSurgeryClaimStatus newStatus,
+    double? approvedAmount,
+    String? rejectionReason,
+    String? claimNumber,
+    DateTime? submissionDate,
+  }) async {
+    final current = state.valueOrNull;
+    if (current == null) {
+      throw StateError('Cannot update claim status: Insurance record not found.');
+    }
+    final updated = await ref
+        .read(eyeSurgeryInsuranceRepositoryProvider)
+        .updateClaimStatus(
+          insuranceId: current.id,
+          newStatus: newStatus,
+          approvedAmount: approvedAmount,
+          rejectionReason: rejectionReason,
+          claimNumber: claimNumber,
+          submissionDate: submissionDate,
+        );
+    state = AsyncData(updated);
+    return updated;
+  }
+}
+
+final eyeSurgeryInsuranceProvider = AsyncNotifierProvider.family<
+    EyeSurgeryInsuranceNotifier, EyeSurgeryInsuranceModel?, String>(
+  EyeSurgeryInsuranceNotifier.new,
+);
+
+final eyeSurgeryInvoiceProvider =
+    FutureProvider.family<BillingInvoiceModel?, String>((ref, surgeryId) async {
+  return ref.watch(billingRepositoryProvider).fetchInvoiceForSurgery(surgeryId);
+});
+
+final eyeSurgeryFinancialSummaryProvider =
+    Provider.family<EyeSurgeryFinancialSummary, String>((ref, surgeryId) {
+  final invoiceAsync = ref.watch(eyeSurgeryInvoiceProvider(surgeryId));
+  final insuranceAsync = ref.watch(eyeSurgeryInsuranceProvider(surgeryId));
+
+  final invoice = invoiceAsync.valueOrNull;
+  final insurance = insuranceAsync.valueOrNull;
+
+  final totalBill = invoice?.totalAmount ?? 0.0;
+  final patientPaid = invoice?.amountPaid ?? 0.0;
+
+  return EyeSurgeryFinancialSummary.calculate(
+    surgeryBill: totalBill,
+    insurance: insurance,
+    patientPayments: patientPaid,
+  );
+});
+

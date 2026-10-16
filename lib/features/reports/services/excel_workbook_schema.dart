@@ -21,6 +21,20 @@ class ExcelColumnSpec {
   final dynamic defaultValue;
 }
 
+/// Sorting specification rule for ordering worksheet records chronologically.
+@immutable
+class ExcelSortRule {
+  const ExcelSortRule({
+    required this.field,
+    this.descending = true,
+    this.nullsLast = true,
+  });
+
+  final String field;
+  final bool descending;
+  final bool nullsLast;
+}
+
 /// Definition of a normalized Excel worksheet.
 @immutable
 class ExcelWorksheetSpec {
@@ -32,6 +46,7 @@ class ExcelWorksheetSpec {
     required this.columns,
     this.sensitiveExcludedFields = const [],
     this.description = '',
+    this.sortRules = const [],
   });
 
   final String name;
@@ -41,6 +56,7 @@ class ExcelWorksheetSpec {
   final List<ExcelColumnSpec> columns;
   final List<String> sensitiveExcludedFields;
   final String description;
+  final List<ExcelSortRule> sortRules;
 
   int get columnCount => columns.length;
 }
@@ -526,4 +542,8 @@ class ExcelWorkbookSchema {
 
   /// Total count of normalized worksheets in the central workbook.
   static int get totalWorksheetCount => worksheets.length;
+
+  /// Ordered list of all 21 normalized worksheet names.
+  static List<String> get worksheetNames =>
+      worksheets.map((w) => w.name).toList();
 }

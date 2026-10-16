@@ -167,7 +167,7 @@ class AttendanceRepository {
     _source = ManualAttendanceSource(_supabase);
   }
 
-  /// Get attendance for a specific user and month
+  /// Get attendance for a specific user and month (staff only)
   Future<List<AttendanceRecord>> fetchMonthlyAttendance(
     String staffId,
     int year,
@@ -179,7 +179,8 @@ class AttendanceRepository {
 
     var query = _supabase
         .from('staff_attendance')
-        .select()
+        .select('*, profiles!staff_attendance_staff_id_fkey!inner(full_name, role)')
+        .eq('profiles.role', 'staff')
         .eq('staff_id', staffId)
         .gte('record_date', startDate)
         .lte('record_date', endDate);
@@ -221,8 +222,19 @@ class AttendanceRepository {
 
     for (final record in records) {
       final status = record.status.toLowerCase();
-      if (summary.containsKey(status)) {
-        summary[status] = summary[status]! + 1;
+      // An account is only counted as present or late if they recorded a valid check-in
+      if (record.checkInTime != null) {
+        if (record.isLate || status == 'late') {
+          summary['late'] = summary['late']! + 1;
+        } else {
+          summary['present'] = summary['present']! + 1;
+        }
+      } else if (status == 'leave') {
+        summary['leave'] = summary['leave']! + 1;
+      } else if (status == 'absent') {
+        summary['absent'] = summary['absent']! + 1;
+      } else if (status == 'holiday') {
+        summary['holiday'] = summary['holiday']! + 1;
       }
     }
 

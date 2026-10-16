@@ -1061,7 +1061,8 @@ void main() {
       expect(EyeSurgeryModel.canTransition('scheduled', 'pre_op'), isTrue);
       expect(EyeSurgeryModel.canTransition('pre_op', 'in_surgery'), isTrue);
       expect(EyeSurgeryModel.canTransition('in_surgery', 'post_op'), isTrue);
-      expect(EyeSurgeryModel.canTransition('post_op', 'discharged'), isTrue);
+      expect(EyeSurgeryModel.canTransition('post_op', 'billing'), isTrue);
+      expect(EyeSurgeryModel.canTransition('billing', 'discharged'), isTrue);
 
       // Backwards transitions rejected
       expect(EyeSurgeryModel.canTransition('in_surgery', 'scheduled'), isFalse);
@@ -2104,7 +2105,7 @@ void main() {
 
     // 16. Follow-up option is hidden before discharge.
     testWidgets('16. Follow-up option is hidden before discharge', (tester) async {
-      for (final nonDischargedStatus in ['scheduled', 'pre_op', 'in_surgery', 'post_op', 'cancelled']) {
+      for (final nonDischargedStatus in ['scheduled', 'pre_op', 'in_surgery', 'post_op', 'billing', 'cancelled']) {
         final surgery = _sampleSurgery(status: nonDischargedStatus);
         final fakeRepo = _FakeEyeSurgeryRepository(items: [surgery]);
         final container = ProviderContainer(overrides: [
