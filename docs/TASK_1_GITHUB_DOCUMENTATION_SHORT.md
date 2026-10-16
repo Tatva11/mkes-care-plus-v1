@@ -11,7 +11,7 @@
 | **Project Target** | **MKES CARE+** Clinical Management Platform (Flutter Web & Mobile) |
 | **GitHub Repository** | `Tatva11/mkes-care-plus-lovable` (`https://github.com/Tatva11/mkes-care-plus-lovable.git`) |
 | **Local Workspace** | `D:\mkes-lovable` (and `/c/MKES PRO/mkes final`) |
-| **Active Git Branches** | `main` (production), `sprint-7-8` (reporting feature branch), `sprint-9`, `devops/jenkins-ci` |
+| **Active Git Branches** | `main` (production), `sprint-7-8` (reporting feature branch), `sprint-9` |
 | **Version Control Tool** | Git CLI 2.43+ / Git Bash (MinGW64) on Windows 11 |
 | **Demonstrated Operations** | `git status`, `git add .`, `git commit`, `git push -u origin sprint-7-8`, `git push origin main`, `git pull origin main`, `git remote -v` |
 
@@ -168,7 +168,7 @@ The local repository reflog confirms the fast-forward pull integration:
 $ git reflog -n 3
 6f7627a HEAD@{0}: checkout: moving from main to sprint-9
 6f7627a HEAD@{1}: pull origin main: Fast-forward
-18e95db HEAD@{2}: checkout: moving from devops/jenkins-ci to main
+18e95db HEAD@{2}: checkout: moving from sprint-7-8 to main
 ```
 
 ![Figure 6 — Git Pull & Remote Resolution](assets/git_fig7_pull_terminal.png)
@@ -194,7 +194,7 @@ To avoid common viva misconceptions, the clear operational boundaries of Git Pus
 
 The results of the push and pull synchronization are verified on GitHub at `https://github.com/Tatva11/mkes-care-plus-lovable`:
 - **Repository URL:** `https://github.com/Tatva11/mkes-care-plus-lovable`
-- **Active Remote Branches:** `main` (default production), `sprint-7-8`, `sprint-9`, `devops/jenkins-ci`.
+- **Active Remote Branches:** `main` (default production), `sprint-7-8`, `sprint-9`.
 - **Verified Latest Commits:** `6f7627a Complete Sprint 8`, `5c77a7d 9 sprint`, `18e95db feat(shifts-inventory)`.
 
 > [!TIP]
