@@ -103,7 +103,8 @@ class _PendingTabState extends ConsumerState<_PendingTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Leave request for ${request.staffName ?? "staff"} approved.'),
+            content: Text(
+                'Leave request for ${request.staffName ?? "staff"} approved.'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -139,7 +140,8 @@ class _PendingTabState extends ConsumerState<_PendingTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Leave request for ${request.staffName ?? "staff"} rejected.'),
+            content: Text(
+                'Leave request for ${request.staffName ?? "staff"} rejected.'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -190,11 +192,14 @@ class _PendingTabState extends ConsumerState<_PendingTab> {
         }
 
         return RefreshIndicator(
-          onRefresh: () async =>
-              ref.read(pendingAdminLeaveRequestsProvider.notifier).fetchPending(),
+          onRefresh: () async => ref
+              .read(pendingAdminLeaveRequestsProvider.notifier)
+              .fetchPending(),
           child: ListView.separated(
             padding: EdgeInsets.all(
-              widget.isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
+              widget.isDesktop
+                  ? AppSpacing.marginDesktop
+                  : AppSpacing.marginMobile,
             ),
             itemCount: requests.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
@@ -381,7 +386,8 @@ class _LeaveCard extends ConsumerWidget {
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -402,7 +408,8 @@ class _LeaveCard extends ConsumerWidget {
               ),
               // Status badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: _statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -497,8 +504,8 @@ class _LeaveCard extends ConsumerWidget {
                 Flexible(
                   child: Text(
                     'Rejection reason: ${request.rejectionReason}',
-                    style: AppTypography.bodySm
-                        .copyWith(color: AppColors.error.withValues(alpha: 0.8)),
+                    style: AppTypography.bodySm.copyWith(
+                        color: AppColors.error.withValues(alpha: 0.8)),
                   ),
                 ),
               ],
@@ -516,17 +523,16 @@ class _LeaveCard extends ConsumerWidget {
                       const Icon(Icons.close, size: 18, color: AppColors.error),
                   label: Text(
                     'Reject',
-                    style:
-                        AppTypography.labelCaps.copyWith(color: AppColors.error),
+                    style: AppTypography.labelCaps
+                        .copyWith(color: AppColors.error),
                   ),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.error),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
-                  onPressed: isProcessing
-                      ? null
-                      : () => _showRejectDialog(context),
+                  onPressed:
+                      isProcessing ? null : () => _showRejectDialog(context),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 FilledButton.icon(
@@ -545,8 +551,8 @@ class _LeaveCard extends ConsumerWidget {
                           .copyWith(color: Colors.white)),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primaryContainer,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                   onPressed: isProcessing ? null : onApprove,
                 ),

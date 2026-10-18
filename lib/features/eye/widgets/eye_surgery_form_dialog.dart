@@ -39,11 +39,21 @@ class EyeSurgeryFormDialog extends ConsumerStatefulWidget {
     this.existingSurgery,
     this.initialPatientId,
     this.initialPatientName,
+    this.initialPatientNumber,
+    this.initialSurgeryDate,
+    this.initialSurgeryTime,
+    this.initialAssignedStaffId,
+    this.initialRemarks,
   });
 
   final EyeSurgeryModel? existingSurgery;
   final String? initialPatientId;
   final String? initialPatientName;
+  final String? initialPatientNumber;
+  final DateTime? initialSurgeryDate;
+  final TimeOfDay? initialSurgeryTime;
+  final String? initialAssignedStaffId;
+  final String? initialRemarks;
 
   bool get isEditing => existingSurgery != null;
 
@@ -84,19 +94,23 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
     final surgery = widget.existingSurgery;
     _selectedPatientId = surgery?.patientId ?? widget.initialPatientId;
     _selectedPatientName = surgery?.patientName ?? widget.initialPatientName;
-    _selectedPatientNumber = surgery?.patientNumber;
+    _selectedPatientNumber =
+        surgery?.patientNumber ?? widget.initialPatientNumber;
     _surgeryTypeCategory = surgery?.surgeryTypeCategory ??
         EyeSurgeryModel.surgeryTypeOptions.first;
     _customTypeController.text = surgery?.customSurgeryType ??
         (surgery?.surgeryTypeCategory == 'Other' ? surgery?.surgeryType : '') ??
         '';
     _eyeSide = surgery?.eyeSide;
-    _assignedStaffId = surgery?.assignedStaffId?.trim().toLowerCase();
-    _surgeryDate = surgery?.surgeryDate ?? DateTime.now();
-    _surgeryTime = _parseTime(surgery?.surgeryTime);
+    _assignedStaffId = surgery?.assignedStaffId?.trim().toLowerCase() ??
+        widget.initialAssignedStaffId?.trim().toLowerCase();
+    _surgeryDate =
+        surgery?.surgeryDate ?? widget.initialSurgeryDate ?? DateTime.now();
+    _surgeryTime =
+        _parseTime(surgery?.surgeryTime) ?? widget.initialSurgeryTime;
     _checklist.addAll(surgery?.preOpChecklist ?? const {});
     _iolController.text = surgery?.iolDetails ?? '';
-    _remarksController.text = surgery?.remarks ?? '';
+    _remarksController.text = surgery?.remarks ?? widget.initialRemarks ?? '';
 
     if (widget.isEditing) {
       _loadedSurgeryTypeForTemplates = _surgeryTypeCategory;
@@ -182,7 +196,8 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
         if (widget.isEditing && _surgeryItems[existingIndex].id != null) {
           try {
             await ref
-                .read(eyeSurgeryItemsProvider(widget.existingSurgery!.id).notifier)
+                .read(eyeSurgeryItemsProvider(widget.existingSurgery!.id)
+                    .notifier)
                 .updateItem(
                   itemId: _surgeryItems[existingIndex].id!,
                   plannedQuantity: _surgeryItems[existingIndex].plannedQuantity,
@@ -194,7 +209,8 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
         if (widget.isEditing) {
           try {
             await ref
-                .read(eyeSurgeryItemsProvider(widget.existingSurgery!.id).notifier)
+                .read(eyeSurgeryItemsProvider(widget.existingSurgery!.id)
+                    .notifier)
                 .addItem(
                   inventoryItemId: entry.item.id,
                   plannedQuantity: entry.quantity,
@@ -264,7 +280,8 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
       if (widget.isEditing && item.id != null) {
         try {
           await ref
-              .read(eyeSurgeryItemsProvider(widget.existingSurgery!.id).notifier)
+              .read(
+                  eyeSurgeryItemsProvider(widget.existingSurgery!.id).notifier)
               .updateItem(
                 itemId: item.id!,
                 plannedQuantity: newQty,
@@ -738,9 +755,10 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: _checklist.values.where((v) => v).length == 8
-                                  ? Colors.green.withValues(alpha: 0.15)
-                                  : Colors.orange.withValues(alpha: 0.15),
+                              color:
+                                  _checklist.values.where((v) => v).length == 8
+                                      ? Colors.green.withValues(alpha: 0.15)
+                                      : Colors.orange.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -748,9 +766,11 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: _checklist.values.where((v) => v).length == 8
-                                    ? Colors.green.shade800
-                                    : Colors.orange.shade800,
+                                color:
+                                    _checklist.values.where((v) => v).length ==
+                                            8
+                                        ? Colors.green.shade800
+                                        : Colors.orange.shade800,
                               ),
                             ),
                           ),
@@ -884,7 +904,8 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
             0,
             EyeSurgeryStaffCandidate(
               id: savedStaffId,
-              fullName: widget.existingSurgery?.assignedStaffName ?? 'Assigned Staff',
+              fullName:
+                  widget.existingSurgery?.assignedStaffName ?? 'Assigned Staff',
             ),
           );
         }
@@ -895,8 +916,8 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
           const DropdownMenuItem(value: null, child: Text('Unassigned')),
           ...displayStaff.map((candidate) => DropdownMenuItem<String?>(
                 value: candidate.id,
-                child: Text(candidate.fullName,
-                    overflow: TextOverflow.ellipsis),
+                child:
+                    Text(candidate.fullName, overflow: TextOverflow.ellipsis),
               )),
         ];
 
@@ -1093,7 +1114,8 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
                             TextButton.icon(
                               style: TextButton.styleFrom(
                                 visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6),
                               ),
                               onPressed: () =>
                                   openEyeSurgeryPurchaseOrders(context),

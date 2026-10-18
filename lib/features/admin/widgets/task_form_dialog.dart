@@ -45,7 +45,8 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
     super.initState();
     final task = widget.task;
     _titleController = TextEditingController(text: task?.title ?? '');
-    _descriptionController = TextEditingController(text: task?.description ?? '');
+    _descriptionController =
+        TextEditingController(text: task?.description ?? '');
     _noteController = TextEditingController();
 
     _selectedStaffId = task?.assignedTo ?? widget.initialStaffId;
@@ -76,7 +77,8 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
     final currentUser = ref.watch(currentUserProvider);
 
     final staffUsers = usersAsync.valueOrNull
-            ?.where((u) => u.role == 'staff' && (u.isActive || u.id == _selectedStaffId))
+            ?.where((u) =>
+                u.role == 'staff' && (u.isActive || u.id == _selectedStaffId))
             .toList() ??
         <UserProfile>[];
 
@@ -142,7 +144,8 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
                     return DropdownMenuItem<String>(
                       value: u.id,
                       child: Text(
-                        u.fullName + (u.department != null ? ' (${u.department})' : ''),
+                        u.fullName +
+                            (u.department != null ? ' (${u.department})' : ''),
                         overflow: TextOverflow.ellipsis,
                       ),
                     );
@@ -171,12 +174,16 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
                         ),
                         items: const [
                           DropdownMenuItem(value: 'low', child: Text('Low')),
-                          DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                          DropdownMenuItem(
+                              value: 'medium', child: Text('Medium')),
                           DropdownMenuItem(value: 'high', child: Text('High')),
-                          DropdownMenuItem(value: 'critical', child: Text('Critical')),
+                          DropdownMenuItem(
+                              value: 'critical', child: Text('Critical')),
                         ],
                         onChanged: (val) {
-                          if (val != null) setState(() => _selectedPriority = val);
+                          if (val != null) {
+                            setState(() => _selectedPriority = val);
+                          }
                         },
                       ),
                     ),
@@ -190,14 +197,22 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
                             labelText: 'Status',
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                            DropdownMenuItem(value: 'in_progress', child: Text('In Progress')),
-                            DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                            DropdownMenuItem(value: 'overdue', child: Text('Overdue')),
-                            DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                            DropdownMenuItem(
+                                value: 'pending', child: Text('Pending')),
+                            DropdownMenuItem(
+                                value: 'in_progress',
+                                child: Text('In Progress')),
+                            DropdownMenuItem(
+                                value: 'completed', child: Text('Completed')),
+                            DropdownMenuItem(
+                                value: 'overdue', child: Text('Overdue')),
+                            DropdownMenuItem(
+                                value: 'cancelled', child: Text('Cancelled')),
                           ],
                           onChanged: (val) {
-                            if (val != null) setState(() => _selectedStatus = val);
+                            if (val != null) {
+                              setState(() => _selectedStatus = val);
+                            }
                           },
                         ),
                       ),
@@ -269,7 +284,8 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
                 )
               : Text(widget.isEditing ? 'Save Changes' : 'Assign Task'),
         ),
@@ -283,7 +299,8 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
 
     if (adminId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: No active administrator session found.')),
+        const SnackBar(
+            content: Text('Error: No active administrator session found.')),
       );
       return;
     }
@@ -306,7 +323,9 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
               dueDate: _dueDate,
               priority: _selectedPriority,
               status: _selectedStatus,
-              note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+              note: _noteController.text.trim().isEmpty
+                  ? null
+                  : _noteController.text.trim(),
             );
 
         // Cross-refresh staff providers
@@ -338,7 +357,8 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Task created and assigned successfully!')),
+            const SnackBar(
+                content: Text('Task created and assigned successfully!')),
           );
           Navigator.of(context).pop(true);
         }

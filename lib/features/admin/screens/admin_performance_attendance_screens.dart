@@ -182,7 +182,8 @@ class _PerformanceWorkloadView extends ConsumerWidget {
                   tasks.where((t) => t.status == 'completed').length;
               final overdue = tasks.where((t) => t.isOverdue).length;
               final active = tasks
-                  .where((t) => t.status == 'pending' || t.status == 'in_progress')
+                  .where(
+                      (t) => t.status == 'pending' || t.status == 'in_progress')
                   .length;
               final completionRate =
                   total > 0 ? (completed / total * 100).round() : 0;
@@ -222,8 +223,8 @@ class _PerformanceWorkloadView extends ConsumerWidget {
                       children: cards
                           .map((c) => Expanded(
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 4),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 4),
                                   child: c,
                                 ),
                               ))
@@ -233,8 +234,8 @@ class _PerformanceWorkloadView extends ConsumerWidget {
                   return Column(
                     children: cards
                         .map((c) => Padding(
-                              padding: const EdgeInsets.only(
-                                  bottom: AppSpacing.xs),
+                              padding:
+                                  const EdgeInsets.only(bottom: AppSpacing.xs),
                               child: c,
                             ))
                         .toList(),
@@ -257,8 +258,7 @@ class _PerformanceWorkloadView extends ConsumerWidget {
                     prefixIcon: const Icon(Icons.search, size: 20),
                     isDense: true,
                     border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusMd),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     ),
                   ),
                   onChanged: onSearchChanged,
@@ -306,9 +306,8 @@ class _PerformanceWorkloadView extends ConsumerWidget {
             ),
             error: (e, _) => Center(child: Text('Error loading staff: $e')),
             data: (allUsers) {
-              final staffList = allUsers
-                  .where((u) => u.role == 'staff')
-                  .toList();
+              final staffList =
+                  allUsers.where((u) => u.role == 'staff').toList();
 
               return tasksAsync.when(
                 loading: () => const SizedBox.shrink(),
@@ -412,7 +411,8 @@ class _PerformanceWorkloadView extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusXl)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusXl)),
       ),
       builder: (ctx) => DraggableScrollableSheet(
         initialChildSize: 0.65,
@@ -532,13 +532,15 @@ class _PerformanceWorkloadView extends ConsumerWidget {
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                                  icon: const Icon(Icons.edit_outlined,
+                                      size: 18, color: AppColors.primary),
                                   tooltip: 'Edit Task',
                                   onPressed: () {
                                     Navigator.of(ctx).pop();
                                     showDialog(
                                       context: context,
-                                      builder: (_) => TaskFormDialog(task: task),
+                                      builder: (_) =>
+                                          TaskFormDialog(task: task),
                                     );
                                   },
                                 ),
@@ -940,7 +942,8 @@ class _AttendanceView extends ConsumerWidget {
 
                 if (staffRecords.isEmpty) {
                   return const Center(
-                    child: Text('No staff attendance records found for this date.'),
+                    child: Text(
+                        'No staff attendance records found for this date.'),
                   );
                 }
 
@@ -1010,8 +1013,7 @@ class _AttendanceView extends ConsumerWidget {
 
                 return ListView(children: rows);
               },
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, st) => Center(
                 child: Text('Unable to load attendance: $e'),
               ),

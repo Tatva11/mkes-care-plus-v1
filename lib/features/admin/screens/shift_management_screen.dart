@@ -55,7 +55,8 @@ class ShiftManagementScreen extends StatelessWidget {
         }
         if (item == AdminNavItem.operations) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const InventoryManagementScreen()),
+            MaterialPageRoute(
+                builder: (_) => const InventoryManagementScreen()),
           );
           return;
         }
@@ -69,10 +70,12 @@ class ShiftManagementContent extends ConsumerStatefulWidget {
   const ShiftManagementContent({super.key});
 
   @override
-  ConsumerState<ShiftManagementContent> createState() => _ShiftManagementContentState();
+  ConsumerState<ShiftManagementContent> createState() =>
+      _ShiftManagementContentState();
 }
 
-class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent> {
+class _ShiftManagementContentState
+    extends ConsumerState<ShiftManagementContent> {
   final _searchController = TextEditingController();
   String _filterShift = 'all'; // 'all' | 'morning' | 'afternoon' | 'both'
   String _searchQuery = '';
@@ -94,7 +97,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
 
     TimeOfDay currentStart = startTod;
     TimeOfDay currentEnd = endTod;
-    final graceController = TextEditingController(text: '${config.gracePeriodMinutes}');
+    final graceController =
+        TextEditingController(text: '${config.gracePeriodMinutes}');
 
     final updated = await showDialog<bool>(
       context: context,
@@ -103,7 +107,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
         builder: (ctx, setDialogState) {
           String formatTod(TimeOfDay tod) {
             final period = tod.hour >= 12 ? 'PM' : 'AM';
-            final h = tod.hour == 0 ? 12 : (tod.hour > 12 ? tod.hour - 12 : tod.hour);
+            final h =
+                tod.hour == 0 ? 12 : (tod.hour > 12 ? tod.hour - 12 : tod.hour);
             return '${h.toString().padLeft(2, '0')}:${tod.minute.toString().padLeft(2, '0')} $period';
           }
 
@@ -113,9 +118,7 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
             title: Row(
               children: [
                 Icon(
-                  isAft
-                      ? Icons.wb_twilight_outlined
-                      : Icons.wb_sunny_outlined,
+                  isAft ? Icons.wb_twilight_outlined : Icons.wb_sunny_outlined,
                   color: isAft ? AppColors.secondary : AppColors.primary,
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -129,7 +132,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                 children: [
                   Text(
                     'Configure standard shift start and end times for ${config.displayName}.',
-                    style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                    style: AppTypography.bodySm
+                        .copyWith(color: AppColors.onSurfaceVariant),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   ListTile(
@@ -177,7 +181,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Late Grace Period (Minutes)',
-                      helperText: 'Minutes after shift start before attendance is marked late.',
+                      helperText:
+                          'Minutes after shift start before attendance is marked late.',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -211,17 +216,22 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
 
                     // Notify affected staff members whose duty is this shift or 'both'
                     try {
-                      final allUsers = ref.read(usersProvider).valueOrNull ?? [];
+                      final allUsers =
+                          ref.read(usersProvider).valueOrNull ?? [];
                       final affectedStaff = allUsers.where((u) =>
                           u.role == 'staff' &&
-                          (u.assignedShift == config.name || u.assignedShift == 'both'));
+                          (u.assignedShift == config.name ||
+                              u.assignedShift == 'both'));
                       for (final s in affectedStaff) {
-                        await ref.read(notificationRepositoryProvider).insertNotification(
-                          userId: s.id,
-                          title: 'Shift Timings Updated',
-                          message: '${config.displayName} timings have been updated to ${newConfig.formattedTiming}.',
-                          type: 'duty_assignment',
-                        );
+                        await ref
+                            .read(notificationRepositoryProvider)
+                            .insertNotification(
+                              userId: s.id,
+                              title: 'Shift Timings Updated',
+                              message:
+                                  '${config.displayName} timings have been updated to ${newConfig.formattedTiming}.',
+                              type: 'duty_assignment',
+                            );
                       }
                     } catch (notifErr) {
                       debugPrint('Notification dispatch error: $notifErr');
@@ -247,7 +257,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
     if (updated == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${config.displayName} configuration updated successfully.'),
+          content:
+              Text('${config.displayName} configuration updated successfully.'),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -264,7 +275,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
   Future<void> _confirmAndChangeShift(UserProfile user, String newShift) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    DateTime effectiveDate = today.add(const Duration(days: 1)); // Default: tomorrow
+    DateTime effectiveDate =
+        today.add(const Duration(days: 1)); // Default: tomorrow
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -279,7 +291,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
           return AlertDialog(
             title: Row(
               children: [
-                const Icon(Icons.calendar_month_outlined, color: AppColors.primary),
+                const Icon(Icons.calendar_month_outlined,
+                    color: AppColors.primary),
                 const SizedBox(width: AppSpacing.sm),
                 const Text('Schedule Shift Change'),
               ],
@@ -291,12 +304,14 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                 children: [
                   Text(
                     'Assign ${user.fullName} to $targetShiftLabel.',
-                    style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
+                    style: AppTypography.bodyMd
+                        .copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Current Shift: ${user.shiftDisplayName} (Active Today)',
-                    style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                    style: AppTypography.bodySm
+                        .copyWith(color: AppColors.onSurfaceVariant),
                   ),
                   if (user.hasScheduledShift) ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -304,12 +319,15 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                       padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
                         color: AppColors.secondary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        border: Border.all(color: AppColors.secondary.withValues(alpha: 0.4)),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusSm),
+                        border: Border.all(
+                            color: AppColors.secondary.withValues(alpha: 0.4)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline, size: 16, color: AppColors.secondary),
+                          const Icon(Icons.info_outline,
+                              size: 16, color: AppColors.secondary),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
@@ -330,11 +348,13 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     'EFFECTIVE DATE',
-                    style: AppTypography.labelCaps.copyWith(fontWeight: FontWeight.w700),
+                    style: AppTypography.labelCaps
+                        .copyWith(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       side: const BorderSide(color: AppColors.outlineVariant),
@@ -344,13 +364,15 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                       isTomorrow
                           ? 'Tomorrow (${DateFormat('d MMMM yyyy').format(effectiveDate)})'
                           : DateFormat('d MMMM yyyy').format(effectiveDate),
-                      style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
+                      style: AppTypography.bodyMd
+                          .copyWith(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
                       isTomorrow
                           ? 'Effective from next calendar day by default'
                           : 'Custom effective date selected',
-                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11),
+                      style: AppTypography.bodySm.copyWith(
+                          color: AppColors.onSurfaceVariant, fontSize: 11),
                     ),
                     trailing: OutlinedButton(
                       onPressed: () async {
@@ -410,13 +432,14 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
 
     final targetShiftName = _formatShiftName(newShift);
     final formattedDate = DateFormat('d MMMM yyyy').format(effectiveDate);
-    final notifMessage = 'Your shift effective $formattedDate has been changed to $targetShiftName.';
+    final notifMessage =
+        'Your shift effective $formattedDate has been changed to $targetShiftName.';
 
     try {
       // 1. Save shift change to database first
-      await ref
-          .read(attendanceRepositoryProvider)
-          .updateStaffShiftAssignment(user.id, newShift, effectiveDate: effectiveDate);
+      await ref.read(attendanceRepositoryProvider).updateStaffShiftAssignment(
+          user.id, newShift,
+          effectiveDate: effectiveDate);
 
       ref.invalidate(usersProvider);
       ref.invalidate(staffAssignedShiftProvider(user.id));
@@ -425,12 +448,12 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
       bool notificationDelivered = false;
       try {
         await ref.read(notificationRepositoryProvider).insertNotification(
-          userId: user.id,
-          title: 'Duty Assignment Updated',
-          message: notifMessage,
-          type: 'duty_assignment',
-          idempotent: true,
-        );
+              userId: user.id,
+              title: 'Duty Assignment Updated',
+              message: notifMessage,
+              type: 'duty_assignment',
+              idempotent: true,
+            );
         notificationDelivered = true;
         setState(() => _failedNotification = null);
       } catch (notifErr) {
@@ -500,12 +523,12 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
 
     try {
       await ref.read(notificationRepositoryProvider).insertNotification(
-        userId: user.id,
-        title: 'Duty Assignment Updated',
-        message: message,
-        type: 'duty_assignment',
-        idempotent: true,
-      );
+            userId: user.id,
+            title: 'Duty Assignment Updated',
+            message: message,
+            type: 'duty_assignment',
+            idempotent: true,
+          );
 
       setState(() {
         _failedNotification = null;
@@ -515,18 +538,21 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Notification successfully sent to ${user.fullName}.'),
+            content:
+                Text('Notification successfully sent to ${user.fullName}.'),
             backgroundColor: AppColors.primary,
           ),
         );
       }
     } catch (e) {
-      debugPrint('[ShiftManagement ERROR] Retry notification failed for ${user.fullName}: $e');
+      debugPrint(
+          '[ShiftManagement ERROR] Retry notification failed for ${user.fullName}: $e');
       setState(() => _isRetryingNotification = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Unable to deliver notification to ${user.fullName}. Please retry.'),
+            content: Text(
+                'Unable to deliver notification to ${user.fullName}. Please retry.'),
             backgroundColor: const Color(0xFFE65100),
             duration: const Duration(seconds: 6),
             action: SnackBarAction(
@@ -571,7 +597,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       'Administer Morning and Evening shift timings, grace periods, and individual staff roster assignments.',
-                      style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+                      style: AppTypography.bodyLg
+                          .copyWith(color: AppColors.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -581,7 +608,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
           const SizedBox(height: AppSpacing.lg),
 
           // ── Section 1: Configured Shift Timings ─────────────────────────────
-          Text('Shift Configurations & Working Hours', style: AppTypography.headlineMd),
+          Text('Shift Configurations & Working Hours',
+              style: AppTypography.headlineMd),
           const SizedBox(height: AppSpacing.sm),
           configsAsync.when(
             loading: () => const Center(
@@ -602,7 +630,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                     child: Text('Unable to load shift configurations: $err'),
                   ),
                   TextButton.icon(
-                    onPressed: () => ref.invalidate(shiftConfigurationsProvider),
+                    onPressed: () =>
+                        ref.invalidate(shiftConfigurationsProvider),
                     icon: const Icon(Icons.refresh),
                     label: const Text('Retry'),
                   ),
@@ -624,7 +653,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                       children: [
                         Expanded(child: _buildConfigCard(morningConfig, true)),
                         const SizedBox(width: AppSpacing.md),
-                        Expanded(child: _buildConfigCard(afternoonConfig, false)),
+                        Expanded(
+                            child: _buildConfigCard(afternoonConfig, false)),
                       ],
                     )
                   : Column(
@@ -657,7 +687,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                     ButtonSegment(value: 'both', label: Text('Both')),
                   ],
                   selected: {_filterShift},
-                  onSelectionChanged: (set) => setState(() => _filterShift = set.first),
+                  onSelectionChanged: (set) =>
+                      setState(() => _filterShift = set.first),
                   style: SegmentedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                   ),
@@ -676,9 +707,11 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
-            onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+            onChanged: (val) =>
+                setState(() => _searchQuery = val.trim().toLowerCase()),
           ),
           const SizedBox(height: AppSpacing.md),
 
@@ -717,7 +750,9 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                   if (_filterShift == 'both' && s != 'both') {
                     return false;
                   }
-                  if (_filterShift == 'morning' && s != 'morning' && s != 'both') {
+                  if (_filterShift == 'morning' &&
+                      s != 'morning' &&
+                      s != 'both') {
                     return false;
                   }
                   if (_filterShift == 'afternoon' &&
@@ -729,8 +764,10 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                   }
                 }
                 if (_searchQuery.isNotEmpty) {
-                  final nameMatches = u.fullName.toLowerCase().contains(_searchQuery);
-                  final emailMatches = u.email.toLowerCase().contains(_searchQuery);
+                  final nameMatches =
+                      u.fullName.toLowerCase().contains(_searchQuery);
+                  final emailMatches =
+                      u.email.toLowerCase().contains(_searchQuery);
                   return nameMatches || emailMatches;
                 }
                 return true;
@@ -747,7 +784,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                   ),
                   child: Text(
                     'No staff members found matching criteria.',
-                    style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+                    style: AppTypography.bodyLg
+                        .copyWith(color: AppColors.onSurfaceVariant),
                   ),
                 );
               }
@@ -791,20 +829,24 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                           size: 20,
                         ),
                       ),
-                      title: Text(staff.fullName, style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600)),
+                      title: Text(staff.fullName,
+                          style: AppTypography.bodyMd
+                              .copyWith(fontWeight: FontWeight.w600)),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             '${staff.email}${staff.departmentName != null ? ' · ${staff.departmentName}' : ''}',
-                            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant),
                           ),
                           if (staff.hasScheduledShift)
                             Padding(
                               padding: const EdgeInsets.only(top: 3),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.schedule_send_outlined, size: 14, color: AppColors.secondary),
+                                  const Icon(Icons.schedule_send_outlined,
+                                      size: 14, color: AppColors.secondary),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Effective ${DateFormat('d MMM yyyy').format(staff.shiftEffectiveDate!)}: ${staff.scheduledShiftDisplayName}',
@@ -823,10 +865,12 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: chipColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusSm),
                               border: Border.all(
                                 color: chipColor,
                               ),
@@ -850,45 +894,47 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                             PopupMenuButton<String>(
                               tooltip: 'Schedule Shift Change',
                               icon: const Icon(Icons.more_vert),
-                              onSelected: (newShift) => _confirmAndChangeShift(staff, newShift),
+                              onSelected: (newShift) =>
+                                  _confirmAndChangeShift(staff, newShift),
                               itemBuilder: (ctx) => [
-                              PopupMenuItem(
-                                value: 'morning',
-                                enabled: staff.assignedShift != 'morning',
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.wb_sunny_outlined, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Assign Morning Shift'),
-                                  ],
+                                PopupMenuItem(
+                                  value: 'morning',
+                                  enabled: staff.assignedShift != 'morning',
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.wb_sunny_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Assign Morning Shift'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              PopupMenuItem(
-                                value: 'afternoon',
-                                enabled: staff.assignedShift != 'afternoon' &&
-                                    staff.assignedShift != 'evening' &&
-                                    staff.assignedShift != 'night',
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.wb_twilight_outlined, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Assign Evening Shift'),
-                                  ],
+                                PopupMenuItem(
+                                  value: 'afternoon',
+                                  enabled: staff.assignedShift != 'afternoon' &&
+                                      staff.assignedShift != 'evening' &&
+                                      staff.assignedShift != 'night',
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.wb_twilight_outlined,
+                                          size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Assign Evening Shift'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              PopupMenuItem(
-                                value: 'both',
-                                enabled: staff.assignedShift != 'both',
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.all_inclusive, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Assign Both (Morning & Evening)'),
-                                  ],
+                                PopupMenuItem(
+                                  value: 'both',
+                                  enabled: staff.assignedShift != 'both',
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.all_inclusive, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Assign Both (Morning & Evening)'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
                         ],
                       ),
                     );
@@ -930,7 +976,9 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
               Row(
                 children: [
                   Icon(
-                    isMorning ? Icons.wb_sunny_outlined : Icons.wb_twilight_outlined,
+                    isMorning
+                        ? Icons.wb_sunny_outlined
+                        : Icons.wb_twilight_outlined,
                     color: themeColor,
                     size: 24,
                   ),
@@ -963,7 +1011,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                     const SizedBox(height: 2),
                     Text(
                       config.formattedTiming,
-                      style: AppTypography.headlineMd.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: AppTypography.headlineMd
+                          .copyWith(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -976,7 +1025,8 @@ class _ShiftManagementContentState extends ConsumerState<ShiftManagementContent>
                     const SizedBox(height: 2),
                     Text(
                       '${config.gracePeriodMinutes} Minutes',
-                      style: AppTypography.headlineMd.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: AppTypography.headlineMd
+                          .copyWith(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),

@@ -76,7 +76,8 @@ class _AttendanceBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         _SummaryChip(
           icon: Icons.how_to_reg_outlined,
-          label: '${records.length} patient${records.length == 1 ? '' : 's'} attended',
+          label:
+              '${records.length} patient${records.length == 1 ? '' : 's'} attended',
           color: AppColors.primary,
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -89,8 +90,8 @@ class _AttendanceBody extends StatelessWidget {
             ),
             title: Text(entry.key, style: AppTypography.bodyMd),
             trailing: Chip(
-              label: Text(
-                  '${entry.value} patient${entry.value == 1 ? '' : 's'}'),
+              label:
+                  Text('${entry.value} patient${entry.value == 1 ? '' : 's'}'),
               padding: EdgeInsets.zero,
               backgroundColor:
                   AppColors.primaryContainer.withValues(alpha: 0.15),
@@ -127,8 +128,7 @@ class _AttendanceCard extends StatelessWidget {
     ].join(' • ');
 
     final staffLabel = record.staffName ?? 'Staff';
-    final timeLabel =
-        DateFormat('h:mm a').format(record.attendedAt.toLocal());
+    final timeLabel = DateFormat('h:mm a').format(record.attendedAt.toLocal());
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -197,8 +197,11 @@ class _AttendanceCard extends StatelessWidget {
     );
   }
 
-  String _deptLabel(String dept) =>
-      dept == 'eye' ? 'Eye' : dept == 'dental' ? 'Dental' : dept;
+  String _deptLabel(String dept) => dept == 'eye'
+      ? 'Eye'
+      : dept == 'dental'
+          ? 'Dental'
+          : dept;
 }
 
 // ── Summary chip ──────────────────────────────────────────────────────────────

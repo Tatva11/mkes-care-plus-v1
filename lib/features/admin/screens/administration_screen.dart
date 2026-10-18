@@ -8,6 +8,7 @@ import '../../reports/screens/admin_reports_screen.dart';
 import '../../admin/widgets/admin_shell.dart';
 import 'user_management_screen.dart';
 import 'shift_management_screen.dart';
+import 'doctor_management_screen.dart';
 
 class AdministrationScreen extends StatelessWidget {
   const AdministrationScreen({super.key});
@@ -59,7 +60,8 @@ class AdministrationContent extends StatelessWidget {
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => const BillingManagementScreen(),
+                                  builder: (_) =>
+                                      const BillingManagementScreen(),
                                 ),
                               );
                             },
@@ -118,6 +120,20 @@ class AdministrationContent extends StatelessWidget {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => const ShiftManagementScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildSettingCard(
+                            Icons.medical_information_outlined,
+                            'Doctor Management',
+                            'Manage Eye and Dental department static doctors for appointment booking.',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const DoctorManagementScreen(),
                                 ),
                               );
                             },
@@ -202,6 +218,19 @@ class AdministrationContent extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => const ShiftManagementScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildSettingCard(
+                      Icons.medical_information_outlined,
+                      'Doctor Management',
+                      'Manage Eye and Dental department static doctors for appointment booking.',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const DoctorManagementScreen(),
                           ),
                         );
                       },

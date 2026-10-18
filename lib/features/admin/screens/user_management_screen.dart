@@ -41,7 +41,8 @@ class UserManagementScreen extends StatelessWidget {
         }
         if (item == AdminNavItem.operations) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const DepartmentManagementScreen()),
+            MaterialPageRoute(
+                builder: (_) => const DepartmentManagementScreen()),
           );
           return;
         }
@@ -61,7 +62,8 @@ class UserManagementContent extends ConsumerStatefulWidget {
   const UserManagementContent({super.key});
 
   @override
-  ConsumerState<UserManagementContent> createState() => _UserManagementContentState();
+  ConsumerState<UserManagementContent> createState() =>
+      _UserManagementContentState();
 }
 
 class _UserManagementContentState extends ConsumerState<UserManagementContent> {
@@ -160,11 +162,15 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
 
   Future<void> _toggleActive(UserProfile user) async {
     try {
-      await ref.read(usersProvider.notifier).toggleStatus(user.id, !user.isActive);
+      await ref
+          .read(usersProvider.notifier)
+          .toggleStatus(user.id, !user.isActive);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating status: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text('Error updating status: $e'),
+              backgroundColor: AppColors.error),
         );
       }
     }
@@ -221,13 +227,16 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
             children: [
               Text(
                 'User Management',
-                style: (isDesktop ? AppTypography.displayLg : AppTypography.displayLg.copyWith(fontSize: 26))
+                style: (isDesktop
+                        ? AppTypography.displayLg
+                        : AppTypography.displayLg.copyWith(fontSize: 26))
                     .copyWith(color: AppColors.onBackground),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 'Add, remove, or modify user accounts and login access.',
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+                style: AppTypography.bodyLg
+                    .copyWith(color: AppColors.onSurfaceVariant),
               ),
             ],
           ),
@@ -242,8 +251,10 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
       style: FilledButton.styleFrom(
         backgroundColor: AppColors.primaryContainer,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
       ),
     );
 
@@ -284,7 +295,8 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.outlineVariant),
         boxShadow: const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 1)),
+          BoxShadow(
+              color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 1)),
         ],
       ),
       child: SingleChildScrollView(
@@ -295,17 +307,30 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
             children: [
               Container(
                 width: 860,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                 decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.outlineVariant)),
+                  border: Border(
+                      bottom: BorderSide(color: AppColors.outlineVariant)),
                 ),
                 child: Row(
                   children: [
-                    Expanded(flex: 3, child: Text('NAME', style: AppTypography.labelCaps)),
-                    Expanded(flex: 3, child: Text('EMAIL', style: AppTypography.labelCaps)),
-                    Expanded(flex: 2, child: Text('ROLE', style: AppTypography.labelCaps)),
-                    Expanded(flex: 2, child: Text('DEPARTMENT', style: AppTypography.labelCaps)),
-                    Expanded(flex: 2, child: Text('STATUS', style: AppTypography.labelCaps)),
+                    Expanded(
+                        flex: 3,
+                        child: Text('NAME', style: AppTypography.labelCaps)),
+                    Expanded(
+                        flex: 3,
+                        child: Text('EMAIL', style: AppTypography.labelCaps)),
+                    Expanded(
+                        flex: 2,
+                        child: Text('ROLE', style: AppTypography.labelCaps)),
+                    Expanded(
+                        flex: 2,
+                        child:
+                            Text('DEPARTMENT', style: AppTypography.labelCaps)),
+                    Expanded(
+                        flex: 2,
+                        child: Text('STATUS', style: AppTypography.labelCaps)),
                     const SizedBox(width: 96),
                   ],
                 ),
@@ -332,7 +357,8 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
   Widget _buildUserRow(UserProfile user) {
     final isAdmin = user.role == 'admin';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.outlineVariant)),
       ),
@@ -350,7 +376,8 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
             flex: 3,
             child: Text(
               user.email,
-              style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodySm
+                  .copyWith(color: AppColors.onSurfaceVariant),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -369,7 +396,9 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                 child: Text(
                   isAdmin ? 'Admin' : 'Staff',
                   style: AppTypography.labelCaps.copyWith(
-                    color: isAdmin ? AppColors.secondary : AppColors.primaryContainer,
+                    color: isAdmin
+                        ? AppColors.secondary
+                        : AppColors.primaryContainer,
                     fontSize: 10,
                   ),
                 ),
@@ -380,7 +409,8 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
             flex: 2,
             child: Text(
               user.departmentName ?? user.department ?? '—',
-              style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodySm
+                  .copyWith(color: AppColors.onSurfaceVariant),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -392,7 +422,8 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                 onTap: () => _toggleActive(user),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: user.isActive
                         ? AppColors.primaryContainer.withValues(alpha: 0.1)
@@ -402,7 +433,9 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                   child: Text(
                     user.isActive ? 'Active' : 'Inactive',
                     style: AppTypography.labelCaps.copyWith(
-                      color: user.isActive ? AppColors.primaryContainer : AppColors.onSurfaceVariant,
+                      color: user.isActive
+                          ? AppColors.primaryContainer
+                          : AppColors.onSurfaceVariant,
                     ),
                   ),
                 ),

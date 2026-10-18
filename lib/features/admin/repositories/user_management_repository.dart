@@ -65,7 +65,8 @@ class UserManagementRepository {
       // but decode any error message from the JSON body for clarity.
       final responseBody = response.data;
       if (responseBody is Map && responseBody.containsKey('error')) {
-        final serverError = responseBody['error']?.toString() ?? 'Unknown error';
+        final serverError =
+            responseBody['error']?.toString() ?? 'Unknown error';
         debugPrint('create-staff-user Edge Function error: $serverError');
         _throwFriendlyError(serverError);
       }

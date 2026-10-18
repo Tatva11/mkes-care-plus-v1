@@ -6,11 +6,12 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/mkes_primary_button.dart';
 import '../../../shared/widgets/mkes_text_field.dart';
-import '../../department/providers/departments_provider.dart';
+import '../../eye/widgets/eye_surgery_form_dialog.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/repositories/patient_repository.dart';
 import '../../patients/widgets/patient_form_dialog.dart';
 import '../models/appointment_model.dart';
+import '../models/department_doctor_config.dart';
 import '../providers/appointment_provider.dart';
 
 class AppointmentFormDialog extends ConsumerStatefulWidget {
@@ -35,7 +36,18 @@ class AppointmentFormDialog extends ConsumerStatefulWidget {
     (id: 'regular', label: 'Regular Visit'),
     (id: 'walk_in', label: 'Walk-in'),
     (id: 'follow_up', label: 'Follow-up'),
+    (id: 'surgery', label: 'Surgery'),
   ];
+
+  static List<({String id, String label})> getAvailableAppointmentTypes(
+      String department) {
+    if (department.toLowerCase().trim() == 'dental') {
+      return availableAppointmentTypes
+          .where((type) => type.id != 'surgery')
+          .toList();
+    }
+    return availableAppointmentTypes;
+  }
 
   static String normalizeAppointmentType(String? raw) {
     if (raw == null || raw.trim().isEmpty) return 'regular';
@@ -45,6 +57,11 @@ class AppointmentFormDialog extends ConsumerStatefulWidget {
     }
     if (normalized == 'walk_in' || normalized == 'walkin') {
       return 'walk_in';
+    }
+    if (normalized == 'surgery' ||
+        normalized == 'eye_surgery' ||
+        normalized == 'eye surgery') {
+      return 'surgery';
     }
     if (normalized == 'regular') {
       return 'regular';
@@ -127,12 +144,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
   bool _isLoading = false;
 
-  static List<({String id, String label})> get availableAppointmentTypes =>
-      AppointmentFormDialog.availableAppointmentTypes;
-
   static String normalizeAppointmentType(String? raw) =>
       AppointmentFormDialog.normalizeAppointmentType(raw);
-
 
   @override
   void initState() {
@@ -145,12 +158,27 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       _selectedPatientId = existing.patientId ?? widget.initialPatientId;
       _selectedPatientName = existing.patientName ?? widget.initialPatientName;
       _selectedPatientNumber = existing.patientNumber;
-      _selectedDoctorId = existing.doctorId;
-      _selectedDoctorName = existing.doctorName;
-      _selectedDoctorSpecialty = existing.specialty;
+      if (DepartmentDoctorConfig.isValidDoctorNameForDepartment(
+          existing.doctorName, _selectedDepartment)) {
+        _selectedDoctorName = existing.doctorName;
+        _selectedDoctorSpecialty = existing.specialty;
+        _selectedDoctorId = DepartmentDoctorConfig.isValidUuid(existing.doctorId)
+            ? existing.doctorId
+            : null;
+      } else if (DepartmentDoctorConfig.isValidDoctorForDepartment(
+          existing.doctorId, _selectedDepartment)) {
+        _selectedDoctorId = existing.doctorId;
+        _selectedDoctorName = existing.doctorName;
+        _selectedDoctorSpecialty = existing.specialty;
+      } else {
+        _selectedDoctorId = null;
+        _selectedDoctorName = null;
+        _selectedDoctorSpecialty = null;
+      }
       final parsedTime = _parseTimeOfDay(existing.appointmentTime);
       if (parsedTime != null) _selectedTime = parsedTime;
-      _notesController = TextEditingController(text: existing.notes ?? '');
+      _notesController = TextEditingController(
+          text: AppointmentModel.stripDoctorNameFromNotes(existing.notes));
     } else {
       _selectedDate = widget.initialDate ?? DateTime.now();
       _selectedType = normalizeAppointmentType(widget.initialAppointmentType);
@@ -244,9 +272,15 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
         }
       }
       _selectedDepartment = newDept;
-      _selectedDoctorId = null;
-      _selectedDoctorName = null;
-      _selectedDoctorSpecialty = null;
+      if (newDept.toLowerCase() == 'dental' && _selectedType == 'surgery') {
+        _selectedType = 'regular';
+      }
+      if (!DepartmentDoctorConfig.isValidDoctorNameForDepartment(
+          _selectedDoctorName, newDept)) {
+        _selectedDoctorId = null;
+        _selectedDoctorName = null;
+        _selectedDoctorSpecialty = null;
+      }
       _searchController.clear();
       _searchQuery = '';
       _searchResults = [];
@@ -261,7 +295,19 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       _selectedPatientName = patient.name;
       _selectedPatientNumber = patient.patientNumber;
       if (patient.department == 'eye' || patient.department == 'dental') {
+        final oldDept = _selectedDepartment;
         _selectedDepartment = patient.department!;
+        if (_selectedDepartment.toLowerCase() == 'dental' &&
+            _selectedType == 'surgery') {
+          _selectedType = 'regular';
+        }
+        if (oldDept != _selectedDepartment &&
+            !DepartmentDoctorConfig.isValidDoctorNameForDepartment(
+                _selectedDoctorName, _selectedDepartment)) {
+          _selectedDoctorId = null;
+          _selectedDoctorName = null;
+          _selectedDoctorSpecialty = null;
+        }
       }
       _searchController.clear();
       _searchQuery = '';
@@ -320,19 +366,84 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       }
     }
 
+    if (_selectedDepartment.toLowerCase() == 'dental' &&
+        _selectedType == 'surgery') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Surgery appointments are only available for the Eye clinic.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedDoctorName != null &&
+        _selectedDoctorName!.trim().isNotEmpty &&
+        !DepartmentDoctorConfig.isValidDoctorNameForDepartment(
+            _selectedDoctorName, _selectedDepartment)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Selected doctor is not configured for the ${_selectedDepartment == "eye" ? "Eye" : "Dental"} clinic.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedType == 'surgery') {
+      if (_selectedPatientId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Please select a patient before proceeding to Surgery booking.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
+      final surgeryCreated = await showDialog<bool>(
+        context: context,
+        builder: (_) => EyeSurgeryFormDialog(
+          initialPatientId: _selectedPatientId,
+          initialPatientName: _selectedPatientName,
+          initialPatientNumber: _selectedPatientNumber,
+          initialSurgeryDate: _selectedDate,
+          initialSurgeryTime: _selectedTime,
+          initialAssignedStaffId: _selectedDoctorId,
+          initialRemarks: _notesController.text.trim().isNotEmpty
+              ? _notesController.text.trim()
+              : null,
+        ),
+      );
+
+      if (surgeryCreated == true && mounted) {
+        Navigator.of(context).pop(true);
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       if (widget.isEditing && widget.existingAppointment != null) {
+        final formattedNotes = AppointmentModel.formatNotesWithDoctor(
+          _notesController.text.trim(),
+          _selectedDoctorName,
+        );
         final updates = <String, dynamic>{
           'patient_id': _selectedPatientId,
           'department': _selectedDepartment,
-          'doctor_id': _selectedDoctorId,
+          'doctor_id': DepartmentDoctorConfig.isValidUuid(_selectedDoctorId)
+              ? _selectedDoctorId
+              : null,
           'appointment_date': _selectedDate.toIso8601String().split('T').first,
           'appointment_time': _formatTimeOfDay(_selectedTime),
           'appointment_type': _selectedType,
           'status': _selectedType == 'walk_in' ? 'waiting' : 'scheduled',
-          if (_notesController.text.trim().isNotEmpty) 'notes': _notesController.text.trim(),
-          if (_notesController.text.trim().isEmpty) 'notes': null,
+          if (formattedNotes.isNotEmpty) 'notes': formattedNotes,
+          if (formattedNotes.isEmpty) 'notes': null,
         };
 
         await ref
@@ -345,7 +456,9 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
           patientName: _selectedPatientName ?? 'Walk-in Patient',
           patientNumber: _selectedPatientNumber ?? 'Unknown ID',
           department: _selectedDepartment,
-          doctorId: _selectedDoctorId,
+          doctorId: DepartmentDoctorConfig.isValidUuid(_selectedDoctorId)
+              ? _selectedDoctorId
+              : null,
           doctorName: _selectedDoctorName,
           specialty: _selectedDoctorSpecialty,
           appointmentDate: _selectedDate,
@@ -364,6 +477,10 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
             .read(appointmentsNotifierProvider.notifier)
             .createAppointment(newAppointment);
       }
+
+      await ref
+          .read(appointmentsNotifierProvider.notifier)
+          .loadTodayAppointments();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -405,22 +522,6 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final departmentsAsync = ref.watch(departmentsProvider);
-    final matchingDepartments = departmentsAsync.value
-            ?.where(
-              (department) =>
-                  department.isActive &&
-                  department.name.toLowerCase().contains(_selectedDepartment),
-            )
-            .toList() ??
-        [];
-    final selectedDepartmentId =
-        matchingDepartments.length == 1 ? matchingDepartments.single.id : null;
-    final candidatesAsync = selectedDepartmentId == null
-        ? null
-        : ref.watch(
-            appointmentStaffCandidatesProvider(selectedDepartmentId),
-          );
     final screenWidth = MediaQuery.sizeOf(context).width;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final viewInsets = MediaQuery.viewInsetsOf(context);
@@ -543,26 +644,33 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                           Expanded(
                             child: Builder(
                               builder: (context) {
+                                final availableForDept = AppointmentFormDialog
+                                    .getAvailableAppointmentTypes(
+                                        _selectedDepartment);
                                 final Map<String, String> typesMap = {
-                                  for (final item in availableAppointmentTypes)
+                                  for (final item in availableForDept)
                                     item.id: item.label,
                                 };
                                 final canonicalSelected =
                                     normalizeAppointmentType(_selectedType);
                                 if (!typesMap.containsKey(canonicalSelected)) {
-                                  typesMap[canonicalSelected] = canonicalSelected
-                                      .split('_')
-                                      .map((w) => w.isEmpty
-                                          ? ''
-                                          : '${w[0].toUpperCase()}${w.substring(1)}')
-                                      .join(' ');
+                                  if (_selectedDepartment == 'eye') {
+                                    typesMap[canonicalSelected] = canonicalSelected
+                                        .split('_')
+                                        .map((w) => w.isEmpty
+                                            ? ''
+                                            : '${w[0].toUpperCase()}${w.substring(1)}')
+                                        .join(' ');
+                                  }
                                 }
-                                final safeValue = typesMap.containsKey(canonicalSelected)
-                                    ? canonicalSelected
-                                    : 'regular';
+                                final safeValue =
+                                    typesMap.containsKey(canonicalSelected)
+                                        ? canonicalSelected
+                                        : 'regular';
 
                                 return DropdownButtonFormField<String>(
-                                  key: ValueKey(safeValue),
+                                  key: ValueKey(
+                                      '$_selectedDepartment:$safeValue'),
                                   initialValue: safeValue,
                                   isExpanded: true,
                                   decoration: InputDecoration(
@@ -585,8 +693,14 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                                   }).toList(),
                                   onChanged: (val) {
                                     if (val != null) {
-                                      setState(() => _selectedType =
-                                          normalizeAppointmentType(val));
+                                      setState(() {
+                                        _selectedType =
+                                            normalizeAppointmentType(val);
+                                        if (_selectedType == 'surgery' &&
+                                            _selectedDepartment != 'eye') {
+                                          _selectedType = 'regular';
+                                        }
+                                      });
                                     }
                                   },
                                 );
@@ -595,6 +709,56 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                           ),
                         ],
                       ),
+
+                      if (_selectedType == 'surgery') ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryContainer
+                                .withValues(alpha: 0.12),
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusMd),
+                            border: Border.all(
+                              color: AppColors.primaryContainer
+                                  .withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.medical_services_outlined,
+                                color: AppColors.primaryContainer,
+                                size: 20,
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Eye Surgery Scheduling',
+                                      style: AppTypography.labelCaps.copyWith(
+                                        color: AppColors.primaryContainer,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Surgery bookings require clinical details (eye side, procedure category, surgeon, and consumable reservations). Proceeding will open the Surgery workflow with the selected patient and schedule.',
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: AppColors.onSurface,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: AppSpacing.md),
 
@@ -667,7 +831,19 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                               _selectedPatientNumber = created.patientNumber;
                               if (created.department == 'eye' ||
                                   created.department == 'dental') {
+                                final oldDept = _selectedDepartment;
                                 _selectedDepartment = created.department!;
+                                if (_selectedDepartment.toLowerCase() == 'dental' &&
+                                    _selectedType == 'surgery') {
+                                  _selectedType = 'regular';
+                                }
+                                if (oldDept != _selectedDepartment &&
+                                    !DepartmentDoctorConfig.isValidDoctorNameForDepartment(
+                                        _selectedDoctorName, _selectedDepartment)) {
+                                  _selectedDoctorId = null;
+                                  _selectedDoctorName = null;
+                                  _selectedDoctorSpecialty = null;
+                                }
                               }
                               _searchController.clear();
                               _searchQuery = '';
@@ -689,84 +865,59 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                             .copyWith(color: AppColors.primary),
                       ),
                       const SizedBox(height: AppSpacing.xs),
-                      if (departmentsAsync.isLoading)
-                        const LinearProgressIndicator()
-                      else if (departmentsAsync.hasError)
-                        Text(
-                          'Error loading departments: '
-                          '${departmentsAsync.error}',
-                        )
-                      else if (matchingDepartments.isEmpty)
-                        Text(
-                          'No active ${_selectedDepartment == 'eye' ? 'Eye' : 'Dental'} department is configured.',
-                        )
-                      else if (matchingDepartments.length > 1)
-                        Text(
-                          'More than one active ${_selectedDepartment == 'eye' ? 'Eye' : 'Dental'} department was found.',
-                        )
-                      else
-                        candidatesAsync!.when(
-                          loading: () => const LinearProgressIndicator(),
-                          error: (error, _) => Text(
-                            'Error loading department staff: $error',
-                          ),
-                          data: (candidates) => Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              DropdownButtonFormField<String?>(
-                                initialValue: _selectedDoctorId,
-                                decoration: InputDecoration(
-                                  labelText: 'Attending Doctor',
-                                  prefixIcon:
-                                      const Icon(Icons.person_pin_outlined),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      AppSpacing.radiusMd,
-                                    ),
-                                  ),
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final configuredDoctors = ref.watch(
+                              departmentDoctorsProvider(_selectedDepartment));
+
+                          final isSelectedValid = configuredDoctors
+                              .any((doc) => doc.fullName == _selectedDoctorName);
+                          final effectiveDoctorName =
+                              isSelectedValid ? _selectedDoctorName : null;
+
+                          return DropdownButtonFormField<String?>(
+                            key: ValueKey(
+                                '$_selectedDepartment:$effectiveDoctorName'),
+                            initialValue: effectiveDoctorName,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: 'Attending Doctor',
+                              prefixIcon:
+                                  const Icon(Icons.person_pin_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppSpacing.radiusMd,
                                 ),
-                                items: [
-                                  const DropdownMenuItem<String?>(
-                                    value: null,
-                                    child: Text('Unassigned (General Queue)'),
-                                  ),
-                                  ...candidates.map(
-                                    (candidate) => DropdownMenuItem<String?>(
-                                      value: candidate.id,
-                                      child: Text(
-                                        candidate.fullName,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedDoctorId = value;
-                                    final match = candidates
-                                        .where(
-                                          (candidate) => candidate.id == value,
-                                        )
-                                        .firstOrNull;
-                                    _selectedDoctorName = match?.fullName;
-                                    _selectedDoctorSpecialty = null;
-                                  });
-                                },
                               ),
-                              if (candidates.isEmpty)
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.only(top: AppSpacing.xs),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('Unassigned (General Queue)'),
+                              ),
+                              ...configuredDoctors.map(
+                                (doc) => DropdownMenuItem<String?>(
+                                  value: doc.fullName,
                                   child: Text(
-                                    'No active staff found in this department.',
-                                    style: AppTypography.bodySm.copyWith(
-                                      color: AppColors.onSurfaceVariant,
-                                    ),
+                                    doc.fullName,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                              ),
                             ],
-                          ),
-                        ),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedDoctorName = value;
+                                _selectedDoctorId = null;
+                                final match = configuredDoctors
+                                    .where((doc) => doc.fullName == value)
+                                    .firstOrNull;
+                                _selectedDoctorSpecialty = match?.specialty;
+                              });
+                            },
+                          );
+                        },
+                      ),
 
                       const SizedBox(height: AppSpacing.md),
 
@@ -774,7 +925,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                       if (_selectedDate.year == DateTime.now().year &&
                           _selectedDate.month == DateTime.now().month &&
                           _selectedDate.day == DateTime.now().day &&
-                          !AppointmentFormDialog.hasValidSlotsRemainingToday()) ...[
+                          !AppointmentFormDialog
+                              .hasValidSlotsRemainingToday()) ...[
                         Container(
                           padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
@@ -913,7 +1065,11 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                     else
                       Expanded(
                         child: MkesPrimaryButton(
-                          label: isEditing ? 'Update Appointment' : 'Book Appointment',
+                          label: _selectedType == 'surgery'
+                              ? 'Proceed to Eye Surgery'
+                              : (isEditing
+                                  ? 'Update Appointment'
+                                  : 'Book Appointment'),
                           onPressed: _submit,
                         ),
                       ),

@@ -40,7 +40,8 @@ class ManualAttendanceSource implements AttendanceSource {
     String shift = 'morning',
     ShiftConfiguration? config,
   }) async {
-    final normalizedShift = shift.toLowerCase() == 'night' ? 'afternoon' : shift.toLowerCase();
+    final normalizedShift =
+        shift.toLowerCase() == 'night' ? 'afternoon' : shift.toLowerCase();
     final dateStr = getShiftDateStr(time, normalizedShift, config: config);
 
     // Check if user already clocked into this shift today
@@ -74,10 +75,12 @@ class ManualAttendanceSource implements AttendanceSource {
       // Fallback hardcoded defaults if no config object passed
       if (normalizedShift == 'afternoon' || normalizedShift == 'night') {
         isLate = time.hour > 13 || (time.hour == 13 && time.minute > 15);
-        lateMinutes = isLate ? ((time.hour - 13) * 60 + time.minute).clamp(0, 999) : 0;
+        lateMinutes =
+            isLate ? ((time.hour - 13) * 60 + time.minute).clamp(0, 999) : 0;
       } else {
         isLate = time.hour > 8 || (time.hour == 8 && time.minute > 15);
-        lateMinutes = isLate ? ((time.hour - 8) * 60 + time.minute).clamp(0, 999) : 0;
+        lateMinutes =
+            isLate ? ((time.hour - 8) * 60 + time.minute).clamp(0, 999) : 0;
       }
     }
 
@@ -93,7 +96,9 @@ class ManualAttendanceSource implements AttendanceSource {
         'updated_at': DateTime.now().toIso8601String(),
       });
     } on PostgrestException catch (e) {
-      if (e.code == '23505' || e.message.contains('unique') || e.message.contains('duplicate')) {
+      if (e.code == '23505' ||
+          e.message.contains('unique') ||
+          e.message.contains('duplicate')) {
         // Concurrent duplicate tap: already inserted
         return;
       }
@@ -108,7 +113,8 @@ class ManualAttendanceSource implements AttendanceSource {
     String shift = 'morning',
     ShiftConfiguration? config,
   }) async {
-    final normalizedShift = shift.toLowerCase() == 'night' ? 'afternoon' : shift.toLowerCase();
+    final normalizedShift =
+        shift.toLowerCase() == 'night' ? 'afternoon' : shift.toLowerCase();
     final dateStr = getShiftDateStr(time, normalizedShift, config: config);
 
     // 1. Look for active unclosed check-in for this specific staff member, shift, and logical shift date.
@@ -126,7 +132,8 @@ class ManualAttendanceSource implements AttendanceSource {
       final checkInStr = active['check_in_time']?.toString();
       final checkIn = checkInStr != null ? DateTime.tryParse(checkInStr) : null;
       if (checkIn != null) {
-        final workingHours = (time.difference(checkIn).inMinutes / 60.0).clamp(0.0, 24.0);
+        final workingHours =
+            (time.difference(checkIn).inMinutes / 60.0).clamp(0.0, 24.0);
 
         await _supabase.from('staff_attendance').update({
           'check_out_time': time.toIso8601String(),
@@ -174,12 +181,15 @@ class AttendanceRepository {
     int month, {
     String? shift,
   }) async {
-    final startDate = DateTime(year, month, 1).toIso8601String().split('T').first;
-    final endDate = DateTime(year, month + 1, 0).toIso8601String().split('T').first;
+    final startDate =
+        DateTime(year, month, 1).toIso8601String().split('T').first;
+    final endDate =
+        DateTime(year, month + 1, 0).toIso8601String().split('T').first;
 
     var query = _supabase
         .from('staff_attendance')
-        .select('*, profiles!staff_attendance_staff_id_fkey!inner(full_name, role)')
+        .select(
+            '*, profiles!staff_attendance_staff_id_fkey!inner(full_name, role)')
         .eq('profiles.role', 'staff')
         .eq('staff_id', staffId)
         .gte('record_date', startDate)
@@ -191,7 +201,9 @@ class AttendanceRepository {
 
     final response = await query.order('record_date', ascending: false);
 
-    return (response as List).map((json) => AttendanceRecord.fromJson(json)).toList();
+    return (response as List)
+        .map((json) => AttendanceRecord.fromJson(json))
+        .toList();
   }
 
   Future<List<AttendanceRecord>> fetchAllStaffAttendanceForDate(
@@ -201,7 +213,8 @@ class AttendanceRepository {
     final dateKey = date.toIso8601String().split('T').first;
     var query = _supabase
         .from('staff_attendance')
-        .select('*, profiles!staff_attendance_staff_id_fkey!inner(full_name, role)')
+        .select(
+            '*, profiles!staff_attendance_staff_id_fkey!inner(full_name, role)')
         .eq('profiles.role', 'staff')
         .eq('record_date', dateKey);
 
@@ -216,9 +229,16 @@ class AttendanceRepository {
         .toList();
   }
 
-  Future<Map<String, int>> fetchDailySummary(DateTime date, {String? shift}) async {
+  Future<Map<String, int>> fetchDailySummary(DateTime date,
+      {String? shift}) async {
     final records = await fetchAllStaffAttendanceForDate(date, shift: shift);
-    final summary = {'present': 0, 'late': 0, 'absent': 0, 'leave': 0, 'holiday': 0};
+    final summary = {
+      'present': 0,
+      'late': 0,
+      'absent': 0,
+      'leave': 0,
+      'holiday': 0
+    };
 
     for (final record in records) {
       final status = record.status.toLowerCase();
@@ -247,10 +267,12 @@ class AttendanceRepository {
     ShiftConfiguration? config,
   }) async {
     final now = DateTime.now();
-    final normShift = (shift.toLowerCase() == 'night' || shift.toLowerCase() == 'evening')
-        ? 'afternoon'
-        : shift.toLowerCase();
-    final today = ManualAttendanceSource.getShiftDateStr(now, normShift, config: config);
+    final normShift =
+        (shift.toLowerCase() == 'night' || shift.toLowerCase() == 'evening')
+            ? 'afternoon'
+            : shift.toLowerCase();
+    final today =
+        ManualAttendanceSource.getShiftDateStr(now, normShift, config: config);
 
     final response = await _supabase
         .from('staff_attendance')
@@ -264,14 +286,18 @@ class AttendanceRepository {
     final record = AttendanceRecord.fromJson(response);
 
     // Automatic termination safeguard if past configured end time and still unclosed
-    if (record.checkInTime != null && record.checkOutTime == null && config != null) {
+    if (record.checkInTime != null &&
+        record.checkOutTime == null &&
+        config != null) {
       if (config.isTimePastShiftEnd(now)) {
         try {
           await _supabase.rpc('auto_terminate_overdue_shifts');
         } catch (_) {
           final endDateTime = config.getShiftEndDateTime(record.checkInTime!);
           final effectiveClose = now.isAfter(endDateTime) ? endDateTime : now;
-          final workingHours = (effectiveClose.difference(record.checkInTime!).inMinutes / 60.0).clamp(0.0, 24.0);
+          final workingHours =
+              (effectiveClose.difference(record.checkInTime!).inMinutes / 60.0)
+                  .clamp(0.0, 24.0);
           await _supabase.from('staff_attendance').update({
             'check_out_time': effectiveClose.toIso8601String(),
             'working_hours': workingHours,
@@ -295,6 +321,18 @@ class AttendanceRepository {
     return record;
   }
 
+  /// Closes any open attendance records that have exceeded their scheduled shift-end time.
+  /// Sets check_out_time to the scheduled shift end time (not the current time).
+  Future<int> autoTerminateOverdueAttendance() async {
+    try {
+      final res = await _supabase.rpc('auto_terminate_overdue_shifts');
+      return (res is int) ? res : int.tryParse(res?.toString() ?? '0') ?? 0;
+    } catch (e) {
+      debugPrint('autoTerminateOverdueAttendance RPC error: $e');
+      return 0;
+    }
+  }
+
   /// Fetches an active (clocked-in but not clocked-out) attendance session for the staff member.
   /// If [shift] is provided, matches that shift on the logical shift date.
   /// Only matches sessions for today's logical shift date.
@@ -314,10 +352,13 @@ class AttendanceRepository {
           .isFilter('check_out_time', null);
 
       if (shift != null && shift.isNotEmpty && shift.toLowerCase() != 'both') {
-        final normShift = (shift.toLowerCase() == 'night' || shift.toLowerCase() == 'evening')
-            ? 'afternoon'
-            : shift.toLowerCase();
-        final dateStr = ManualAttendanceSource.getShiftDateStr(checkTime, normShift, config: config);
+        final normShift =
+            (shift.toLowerCase() == 'night' || shift.toLowerCase() == 'evening')
+                ? 'afternoon'
+                : shift.toLowerCase();
+        final dateStr = ManualAttendanceSource.getShiftDateStr(
+            checkTime, normShift,
+            config: config);
         query = query.eq('shift', normShift).eq('record_date', dateStr);
       } else {
         final todayStr = checkTime.toIso8601String().split('T').first;
@@ -330,7 +371,30 @@ class AttendanceRepository {
           .maybeSingle();
 
       if (response == null) return null;
-      return AttendanceRecord.fromJson(response);
+      final record = AttendanceRecord.fromJson(response);
+
+      // If active session has passed scheduled shift end time, auto-close at shift end
+      if (record.checkInTime != null &&
+          config != null &&
+          config.isTimePastShiftEnd(checkTime)) {
+        final endDateTime = config.getShiftEndDateTime(record.checkInTime!);
+        final effectiveClose =
+            checkTime.isAfter(endDateTime) ? endDateTime : checkTime;
+        final workingHours =
+            (effectiveClose.difference(record.checkInTime!).inMinutes / 60.0)
+                .clamp(0.0, 24.0);
+        await _supabase.from('staff_attendance').update({
+          'check_out_time': effectiveClose.toIso8601String(),
+          'working_hours': workingHours,
+          'notes': (record.notes == null || record.notes!.isEmpty)
+              ? 'Auto-clocked out at configured shift end time'
+              : '${record.notes} | Auto-clocked out at configured shift end time',
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', record.id);
+        return null;
+      }
+
+      return record;
     } catch (e) {
       debugPrint('fetchActiveAttendance error: $e');
       return null;
@@ -354,16 +418,24 @@ class AttendanceRepository {
       }
 
       final list = rows
-          .map((json) => ShiftConfiguration.fromJson(json as Map<String, dynamic>))
+          .map((json) =>
+              ShiftConfiguration.fromJson(json as Map<String, dynamic>))
           .toList();
 
       // Ensure both morning and afternoon are present
       final hasMorning = list.any((s) => s.name == 'morning');
-      final hasAfternoon = list.any((s) => s.name == 'afternoon' || s.name == 'night');
+      final hasAfternoon =
+          list.any((s) => s.name == 'afternoon' || s.name == 'night');
 
       return [
-        if (hasMorning) list.firstWhere((s) => s.name == 'morning') else ShiftConfiguration.defaultMorning,
-        if (hasAfternoon) list.firstWhere((s) => s.name == 'afternoon' || s.name == 'night') else ShiftConfiguration.defaultAfternoon,
+        if (hasMorning)
+          list.firstWhere((s) => s.name == 'morning')
+        else
+          ShiftConfiguration.defaultMorning,
+        if (hasAfternoon)
+          list.firstWhere((s) => s.name == 'afternoon' || s.name == 'night')
+        else
+          ShiftConfiguration.defaultAfternoon,
       ];
     } catch (e) {
       debugPrint('fetchShiftConfigurations error (using defaults): $e');
@@ -377,9 +449,9 @@ class AttendanceRepository {
   Future<void> updateShiftConfiguration(ShiftConfiguration config) async {
     try {
       await _supabase.from('shift_configurations').upsert(
-        config.toJson(),
-        onConflict: 'name',
-      );
+            config.toJson(),
+            onConflict: 'name',
+          );
     } catch (e) {
       debugPrint('updateShiftConfiguration error: $e');
       rethrow;
@@ -406,10 +478,13 @@ class AttendanceRepository {
         normalized != 'evening' &&
         normalized != 'both' &&
         normalized != 'night') {
-      throw ArgumentError('Invalid shift: $shift. Must be morning, evening, or both.');
+      throw ArgumentError(
+          'Invalid shift: $shift. Must be morning, evening, or both.');
     }
 
-    final storedShift = (normalized == 'night' || normalized == 'evening') ? 'afternoon' : normalized;
+    final storedShift = (normalized == 'night' || normalized == 'evening')
+        ? 'afternoon'
+        : normalized;
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -450,7 +525,8 @@ class AttendanceRepository {
           'created_at': DateTime.now().toUtc().toIso8601String(),
         }, onConflict: 'staff_id,effective_date');
       } catch (tableErr) {
-        debugPrint('Note: staff_shift_assignments table insert skipped or unavailable: $tableErr');
+        debugPrint(
+            'Note: staff_shift_assignments table insert skipped or unavailable: $tableErr');
       }
     } catch (e) {
       debugPrint('updateStaffShiftAssignment error: $e');
@@ -461,7 +537,9 @@ class AttendanceRepository {
   /// Fetches staff shift assignment for a given calendar date (defaults to today).
   /// If a scheduled shift change exists and [forDate] is on or after [shift_effective_date],
   /// returns [next_shift]. Otherwise returns [assigned_shift].
-  Future<String> fetchStaffShiftAssignment(String staffId, {DateTime? forDate}) async {
+  /// Returns null if no shift is assigned (honest unassigned state).
+  Future<String?> fetchStaffShiftAssignment(String staffId,
+      {DateTime? forDate}) async {
     try {
       final response = await _supabase
           .from('profiles')
@@ -470,17 +548,22 @@ class AttendanceRepository {
           .maybeSingle();
 
       if (response != null) {
-        final assigned = response['assigned_shift']?.toString().toLowerCase().trim() ?? 'morning';
+        final assigned =
+            response['assigned_shift']?.toString().toLowerCase().trim();
         final next = response['next_shift']?.toString().toLowerCase().trim();
         final effStr = response['shift_effective_date']?.toString();
 
-        if (next != null && effStr != null) {
+        if (next != null &&
+            next.isNotEmpty &&
+            effStr != null &&
+            effStr.isNotEmpty) {
           final now = DateTime.now();
           final target = forDate ?? now;
           final targetOnly = DateTime(target.year, target.month, target.day);
 
           DateTime? effDate;
-          final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(effStr.trim());
+          final match =
+              RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(effStr.trim());
           if (match != null) {
             effDate = DateTime(
               int.parse(match.group(1)!),
@@ -495,20 +578,30 @@ class AttendanceRepository {
             final effOnly = DateTime(effDate.year, effDate.month, effDate.day);
             if (!targetOnly.isBefore(effOnly)) {
               if (next == 'both') return 'both';
-              if (next == 'afternoon' || next == 'evening' || next == 'night') return 'afternoon';
-              return 'morning';
+              if (next == 'afternoon' || next == 'evening' || next == 'night') {
+                return 'afternoon';
+              }
+              if (next == 'morning') return 'morning';
+              return next;
             }
           }
         }
 
-        if (assigned == 'both') return 'both';
-        if (assigned == 'afternoon' || assigned == 'evening' || assigned == 'night') return 'afternoon';
-        return 'morning';
+        if (assigned != null && assigned.isNotEmpty) {
+          if (assigned == 'both') return 'both';
+          if (assigned == 'afternoon' ||
+              assigned == 'evening' ||
+              assigned == 'night') {
+            return 'afternoon';
+          }
+          if (assigned == 'morning') return 'morning';
+          return assigned;
+        }
       }
-      return 'morning';
+      return null;
     } catch (e) {
       debugPrint('fetchStaffShiftAssignment error: $e');
-      return 'morning';
+      return null;
     }
   }
 
@@ -517,7 +610,8 @@ class AttendanceRepository {
     String shift = 'morning',
     ShiftConfiguration? config,
   }) async {
-    await _source.recordCheckIn(staffId, DateTime.now(), shift: shift, config: config);
+    await _source.recordCheckIn(staffId, DateTime.now(),
+        shift: shift, config: config);
   }
 
   Future<void> checkOut(
@@ -525,6 +619,7 @@ class AttendanceRepository {
     String shift = 'morning',
     ShiftConfiguration? config,
   }) async {
-    await _source.recordCheckOut(staffId, DateTime.now(), shift: shift, config: config);
+    await _source.recordCheckOut(staffId, DateTime.now(),
+        shift: shift, config: config);
   }
 }

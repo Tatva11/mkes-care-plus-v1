@@ -14,7 +14,8 @@ class UserProfile {
   final DateTime createdAt;
 
   final String assignedShift; // 'morning' | 'afternoon' | 'evening' | 'both'
-  final String? nextShift; // Scheduled future shift: 'morning' | 'afternoon' | 'evening' | 'both'
+  final String?
+      nextShift; // Scheduled future shift: 'morning' | 'afternoon' | 'evening' | 'both'
   final DateTime? shiftEffectiveDate; // Date from which nextShift takes effect
 
   UserProfile({
@@ -39,7 +40,9 @@ class UserProfile {
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     DateTime? parseCalendarDate(dynamic value) {
       if (value == null) return null;
-      if (value is DateTime) return DateTime(value.year, value.month, value.day);
+      if (value is DateTime) {
+        return DateTime(value.year, value.month, value.day);
+      }
       final str = value.toString().trim();
       if (str.isEmpty) return null;
       final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(str);
@@ -58,7 +61,8 @@ class UserProfile {
       return null;
     }
 
-    final rawShift = (json['assigned_shift'] as String?)?.toLowerCase() ?? 'morning';
+    final rawShift =
+        (json['assigned_shift'] as String?)?.toLowerCase() ?? 'morning';
     final rawNextShift = (json['next_shift'] as String?)?.toLowerCase();
 
     return UserProfile(
@@ -190,7 +194,8 @@ class UserProfile {
   }
 
   /// Current working shift display name (or for a specific date).
-  String get shiftDisplayName => formatShiftLabel(assignedShift, includeSuffix: true);
+  String get shiftDisplayName =>
+      formatShiftLabel(assignedShift, includeSuffix: true);
 
   /// Scheduled future shift display name.
   String? get scheduledShiftDisplayName =>

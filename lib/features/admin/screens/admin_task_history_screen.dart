@@ -90,9 +90,8 @@ class _AdminTaskHistoryScreenState
         data: (tasks) {
           final filteredTasks = _filterTasks(tasks);
           final total = filteredTasks.length;
-          final completed = filteredTasks
-              .where((task) => task.status == 'completed')
-              .length;
+          final completed =
+              filteredTasks.where((task) => task.status == 'completed').length;
           final pending = filteredTasks
               .where((task) =>
                   task.status == 'pending' || task.status == 'in_progress')
@@ -124,7 +123,8 @@ class _AdminTaskHistoryScreenState
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withValues(alpha: 0.15),
+                        color:
+                            AppColors.primaryContainer.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -173,7 +173,8 @@ class _AdminTaskHistoryScreenState
       if (_selectedStatus != 'all' && task.status != _selectedStatus) {
         return false;
       }
-      if (_fromDate != null && task.createdAt.isBefore(_startOfDay(_fromDate!))) {
+      if (_fromDate != null &&
+          task.createdAt.isBefore(_startOfDay(_fromDate!))) {
         return false;
       }
       if (_toDate != null && task.createdAt.isAfter(_endOfDay(_toDate!))) {
@@ -219,7 +220,8 @@ class _AdminTaskHistoryScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('FILTERS',
-              style: AppTypography.labelCaps.copyWith(color: AppColors.primary)),
+              style:
+                  AppTypography.labelCaps.copyWith(color: AppColors.primary)),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<String?>(
             initialValue: staff.any((user) => user.id == _selectedStaffId)
@@ -324,8 +326,8 @@ class _AdminTaskHistoryScreenState
         ),
         child: Text(
           'No completed tasks in this view.',
-          style: AppTypography.bodyMd
-              .copyWith(color: AppColors.onSurfaceVariant),
+          style:
+              AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
         ),
       );
     }
@@ -338,9 +340,8 @@ class _AdminTaskHistoryScreenState
       ),
       child: Column(
         children: completedByStaff.entries.map((entry) {
-          final staffUser = staff
-              .where((user) => user.id == entry.key)
-              .firstOrNull;
+          final staffUser =
+              staff.where((user) => user.id == entry.key).firstOrNull;
           final staffName = staffUser?.fullName ?? 'Unknown staff';
 
           return ListTile(
@@ -453,7 +454,8 @@ class _AdminTaskHistoryScreenState
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                  icon: const Icon(Icons.edit_outlined,
+                      size: 18, color: AppColors.primary),
                   tooltip: 'Edit Task',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -535,7 +537,9 @@ class _AdminTaskHistoryScreenState
                       Text(
                         'Due: ${DateFormat('MMM d, yyyy').format(task.dueDate!.toLocal())}',
                         style: AppTypography.bodySm.copyWith(
-                          color: task.isOverdue ? Colors.red : AppColors.onSurfaceVariant,
+                          color: task.isOverdue
+                              ? Colors.red
+                              : AppColors.onSurfaceVariant,
                           fontWeight: task.isOverdue ? FontWeight.w600 : null,
                         ),
                       ),
@@ -568,9 +572,8 @@ class _AdminTaskHistoryScreenState
   Future<void> _pickDate({required bool isFrom}) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: isFrom
-          ? (_fromDate ?? DateTime.now())
-          : (_toDate ?? DateTime.now()),
+      initialDate:
+          isFrom ? (_fromDate ?? DateTime.now()) : (_toDate ?? DateTime.now()),
       firstDate: DateTime(2024),
       lastDate: DateTime(2100),
     );

@@ -100,14 +100,20 @@ class AppointmentsNotifier
 
       // If backend returns data, use it; otherwise fallback to preserve initial schedule UI.
       if (items.isNotEmpty) {
+        items.sort(AppointmentModel.compareAppointments);
         state = AsyncValue.data(items);
       } else {
-        state = AsyncValue.data(initialFallbackAppointments);
+        final fallback =
+            List<AppointmentModel>.from(initialFallbackAppointments)
+              ..sort(AppointmentModel.compareAppointments);
+        state = AsyncValue.data(fallback);
       }
     } catch (e) {
       debugPrint('Error loading appointments from Supabase: $e');
       // If error or network offline, provide fallback gracefully
-      state = AsyncValue.data(initialFallbackAppointments);
+      final fallback = List<AppointmentModel>.from(initialFallbackAppointments)
+        ..sort(AppointmentModel.compareAppointments);
+      state = AsyncValue.data(fallback);
     }
   }
 
@@ -122,6 +128,7 @@ class AppointmentsNotifier
       return item;
     }).toList();
 
+    updatedList.sort(AppointmentModel.compareAppointments);
     state = AsyncValue.data(updatedList);
 
     try {
@@ -138,7 +145,9 @@ class AppointmentsNotifier
     try {
       final created = await _repository.createAppointment(newAppointment);
       final currentList = state.value ?? [];
-      state = AsyncValue.data([...currentList, created]);
+      final nextList = [...currentList, created]
+        ..sort(AppointmentModel.compareAppointments);
+      state = AsyncValue.data(nextList);
     } catch (e) {
       debugPrint('Error creating appointment in Supabase: $e');
       rethrow;
@@ -152,10 +161,22 @@ class AppointmentsNotifier
     final currentList = state.value ?? [];
     final updatedList = currentList.map((item) {
       if (item.id == appointmentId) {
+        final updatedNotes = updates.containsKey('notes')
+            ? updates['notes'] as String?
+            : item.notes;
+        final updatedDoctorId = updates.containsKey('doctor_id')
+            ? updates['doctor_id'] as String?
+            : item.doctorId;
+        final updatedDoctorName = updates.containsKey('doctor_name')
+            ? updates['doctor_name'] as String?
+            : (AppointmentModel.extractDoctorNameFromNotes(updatedNotes) ??
+                (updatedDoctorId == null ? null : item.doctorName));
+
         return item.copyWith(
           patientId: updates['patient_id'] ?? item.patientId,
           department: updates['department'] ?? item.department,
-          doctorId: updates['doctor_id'] ?? item.doctorId,
+          doctorId: updatedDoctorId,
+          doctorName: updatedDoctorName,
           appointmentDate: updates['appointment_date'] != null
               ? DateTime.tryParse(updates['appointment_date'] as String) ??
                   item.appointmentDate
@@ -163,14 +184,23 @@ class AppointmentsNotifier
           appointmentTime: updates['appointment_time'] ?? item.appointmentTime,
           appointmentType: updates['appointment_type'] ?? item.appointmentType,
           status: updates['status'] ?? item.status,
-          notes: updates['notes'] ?? item.notes,
+          notes: updatedNotes,
           updatedAt: DateTime.now(),
         );
       }
       return item;
     }).toList();
 
-    state = AsyncValue.data(updatedList);
+    // If appointment moved to another date, remove from today's list
+    final now = DateTime.now();
+    final remainingForToday = updatedList.where((item) {
+      return item.appointmentDate.year == now.year &&
+          item.appointmentDate.month == now.month &&
+          item.appointmentDate.day == now.day;
+    }).toList();
+
+    remainingForToday.sort(AppointmentModel.compareAppointments);
+    state = AsyncValue.data(remainingForToday);
 
     try {
       if (!appointmentId.startsWith('APT-')) {

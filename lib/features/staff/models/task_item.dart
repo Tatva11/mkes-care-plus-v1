@@ -22,7 +22,8 @@ class TaskItem {
   final String? staffName;
   final DateTime? dueDate;
   final String priority; // 'low', 'medium', 'high', 'critical'
-  final String status; // 'pending', 'in_progress', 'completed', 'overdue', 'cancelled'
+  final String
+      status; // 'pending', 'in_progress', 'completed', 'overdue', 'cancelled'
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
@@ -92,18 +93,24 @@ class TaskItem {
       assignedTo: json['assigned_to'] as String,
       assignedBy: json['assigned_by'] as String?,
       staffName: staffName,
-      dueDate: json['due_date'] != null ? DateTime.parse(json['due_date'] as String) : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.parse(json['due_date'] as String)
+          : null,
       priority: (json['priority'] as String? ?? 'medium').toLowerCase(),
       status: (json['status'] as String? ?? 'pending').toLowerCase(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at'] as String) : null,
+      completedAt: json['completed_at'] != null
+          ? DateTime.parse(json['completed_at'] as String)
+          : null,
       relatedSurgeryId: json['related_surgery_id']?.toString(),
     );
   }
 
   bool get isOverdue {
     if (status == 'completed' || status == 'cancelled') return false;
+    // Surgeries are static schedule entries and must NEVER be treated as overdue
+    if (isSurgeryTask) return false;
     if (dueDate == null) return false;
     return dueDate!.isBefore(DateTime.now());
   }

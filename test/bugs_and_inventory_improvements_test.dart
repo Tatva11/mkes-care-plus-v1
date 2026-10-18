@@ -30,7 +30,8 @@ class FakeTestAttendanceRepo implements AttendanceRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   @override
-  Future<String> fetchStaffShiftAssignment(String staffId, {DateTime? forDate}) async {
+  Future<String?> fetchStaffShiftAssignment(String staffId,
+      {DateTime? forDate}) async {
     return shiftAssignments[staffId] ?? 'morning';
   }
 
@@ -166,8 +167,7 @@ class FakeTestEyeSurgeryRepo implements EyeSurgeryRepository {
     required double defaultQuantity,
   }) async {
     final index = templates.indexWhere((t) =>
-        t.surgeryType == surgeryType &&
-        t.inventoryItemId == inventoryItemId);
+        t.surgeryType == surgeryType && t.inventoryItemId == inventoryItemId);
     final item = EyeSurgeryItemTemplateModel(
       id: index != -1 ? templates[index].id : 'tmpl-${templates.length + 1}',
       surgeryType: surgeryType,
@@ -232,7 +232,8 @@ class FakeTestInventoryRepo implements InventoryRepository {
       if (item.batches != null && item.batches!.isNotEmpty) {
         for (final b in item.batches!) {
           if (b.remainingQuantity > 0 && b.expiryDate != null) {
-            final exp = DateTime(b.expiryDate!.year, b.expiryDate!.month, b.expiryDate!.day);
+            final exp = DateTime(
+                b.expiryDate!.year, b.expiryDate!.month, b.expiryDate!.day);
             if (exp.isBefore(today)) {
               entries.add(ExpiredStockEntry(
                 inventoryId: item.id,
@@ -248,7 +249,8 @@ class FakeTestInventoryRepo implements InventoryRepository {
           }
         }
       } else if (item.currentStock > 0 && item.expiryDate != null) {
-        final exp = DateTime(item.expiryDate!.year, item.expiryDate!.month, item.expiryDate!.day);
+        final exp = DateTime(item.expiryDate!.year, item.expiryDate!.month,
+            item.expiryDate!.day);
         if (exp.isBefore(today)) {
           entries.add(ExpiredStockEntry(
             inventoryId: item.id,
@@ -284,7 +286,8 @@ class FakeTestInventoryRepo implements InventoryRepository {
     if (index == -1) throw Exception('Item not found');
     final item = items[index];
     if (item.currentStock < quantity) {
-      throw Exception('Insufficient stock. Available: ${item.currentStock}, Requested: $quantity');
+      throw Exception(
+          'Insufficient stock. Available: ${item.currentStock}, Requested: $quantity');
     }
 
     final newStock = item.currentStock - quantity;
@@ -337,7 +340,10 @@ class FakeTestInventoryRepo implements InventoryRepository {
       transactionType: 'stock_out',
       quantity: quantity,
       reason: StockOutReasons.expired,
-      remarks: remarks ?? (batchNumber != null ? 'Removed expired stock from Batch $batchNumber' : 'Removed expired stock adjustment'),
+      remarks: remarks ??
+          (batchNumber != null
+              ? 'Removed expired stock from Batch $batchNumber'
+              : 'Removed expired stock adjustment'),
     );
   }
 }
@@ -348,13 +354,17 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ISSUE 1: Staff Clock In / Clock Out Regression Tests', () {
-    test('fetchStaffShiftAssignment correctly maps morning, afternoon, and both', () {
+    test(
+        'fetchStaffShiftAssignment correctly maps morning, afternoon, and both',
+        () {
       expect('morning', equals('morning'));
       expect('afternoon', equals('afternoon'));
       expect('both', equals('both'));
     });
 
-    test('Stale unclosed session from days ago does NOT cause today morning shift to show Clock Out', () async {
+    test(
+        'Stale unclosed session from days ago does NOT cause today morning shift to show Clock Out',
+        () async {
       final fakeRepo = FakeTestAttendanceRepo();
       const staffId = 'staff-alice-1';
 
@@ -387,7 +397,8 @@ void main() {
       expect(active, isNull);
     });
 
-    test('Independent shift sessions for staff assigned to Both shifts', () async {
+    test('Independent shift sessions for staff assigned to Both shifts',
+        () async {
       final fakeRepo = FakeTestAttendanceRepo();
       const staffId = 'staff-both-1';
       final now = DateTime.now();
@@ -438,7 +449,8 @@ void main() {
       expect(morningCheck?.checkOutTime, isNotNull);
     });
 
-    test('Idempotent check-in prevents duplicate sessions on double-tap', () async {
+    test('Idempotent check-in prevents duplicate sessions on double-tap',
+        () async {
       final fakeRepo = FakeTestAttendanceRepo();
       const staffId = 'staff-tap-1';
       final now = DateTime.now();
@@ -462,12 +474,16 @@ void main() {
   });
 
   group('ISSUE 2: Duty/Shift Assignment Back Navigation & Loading State', () {
-    testWidgets('ShiftManagementScreen terminates loading and renders retry on error', (tester) async {
+    testWidgets(
+        'ShiftManagementScreen terminates loading and renders retry on error',
+        (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            shiftConfigurationsProvider.overrideWith((ref) => Future.error('Failed to connect to Supabase')),
-            userManagementRepositoryProvider.overrideWithValue(FakeTestUserRepo([])),
+            shiftConfigurationsProvider.overrideWith(
+                (ref) => Future.error('Failed to connect to Supabase')),
+            userManagementRepositoryProvider
+                .overrideWithValue(FakeTestUserRepo([])),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -480,13 +496,15 @@ void main() {
       await tester.pump();
 
       // Verify that error is displayed with a Retry button rather than infinite loading spinner
-      expect(find.textContaining('Unable to load shift configurations'), findsOneWidget);
+      expect(find.textContaining('Unable to load shift configurations'),
+          findsOneWidget);
       expect(find.widgetWithText(TextButton, 'Retry'), findsWidgets);
     });
   });
 
   group('ISSUE 3: Direct Remove Expired Stock Action', () {
-    test('Identifies expired batches and standalone items accurately', () async {
+    test('Identifies expired batches and standalone items accurately',
+        () async {
       final pastDate = DateTime.now().subtract(const Duration(days: 10));
       final futureDate = DateTime.now().add(const Duration(days: 60));
 
@@ -543,13 +561,21 @@ void main() {
 
       // Only the 2 expired lots (batch-exp-1 and item-standalone-2) must be returned
       expect(expired.length, equals(2));
-      expect(expired.any((e) => e.batchNumber == 'LOT-9988' && e.expiredQuantity == 15.0), isTrue);
-      expect(expired.any((e) => e.itemName == 'Expired Suture Kit' && e.expiredQuantity == 10.0), isTrue);
+      expect(
+          expired.any(
+              (e) => e.batchNumber == 'LOT-9988' && e.expiredQuantity == 15.0),
+          isTrue);
+      expect(
+          expired.any((e) =>
+              e.itemName == 'Expired Suture Kit' && e.expiredQuantity == 10.0),
+          isTrue);
       // Valid item sterile gauze must NOT be present
       expect(expired.any((e) => e.itemName == 'Sterile Gauze'), isFalse);
     });
 
-    test('Partial expired quantity removal does NOT delete item and preserves unexpired batches', () async {
+    test(
+        'Partial expired quantity removal does NOT delete item and preserves unexpired batches',
+        () async {
       final pastDate = DateTime.now().subtract(const Duration(days: 5));
       final futureDate = DateTime.now().add(const Duration(days: 100));
 
@@ -600,10 +626,19 @@ void main() {
       expect(tx.stockAfter, equals(30.0));
 
       // Verify central inventory item still exists with remaining 30 units
-      final updatedItem = fakeRepo.items.firstWhere((i) => i.id == 'item-cataract-blade');
+      final updatedItem =
+          fakeRepo.items.firstWhere((i) => i.id == 'item-cataract-blade');
       expect(updatedItem.currentStock, equals(30.0));
-      expect(updatedItem.batches?.firstWhere((b) => b.batchNumber == 'BL-001').remainingQuantity, equals(0.0));
-      expect(updatedItem.batches?.firstWhere((b) => b.batchNumber == 'BL-002').remainingQuantity, equals(30.0));
+      expect(
+          updatedItem.batches
+              ?.firstWhere((b) => b.batchNumber == 'BL-001')
+              .remainingQuantity,
+          equals(0.0));
+      expect(
+          updatedItem.batches
+              ?.firstWhere((b) => b.batchNumber == 'BL-002')
+              .remainingQuantity,
+          equals(30.0));
     });
 
     test('Rejects removal of quantity exceeding current stock', () async {
@@ -633,14 +668,17 @@ void main() {
       expect(fakeRepo.items.first.currentStock, equals(5.0));
     });
 
-    testWidgets('RemoveExpiredStockDialog renders empty state when zero stock is expired', (tester) async {
+    testWidgets(
+        'RemoveExpiredStockDialog renders empty state when zero stock is expired',
+        (tester) async {
       final fakeRepo = FakeTestInventoryRepo([]);
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            inventoryProvider.overrideWith((ref) => InventoryNotifier(fakeRepo)),
+            inventoryProvider
+                .overrideWith((ref) => InventoryNotifier(fakeRepo)),
           ],
           child: const MaterialApp(
             home: Scaffold(body: RemoveExpiredStockDialog()),
@@ -656,7 +694,9 @@ void main() {
   });
 
   group('ISSUE 4: Surgery Inventory Presets Dialog Layout & No Overflow', () {
-    testWidgets('Dialog renders with 0 items on compact phone screen (360x600) with NO RenderFlex overflow', (tester) async {
+    testWidgets(
+        'Dialog renders with 0 items on compact phone screen (360x600) with NO RenderFlex overflow',
+        (tester) async {
       tester.view.physicalSize = const Size(360, 600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -669,8 +709,10 @@ void main() {
           overrides: [
             eyeSurgeryRepositoryProvider.overrideWithValue(fakeEyeRepo),
             inventoryRepositoryProvider.overrideWithValue(fakeInvRepo),
-            inventoryProvider.overrideWith((ref) => InventoryNotifier(fakeInvRepo)),
-            allEyeSurgeryItemTemplatesProvider.overrideWith((ref) => Future.value([])),
+            inventoryProvider
+                .overrideWith((ref) => InventoryNotifier(fakeInvRepo)),
+            allEyeSurgeryItemTemplatesProvider
+                .overrideWith((ref) => Future.value([])),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -689,7 +731,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('Dialog renders with many items on constrained 320x520 layout with NO RenderFlex overflow', (tester) async {
+    testWidgets(
+        'Dialog renders with many items on constrained 320x520 layout with NO RenderFlex overflow',
+        (tester) async {
       tester.view.physicalSize = const Size(320, 520);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -708,7 +752,8 @@ void main() {
         ),
       );
 
-      final fakeEyeRepo = FakeTestEyeSurgeryRepo()..templates.addAll(manyTemplates);
+      final fakeEyeRepo = FakeTestEyeSurgeryRepo()
+        ..templates.addAll(manyTemplates);
       final fakeInvRepo = FakeTestInventoryRepo([]);
 
       await tester.pumpWidget(
@@ -716,8 +761,10 @@ void main() {
           overrides: [
             eyeSurgeryRepositoryProvider.overrideWithValue(fakeEyeRepo),
             inventoryRepositoryProvider.overrideWithValue(fakeInvRepo),
-            inventoryProvider.overrideWith((ref) => InventoryNotifier(fakeInvRepo)),
-            allEyeSurgeryItemTemplatesProvider.overrideWith((ref) => Future.value(manyTemplates)),
+            inventoryProvider
+                .overrideWith((ref) => InventoryNotifier(fakeInvRepo)),
+            allEyeSurgeryItemTemplatesProvider
+                .overrideWith((ref) => Future.value(manyTemplates)),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -730,12 +777,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Surgery Inventory Presets'), findsOneWidget);
-      expect(find.textContaining('Surgical Consumable Long Item Name #0'), findsOneWidget);
+      expect(find.textContaining('Surgical Consumable Long Item Name #0'),
+          findsOneWidget);
       // Verify zero RenderFlex overflow on 320x520 constrained layout
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('Dialog renders on wide desktop (1024x768) layout with accessible Add to Preset controls', (tester) async {
+    testWidgets(
+        'Dialog renders on wide desktop (1024x768) layout with accessible Add to Preset controls',
+        (tester) async {
       tester.view.physicalSize = const Size(1024, 768);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -758,8 +808,10 @@ void main() {
           overrides: [
             eyeSurgeryRepositoryProvider.overrideWithValue(fakeEyeRepo),
             inventoryRepositoryProvider.overrideWithValue(fakeInvRepo),
-            inventoryProvider.overrideWith((ref) => InventoryNotifier(fakeInvRepo)),
-            allEyeSurgeryItemTemplatesProvider.overrideWith((ref) => Future.value([])),
+            inventoryProvider
+                .overrideWith((ref) => InventoryNotifier(fakeInvRepo)),
+            allEyeSurgeryItemTemplatesProvider
+                .overrideWith((ref) => Future.value([])),
           ],
           child: const MaterialApp(
             home: Scaffold(

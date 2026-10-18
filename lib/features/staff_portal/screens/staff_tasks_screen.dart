@@ -10,7 +10,9 @@ import '../../dental/screens/dental_lab_screen.dart';
 import '../../eye/screens/eye_surgery_screen.dart';
 import '../../inventory/screens/inventory_screen.dart';
 import '../../inventory/screens/purchase_order_list_screen.dart';
+import '../../staff/models/task_item.dart';
 import '../../staff/providers/task_provider.dart';
+import '../../staff/utils/task_operational_filter.dart';
 import '../../vendors/screens/vendor_management_screen.dart';
 import 'staff_task_history_screen.dart';
 
@@ -37,11 +39,9 @@ class StaffTasksScreen extends ConsumerStatefulWidget {
 
 class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
   late StaffTaskTab _selectedTab;
-  int _filterIndex = 0; // 0: All, 1: Pending, 2: Completed
-  DateTime _selectedShiftDate = DateTime.now();
-
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
+  int _filterIndex =
+      0; // 0: All Pending / All for Date, 1: Today / Pending, 2: Overdue
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -191,14 +191,16 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                             icon: const Icon(Icons.refresh),
                             tooltip: 'Refresh tasks',
                             onPressed: () => ref
-                                .read(staffTasksProvider(currentUser.id).notifier)
+                                .read(
+                                    staffTasksProvider(currentUser.id).notifier)
                                 .fetchTasks(),
                           ),
                           const SizedBox(width: AppSpacing.xs),
                           OutlinedButton.icon(
                             onPressed: () => setState(
                                 () => _selectedTab = StaffTaskTab.inventory),
-                            icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                            icon: const Icon(Icons.inventory_2_outlined,
+                                size: 18),
                             label: const Text('Inventory'),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
@@ -207,10 +209,10 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                           ),
                           const SizedBox(width: AppSpacing.xs),
                           OutlinedButton.icon(
-                            onPressed: () =>
-                                setState(() => _selectedTab = StaffTaskTab.vendors),
-                            icon:
-                                const Icon(Icons.local_shipping_outlined, size: 18),
+                            onPressed: () => setState(
+                                () => _selectedTab = StaffTaskTab.vendors),
+                            icon: const Icon(Icons.local_shipping_outlined,
+                                size: 18),
                             label: const Text('Vendors'),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
@@ -219,9 +221,10 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                           ),
                           const SizedBox(width: AppSpacing.xs),
                           OutlinedButton.icon(
-                            onPressed: () => setState(
-                                () => _selectedTab = StaffTaskTab.purchaseOrders),
-                            icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                            onPressed: () => setState(() =>
+                                _selectedTab = StaffTaskTab.purchaseOrders),
+                            icon: const Icon(Icons.receipt_long_outlined,
+                                size: 18),
                             label: const Text('Purchase Orders'),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
@@ -330,41 +333,71 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
               ),
             ],
             const SizedBox(height: AppSpacing.lg),
+
+            // Date Selector Control on Staff Tasks Screen (Part 4)
+            _buildDateSelector(isDesktop),
+
             tasksAsync.when(
               data: (tasks) {
-                final shiftTasks = tasks.where((t) {
-                  if (t.dueDate != null) {
-                    return _isSameDay(t.dueDate!, _selectedShiftDate);
-                  }
-                  return _isSameDay(_selectedShiftDate, DateTime.now());
-                }).toList();
+                final isViewingToday =
+                    DateUtils.isSameDay(_selectedDate, DateTime.now());
 
-                final pendingCount = shiftTasks
-                    .where((t) =>
-                        t.status != 'completed' && t.status != 'cancelled')
-                    .length;
-                final completedCount =
-                    shiftTasks.where((t) => t.status == 'completed').length;
+                List<TaskItem> operationalTasks;
+                List<TaskItem> primaryTasks;
+                List<TaskItem> overdueTasks;
+                List<TaskItem> filtered;
 
-                final filtered = shiftTasks.where((t) {
-                  final isCompleted = t.status == 'completed';
-                  if (_filterIndex == 1) {
-                    return !isCompleted && t.status != 'cancelled';
-                  }
-                  if (_filterIndex == 2) {
-                    return isCompleted;
-                  }
-                  return t.status != 'cancelled';
-                }).toList();
+                if (isViewingToday) {
+                  operationalTasks =
+                      TaskOperationalFilter.filterOperationalTasks(
+                    tasks,
+                    referenceDate: _selectedDate,
+                  );
+                  primaryTasks = operationalTasks
+                      .where((t) =>
+                          !TaskOperationalFilter.isOverdueCarryForward(
+                              t, _selectedDate))
+                      .toList();
+                  overdueTasks = operationalTasks
+                      .where((t) => TaskOperationalFilter.isOverdueCarryForward(
+                          t, _selectedDate))
+                      .toList();
+                  filtered = _filterIndex == 1
+                      ? primaryTasks
+                      : _filterIndex == 2
+                          ? overdueTasks
+                          : operationalTasks;
+                } else {
+                  // Specific selected date tasks
+                  final dateTasks = tasks
+                      .where((t) =>
+                          !t.isSurgeryTask &&
+                          t.dueDate != null &&
+                          DateUtils.isSameDay(
+                              t.dueDate!.toLocal(), _selectedDate))
+                      .toList();
+                  primaryTasks = dateTasks
+                      .where((t) =>
+                          t.status != 'completed' && t.status != 'cancelled')
+                      .toList();
+                  // Overdue status depends on actual current time, not merely selecting a past date
+                  overdueTasks = dateTasks.where((t) => t.isOverdue).toList();
+                  operationalTasks = dateTasks;
+                  filtered = _filterIndex == 1
+                      ? primaryTasks
+                      : _filterIndex == 2
+                          ? overdueTasks
+                          : dateTasks;
+                }
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Dynamic Shift Date Selector
+                    // Operational / Date Header showing date and pending count
                     Container(
                       margin: const EdgeInsets.only(bottom: AppSpacing.md),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm, vertical: 4),
+                          horizontal: AppSpacing.md, vertical: 8),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceContainerLowest,
                         borderRadius:
@@ -372,75 +405,35 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                         border: Border.all(color: AppColors.outlineVariant),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.chevron_left),
-                            tooltip: 'Previous Day',
-                            onPressed: () {
-                              setState(() {
-                                _selectedShiftDate = _selectedShiftDate
-                                    .subtract(const Duration(days: 1));
-                              });
-                            },
+                          const Icon(Icons.today,
+                              size: 18, color: AppColors.primary),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            isViewingToday
+                                ? 'Operational Tasks — Today (${DateFormat('d MMM yyyy').format(_selectedDate)})'
+                                : 'Scheduled Tasks — ${DateFormat('EEEE, d MMM yyyy').format(_selectedDate)}',
+                            style: AppTypography.bodyMd
+                                .copyWith(fontWeight: FontWeight.w600),
                           ),
-                          InkWell(
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _selectedShiftDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2035),
-                              );
-                              if (picked != null) {
-                                setState(() => _selectedShiftDate = picked);
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.calendar_today,
-                                      size: 16, color: AppColors.primary),
-                                  const SizedBox(width: AppSpacing.xs),
-                                  Text(
-                                    _isSameDay(
-                                            _selectedShiftDate, DateTime.now())
-                                        ? 'Today (${DateFormat('d MMM').format(_selectedShiftDate)})'
-                                        : DateFormat('EEE, d MMM yyyy')
-                                            .format(_selectedShiftDate),
-                                    style: AppTypography.bodyMd.copyWith(
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ],
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              isViewingToday
+                                  ? '${operationalTasks.length} pending'
+                                  : '${primaryTasks.length} pending',
+                              style: AppTypography.labelCaps.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!_isSameDay(
-                                  _selectedShiftDate, DateTime.now()))
-                                TextButton(
-                                  onPressed: () {
-                                    setState(
-                                        () => _selectedShiftDate = DateTime.now());
-                                  },
-                                  child: const Text('Today'),
-                                ),
-                              IconButton(
-                                icon: const Icon(Icons.chevron_right),
-                                tooltip: 'Next Day',
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedShiftDate = _selectedShiftDate
-                                        .add(const Duration(days: 1));
-                                  });
-                                },
-                              ),
-                            ],
                           ),
                         ],
                       ),
@@ -450,11 +443,23 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                       child: Row(
                         children: [
                           _buildFilterChip(
-                              'All (${pendingCount + completedCount})', 0),
+                            isViewingToday
+                                ? 'All Pending (${operationalTasks.length})'
+                                : 'All for Date (${operationalTasks.length})',
+                            0,
+                          ),
                           const SizedBox(width: AppSpacing.sm),
-                          _buildFilterChip('Pending ($pendingCount)', 1),
+                          _buildFilterChip(
+                            isViewingToday
+                                ? "Today's Tasks (${primaryTasks.length})"
+                                : 'Pending (${primaryTasks.length})',
+                            1,
+                          ),
                           const SizedBox(width: AppSpacing.sm),
-                          _buildFilterChip('Completed ($completedCount)', 2),
+                          _buildFilterChip(
+                            'Overdue (${overdueTasks.length})',
+                            2,
+                          ),
                         ],
                       ),
                     ),
@@ -472,10 +477,14 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                               const SizedBox(height: AppSpacing.sm),
                               Text(
                                 _filterIndex == 1
-                                    ? 'No pending shift tasks for this date.'
+                                    ? (isViewingToday
+                                        ? 'No pending tasks scheduled for today.'
+                                        : 'No pending tasks scheduled for this date.')
                                     : _filterIndex == 2
-                                        ? 'No completed tasks yet for this date.'
-                                        : 'No tasks assigned for this shift date.',
+                                        ? 'No overdue carry-forward tasks.'
+                                        : (isViewingToday
+                                            ? 'No pending tasks for today'
+                                            : 'No tasks for this date'),
                                 style: AppTypography.bodyLg.copyWith(
                                     color: AppColors.onSurfaceVariant),
                               ),
@@ -493,6 +502,10 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                         itemBuilder: (context, index) {
                           final item = filtered[index];
                           final isCompleted = item.status == 'completed';
+                          final isOverdue = !item.isSurgeryTask &&
+                              (TaskOperationalFilter.isOverdueCarryForward(
+                                      item, DateTime.now()) ||
+                                  item.isOverdue);
 
                           Color priorityColor;
                           if (item.priority == 'critical' ||
@@ -517,7 +530,11 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                 side: BorderSide(
                                   color: isCompleted
                                       ? AppColors.outlineVariant
-                                      : AppColors.primary.withValues(alpha: 0.3),
+                                      : isOverdue
+                                          ? AppColors.error
+                                              .withValues(alpha: 0.5)
+                                          : AppColors.primary
+                                              .withValues(alpha: 0.3),
                                 ),
                               ),
                               child: ListTile(
@@ -527,7 +544,9 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                       : Icons.pending_actions_outlined,
                                   color: isCompleted
                                       ? AppColors.primary
-                                      : priorityColor,
+                                      : isOverdue
+                                          ? AppColors.error
+                                          : priorityColor,
                                 ),
                                 title: Text(
                                   item.title,
@@ -550,17 +569,28 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                       Row(
                                         children: [
                                           if (item.dueDate != null) ...[
-                                            const Icon(Icons.access_time,
-                                                size: 12,
-                                                color: AppColors.outline),
+                                            Icon(
+                                              Icons.access_time,
+                                              size: 12,
+                                              color: isOverdue
+                                                  ? AppColors.error
+                                                  : AppColors.outline,
+                                            ),
                                             const SizedBox(width: 4),
                                             Text(
-                                              DateFormat('MMM d, h:mm a')
-                                                  .format(item.dueDate!),
+                                              isOverdue
+                                                  ? TaskOperationalFilter
+                                                      .formatDueDateMessage(
+                                                          item.dueDate!)
+                                                  : DateFormat('MMM d, h:mm a')
+                                                      .format(item.dueDate!),
                                               style: AppTypography.dataMono
                                                   .copyWith(
                                                 fontSize: 11,
-                                                color: item.isOverdue
+                                                fontWeight: isOverdue
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                                color: isOverdue
                                                     ? AppColors.error
                                                     : AppColors.outline,
                                               ),
@@ -573,8 +603,7 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                               child: Text(
                                                 item.description!,
                                                 maxLines: 1,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: AppTypography.bodySm
                                                     .copyWith(
                                                   color: AppColors
@@ -605,28 +634,48 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   spacing: AppSpacing.xs,
                                   children: [
+                                    if (isOverdue)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.error
+                                              .withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: AppColors.error
+                                                  .withValues(alpha: 0.4)),
+                                        ),
+                                        child: Text(
+                                          'OVERDUE',
+                                          style:
+                                              AppTypography.labelCaps.copyWith(
+                                            color: AppColors.error,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: AppColors.primary
                                             .withValues(alpha: 0.12),
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
                                         isCompleted
                                             ? 'SURGERY DISCHARGED'
                                             : 'EYE SURGERY',
-                                        style: AppTypography.labelCaps
-                                            .copyWith(
-                                                color: AppColors.primary,
-                                                fontSize: 10),
+                                        style: AppTypography.labelCaps.copyWith(
+                                            color: AppColors.primary,
+                                            fontSize: 10),
                                       ),
                                     ),
                                     IconButton(
-                                      icon: const Icon(
-                                          Icons.arrow_forward_ios,
+                                      icon: const Icon(Icons.arrow_forward_ios,
                                           size: 14),
                                       tooltip: 'View Eye Surgery',
                                       onPressed: () {
@@ -637,8 +686,8 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                   ],
                                 ),
                                 onTap: () {
-                                  setState(() => _selectedTab =
-                                      StaffTaskTab.eyeSurgery);
+                                  setState(() =>
+                                      _selectedTab = StaffTaskTab.eyeSurgery);
                                 },
                               ),
                             );
@@ -653,8 +702,11 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius:
                                   BorderRadius.circular(AppSpacing.radiusLg),
-                              side:
-                                  const BorderSide(color: AppColors.outlineVariant),
+                              side: BorderSide(
+                                color: isOverdue
+                                    ? AppColors.error.withValues(alpha: 0.4)
+                                    : AppColors.outlineVariant,
+                              ),
                             ),
                             child: CheckboxListTile(
                               value: isCompleted,
@@ -699,15 +751,27 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                 child: Row(
                                   children: [
                                     if (item.dueDate != null) ...[
-                                      const Icon(Icons.access_time,
-                                          size: 12, color: AppColors.outline),
+                                      Icon(
+                                        Icons.access_time,
+                                        size: 12,
+                                        color: isOverdue
+                                            ? AppColors.error
+                                            : AppColors.outline,
+                                      ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        DateFormat('MMM d, h:mm a')
-                                            .format(item.dueDate!),
+                                        isOverdue
+                                            ? TaskOperationalFilter
+                                                .formatDueDateMessage(
+                                                    item.dueDate!)
+                                            : DateFormat('MMM d, h:mm a')
+                                                .format(item.dueDate!),
                                         style: AppTypography.dataMono.copyWith(
                                           fontSize: 11,
-                                          color: item.isOverdue
+                                          fontWeight: isOverdue
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          color: isOverdue
                                               ? AppColors.error
                                               : AppColors.outline,
                                         ),
@@ -730,18 +794,46 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                   ],
                                 ),
                               ),
-                              secondary: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: priorityColor.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  item.priority.toUpperCase(),
-                                  style: AppTypography.labelCaps.copyWith(
-                                      color: priorityColor, fontSize: 10),
-                                ),
+                              secondary: Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 4,
+                                children: [
+                                  if (isOverdue)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.error
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color: AppColors.error
+                                                .withValues(alpha: 0.4)),
+                                      ),
+                                      child: Text(
+                                        'OVERDUE',
+                                        style: AppTypography.labelCaps.copyWith(
+                                          color: AppColors.error,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          priorityColor.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      item.priority.toUpperCase(),
+                                      style: AppTypography.labelCaps.copyWith(
+                                          color: priorityColor, fontSize: 10),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           );
@@ -799,6 +891,101 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
       labelStyle: AppTypography.bodyMd.copyWith(
         color: isSelected ? AppColors.primary : AppColors.onSurfaceVariant,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
+  }
+
+  Widget _buildDateSelector(bool isDesktop) {
+    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
+    final dateLabel = isToday
+        ? 'Today, ${DateFormat('d MMM yyyy').format(_selectedDate)}'
+        : DateFormat('EEE, d MMM yyyy').format(_selectedDate);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding:
+          const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            key: const Key('staff_tasks_prev_date_button'),
+            icon: const Icon(Icons.chevron_left),
+            tooltip: 'Previous Day',
+            visualDensity: VisualDensity.compact,
+            onPressed: () {
+              setState(() {
+                _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+              });
+            },
+          ),
+          InkWell(
+            key: const Key('staff_tasks_date_picker_button'),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2035),
+              );
+              if (picked != null && mounted) {
+                setState(() => _selectedDate = picked);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.calendar_month_outlined,
+                      size: 18, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    dateLabel,
+                    style: AppTypography.bodyMd.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down,
+                      size: 20, color: AppColors.outline),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            key: const Key('staff_tasks_next_date_button'),
+            icon: const Icon(Icons.chevron_right),
+            tooltip: 'Next Day',
+            visualDensity: VisualDensity.compact,
+            onPressed: () {
+              setState(() {
+                _selectedDate = _selectedDate.add(const Duration(days: 1));
+              });
+            },
+          ),
+          const Spacer(),
+          TextButton.icon(
+            key: const Key('staff_tasks_today_button'),
+            icon: const Icon(Icons.today, size: 16),
+            label: const Text('Today'),
+            style: TextButton.styleFrom(
+              foregroundColor: isToday ? AppColors.outline : AppColors.primary,
+              visualDensity: VisualDensity.compact,
+            ),
+            onPressed: isToday
+                ? null
+                : () {
+                    setState(() => _selectedDate = DateTime.now());
+                  },
+          ),
+        ],
       ),
     );
   }

@@ -10,7 +10,6 @@ import '../../../shared/widgets/notification_center_modal.dart';
 import '../../../shared/widgets/user_profile_menu.dart';
 import '../../auth/providers/auth_provider.dart';
 
-
 enum AdminNavItem { dashboard, staff, patients, operations, administration }
 
 class AdminShell extends ConsumerWidget {
@@ -27,23 +26,42 @@ class AdminShell extends ConsumerWidget {
 
   static const _desktopBreakpoint = 768.0;
 
+  static bool _hasSupabaseSession() {
+    try {
+      return Supabase.instance.client.auth.currentSession != null;
+    } catch (_) {
+      // In test or non-initialized environments, fallback to true
+      return true;
+    }
+  }
+
+  static void _safeSupabaseSignOut() {
+    try {
+      Supabase.instance.client.auth.signOut();
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Role-based access check
     final roleAsync = ref.watch(currentUserRoleProvider);
+    final hasSession = _hasSupabaseSession();
     debugPrint(
       '[LOGOUT] AdminShell built; roleState='
       '${roleAsync.hasError ? 'error' : roleAsync.isLoading ? 'loading' : 'data'}; '
-      'sessionPresent=${Supabase.instance.client.auth.currentSession != null}',
+      'sessionPresent=$hasSession',
     );
 
     return roleAsync.when(
       data: (role) {
-        if (Supabase.instance.client.auth.currentSession == null) {
-          debugPrint('[LOGOUT] AdminShell session is cleared; ensuring pushed routes popped');
+        if (!hasSession) {
+          debugPrint(
+              '[LOGOUT] AdminShell session is cleared; ensuring pushed routes popped');
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
-              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            if (context.mounted &&
+                Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true)
+                  .popUntil((route) => route.isFirst);
             }
           });
           return const Scaffold(
@@ -57,22 +75,26 @@ class AdminShell extends ConsumerWidget {
           );
           // Redirect to login if not admin
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
-              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            if (context.mounted &&
+                Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true)
+                  .popUntil((route) => route.isFirst);
             }
-            if (Supabase.instance.client.auth.currentSession == null) return;
+            if (!_hasSupabaseSession()) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Access denied. Admin privileges required.'),
                 backgroundColor: Colors.red,
               ),
             );
-            Supabase.instance.client.auth.signOut();
+            _safeSupabaseSignOut();
           });
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
 
-        final isDesktop = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+        final isDesktop =
+            MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
 
         return Scaffold(
           backgroundColor: AppColors.surfaceContainerLowest,
@@ -94,19 +116,21 @@ class AdminShell extends ConsumerWidget {
                 ),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, st) {
         // SECURITY: On error, do NOT allow access. Sign out and show error.
         debugPrint('Role check error in AdminShell: $e');
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (Supabase.instance.client.auth.currentSession == null) return;
+          if (!_hasSupabaseSession()) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Session verification failed. Please sign in again.'),
+              content:
+                  Text('Session verification failed. Please sign in again.'),
               backgroundColor: Colors.red,
             ),
           );
-          Supabase.instance.client.auth.signOut();
+          _safeSupabaseSignOut();
         });
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       },
@@ -127,9 +151,8 @@ class _AdminTopAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final horizontalPadding = isDesktop
-        ? AppSpacing.marginDesktop
-        : AppSpacing.marginMobile;
+    final horizontalPadding =
+        isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile;
 
     return Material(
       color: AppColors.surface,
@@ -157,10 +180,8 @@ class _AdminTopAppBar extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.xs),
                   ],
-                  Flexible(
-                    child: _BrandCluster(isDesktop: isDesktop),
-                  ),
                   if (isDesktop) ...[
+                    _BrandCluster(isDesktop: isDesktop),
                     const SizedBox(width: AppSpacing.sm),
                     const SizedBox(
                       width: 180,
@@ -175,7 +196,9 @@ class _AdminTopAppBar extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.xs),
                   ] else ...[
-                    const Spacer(),
+                    Expanded(
+                      child: _BrandCluster(isDesktop: isDesktop),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.search),
                       color: AppColors.onSurfaceVariant,
@@ -208,7 +231,7 @@ class _BrandCluster extends StatelessWidget {
     final iconSize = isDesktop ? 24.0 : 20.0;
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: isDesktop ? MainAxisSize.min : MainAxisSize.max,
       children: [
         Container(
           width: avatarSize,
@@ -225,19 +248,27 @@ class _BrandCluster extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
-        Flexible(
-          child: Text(
+        if (isDesktop)
+          Text(
             'MKES CARE+',
-            style: (isDesktop
-                    ? AppTypography.headlineMd
-                    : AppTypography.headlineMd.copyWith(fontSize: 24))
-                .copyWith(
+            style: AppTypography.headlineMd.copyWith(
               fontWeight: FontWeight.w700,
               color: AppColors.primary,
             ),
-            overflow: TextOverflow.ellipsis,
+          )
+        else
+          Expanded(
+            child: Text(
+              'MKES CARE+',
+              style: AppTypography.headlineMd.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -314,14 +345,11 @@ class _DesktopNavLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = selected
-        ? AppColors.primary
-        : AppColors.onSurfaceVariant;
+    final foreground =
+        selected ? AppColors.primary : AppColors.onSurfaceVariant;
 
     return Material(
-      color: selected
-          ? AppColors.surfaceContainerLow
-          : Colors.transparent,
+      color: selected ? AppColors.surfaceContainerLow : Colors.transparent,
       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       child: InkWell(
         onTap: onTap,
@@ -419,7 +447,8 @@ class _AdminBottomNavBar extends StatelessWidget {
                   label: 'Admin',
                   icon: Icons.admin_panel_settings_outlined,
                   selected: selectedItem == AdminNavItem.administration,
-                  onTap: () => onNavItemSelected?.call(AdminNavItem.administration),
+                  onTap: () =>
+                      onNavItemSelected?.call(AdminNavItem.administration),
                 ),
               ),
             ],
@@ -525,7 +554,8 @@ class _GlobalSearchBar extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(4),
@@ -560,7 +590,8 @@ class _ProfileMenuConsumer extends ConsumerWidget {
     return profileAsync.when(
       data: (profile) => UserProfileMenu(
         name: profile?.fullName ?? 'Administrator',
-        role: profile?.designation ?? profile?.roleDisplayName ?? 'Administrator',
+        role:
+            profile?.designation ?? profile?.roleDisplayName ?? 'Administrator',
         initials: profile?.initials ?? 'A',
       ),
       loading: () => const UserProfileMenu(

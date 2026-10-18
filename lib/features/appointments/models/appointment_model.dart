@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../patients/models/patient_model.dart';
+import 'department_doctor_config.dart';
 
 class AppointmentStaffCandidate {
   const AppointmentStaffCandidate({
@@ -75,6 +76,45 @@ class AppointmentModel {
     this.doctorNotes,
   });
 
+  /// Extracts a static doctor name from the appointment notes if present.
+  static String? extractDoctorNameFromNotes(String? notes) {
+    if (notes == null || notes.trim().isEmpty) return null;
+    final match = RegExp(
+            r'(?:\[Doctor:\s*|Doctor:\s*)([^\]\n\r]+)(?:\])?',
+            caseSensitive: false)
+        .firstMatch(notes);
+    if (match != null) {
+      final name = match.group(1)?.trim();
+      if (name != null && name.isNotEmpty) return name;
+    }
+    return null;
+  }
+
+  /// Strips any prefixed doctor tag from notes so user notes display cleanly.
+  static String stripDoctorNameFromNotes(String? notes) {
+    if (notes == null || notes.isEmpty) return '';
+    return notes
+        .replaceAll(
+            RegExp(
+                r'(?:\[Doctor:\s*[^\]\n\r]+\]\s*|Doctor:\s*[^\n\r]+(?:\r?\n)?|\s*\|\s*Doctor:\s*[^\n\r]+)',
+                caseSensitive: false),
+            '')
+        .trim();
+  }
+
+  /// Formats notes with a static doctor display tag to persist without requiring a user account.
+  static String formatNotesWithDoctor(String? notes, String? doctorName) {
+    final cleanNotes = stripDoctorNameFromNotes(notes);
+    if (doctorName == null || doctorName.trim().isEmpty) {
+      return cleanNotes;
+    }
+    final docPrefix = 'Doctor: ${doctorName.trim()}';
+    if (cleanNotes.isEmpty) {
+      return docPrefix;
+    }
+    return '$docPrefix\n$cleanNotes';
+  }
+
   factory AppointmentModel.fromJson(Map<String, dynamic> json) {
     final patientJson = json['patients'] is Map<String, dynamic>
         ? json['patients'] as Map<String, dynamic>
@@ -92,8 +132,12 @@ class AppointmentModel {
     final resolvedPatientNumber =
         patientObj?.patientNumber ?? (json['patient_number'] as String?);
 
-    final resolvedDoctorName =
-        doctorJson?['full_name'] as String? ?? (json['doctor_name'] as String?);
+    final rawNotes = json['notes'] as String?;
+    final extractedDoctorFromNotes = extractDoctorNameFromNotes(rawNotes);
+
+    final resolvedDoctorName = doctorJson?['full_name'] as String? ??
+        (json['doctor_name'] as String?) ??
+        extractedDoctorFromNotes;
     final designation =
         doctorJson?['designation'] as String? ?? (json['specialty'] as String?);
     final isVisiting =
@@ -169,8 +213,18 @@ class AppointmentModel {
       'ai_booked': aiBooked,
     };
     if (patientId != null) map['patient_id'] = patientId;
-    if (doctorId != null) map['doctor_id'] = doctorId;
-    if (notes != null) map['notes'] = notes;
+
+    // Strictly validate UUID: Never pass doctor display name, slug, or fake string into doctor_id column
+    if (doctorId != null &&
+        doctorId!.trim().isNotEmpty &&
+        DepartmentDoctorConfig.isValidUuid(doctorId)) {
+      map['doctor_id'] = doctorId;
+    }
+
+    final formattedNotes = formatNotesWithDoctor(notes, doctorName);
+    if (formattedNotes.isNotEmpty) {
+      map['notes'] = formattedNotes;
+    }
     return map;
   }
 
@@ -257,8 +311,12 @@ class AppointmentModel {
     if (billedMatch != null) return billedMatch.group(1)?.trim();
     final noChargeMatch =
         RegExp(r'\[NO_CHARGE:?\s*([^\]]+)\]').firstMatch(notes!);
-    if (noChargeMatch != null) return 'No-Charge: ${noChargeMatch.group(1)?.trim()}';
-    if (notes!.contains('[NO_CHARGE]')) return 'No-Charge Visit';
+    if (noChargeMatch != null) {
+      return 'No-Charge: ${noChargeMatch.group(1)?.trim()}';
+    }
+    if (notes!.contains('[NO_CHARGE]')) {
+      return 'No-Charge Visit';
+    }
     return null;
   }
 
@@ -309,6 +367,8 @@ class AppointmentModel {
         return 'Walk-In Consultation';
       case 'follow_up':
         return 'Follow-Up Visit';
+      case 'surgery':
+        return 'Eye Surgery';
       case 'regular':
       default:
         if (department.toLowerCase() == 'dental') {
@@ -316,5 +376,53 @@ class AppointmentModel {
         }
         return 'Optometry Refraction & Fitting';
     }
+  }
+
+  /// Converts an appointment time string (e.g. '09:30:00', '09:30', or '3:30 PM') to minutes from midnight.
+  static int timeToMinutes(String timeStr) {
+    final clean = timeStr.trim();
+    if (clean.isEmpty) return 0;
+
+    final isPm = RegExp(r'pm', caseSensitive: false).hasMatch(clean);
+    final isAm = RegExp(r'am', caseSensitive: false).hasMatch(clean);
+
+    final digitsAndColon = clean.replaceAll(RegExp(r'[^0-9:]'), '');
+    final parts = digitsAndColon.split(':');
+    if (parts.isEmpty || parts[0].isEmpty) return 0;
+
+    int hour = int.tryParse(parts[0]) ?? 0;
+    final min = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+
+    if (isPm) {
+      if (hour < 12) hour += 12;
+    } else if (isAm) {
+      if (hour == 12) hour = 0;
+    }
+
+    return hour * 60 + min;
+  }
+
+  /// Authoritative appointment comparator for chronological schedule sorting.
+  /// 1. Appointment Date (ascending)
+  /// 2. Appointment Time in minutes (ascending)
+  /// 3. Creation Date (stable secondary sort)
+  /// 4. ID (tie-breaker)
+  static int compareAppointments(AppointmentModel a, AppointmentModel b) {
+    final aDate = DateTime(
+        a.appointmentDate.year, a.appointmentDate.month, a.appointmentDate.day);
+    final bDate = DateTime(
+        b.appointmentDate.year, b.appointmentDate.month, b.appointmentDate.day);
+    final dateComp = aDate.compareTo(bDate);
+    if (dateComp != 0) return dateComp;
+
+    final aMin = timeToMinutes(a.appointmentTime);
+    final bMin = timeToMinutes(b.appointmentTime);
+    final timeComp = aMin.compareTo(bMin);
+    if (timeComp != 0) return timeComp;
+
+    final createdComp = a.createdAt.compareTo(b.createdAt);
+    if (createdComp != 0) return createdComp;
+
+    return a.id.compareTo(b.id);
   }
 }

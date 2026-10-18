@@ -104,7 +104,7 @@ class InventoryAlertsCard extends ConsumerWidget {
                   ),
                 ),
               ),
-              error: (_, __) => _buildFallbackState(context),
+              error: (err, _) => _buildErrorState(ref, err.toString()),
               data: (items) {
                 final criticalItems = items.where((item) {
                   return item.isLowStock ||
@@ -163,7 +163,8 @@ class InventoryAlertsCard extends ConsumerWidget {
       icon = Icons.schedule_outlined;
       iconBackground = const Color(0x33E65100);
       iconColor = const Color(0xFFE65100);
-      subtitle = 'Expiring in ${item.daysUntilExpiry} days (${item.formattedStock})';
+      subtitle =
+          'Expiring in ${item.daysUntilExpiry} days (${item.formattedStock})';
       subtitleColor = const Color(0xFFE65100);
     } else {
       icon = Icons.inventory_2_outlined;
@@ -239,13 +240,36 @@ class InventoryAlertsCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildFallbackState(BuildContext context) {
-    return const _InventoryAlertItem(
-      icon: Icons.inventory_2_outlined,
-      iconBackground: Color(0x80FFD8EB),
-      iconColor: AppColors.secondary,
-      title: 'Inventory Status',
-      subtitle: 'Tap Manage Inventory to review stock levels',
+  Widget _buildErrorState(WidgetRef ref, String error) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.error, size: 28),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Unable to load inventory alerts',
+            style: AppTypography.labelCaps.copyWith(
+              color: AppColors.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          OutlinedButton.icon(
+            onPressed: () => ref.invalidate(inventoryProvider),
+            icon: const Icon(Icons.refresh, size: 14),
+            label: const Text('Retry'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.base,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -331,7 +355,8 @@ class _InventoryAlertItem extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     backgroundColor: AppColors.surface,
                     foregroundColor: actionTextColor,
-                    side: BorderSide(color: actionBorderColor ?? AppColors.outlineVariant),
+                    side: BorderSide(
+                        color: actionBorderColor ?? AppColors.outlineVariant),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: AppSpacing.base,

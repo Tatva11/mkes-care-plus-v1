@@ -18,7 +18,8 @@ class StaffAttendanceScreen extends ConsumerStatefulWidget {
   const StaffAttendanceScreen({super.key});
 
   @override
-  ConsumerState<StaffAttendanceScreen> createState() => _StaffAttendanceScreenState();
+  ConsumerState<StaffAttendanceScreen> createState() =>
+      _StaffAttendanceScreenState();
 }
 
 class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
@@ -29,12 +30,16 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
     final currentUser = ref.watch(currentUserProvider);
-    if (currentUser == null) return const Center(child: CircularProgressIndicator());
+    if (currentUser == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     final profileAsync = ref.watch(currentProfileProvider);
-    final assignedShiftAsync = ref.watch(staffAssignedShiftProvider(currentUser.id));
+    final assignedShiftAsync =
+        ref.watch(staffAssignedShiftProvider(currentUser.id));
     final configsAsync = ref.watch(shiftConfigurationsProvider);
-    final activeAttendanceAsync = ref.watch(staffActiveAttendanceProvider(currentUser.id));
+    final activeAttendanceAsync =
+        ref.watch(staffActiveAttendanceProvider(currentUser.id));
     final attendanceAsync = ref.watch(attendanceProvider(currentUser.id));
 
     return RefreshIndicator(
@@ -45,11 +50,14 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
         ref.invalidate(staffActiveAttendanceProvider(currentUser.id));
         ref.invalidate(todayShiftAttendanceProvider);
         ref.invalidate(staffLeaveRequestsProvider(currentUser.id));
-        await ref.read(attendanceProvider(currentUser.id).notifier).fetchCurrentMonth();
+        await ref
+            .read(attendanceProvider(currentUser.id).notifier)
+            .fetchCurrentMonth();
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
+        padding: EdgeInsets.all(
+            isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -98,14 +106,16 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
         const SizedBox(height: AppSpacing.xs),
         Text(
           'Track shifts, clock-in history, and PTO requests according to your assigned shift',
-          style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+          style:
+              AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
         ),
       ],
     );
 
     final leaveButton = FilledButton.icon(
       onPressed: () {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StaffLeaveScreen()));
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const StaffLeaveScreen()));
       },
       icon: const Icon(Icons.event_note, size: 18),
       label: const Text('Leave Management'),
@@ -139,15 +149,18 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
     required bool isDesktop,
     required String staffId,
     required String? profileShift,
-    required AsyncValue<String> assignedShiftAsync,
+    required AsyncValue<String?> assignedShiftAsync,
     required AsyncValue<List<ShiftConfiguration>> configsAsync,
     required AsyncValue<AttendanceRecord?> activeAttendanceAsync,
     ProfileModel? profile,
   }) {
     // Resolve assigned shift
-    final effectiveShift = (assignedShiftAsync.valueOrNull ?? profileShift ?? 'morning').toLowerCase();
+    final effectiveShift =
+        (assignedShiftAsync.valueOrNull ?? profileShift ?? 'morning')
+            .toLowerCase();
     final leaveRequestsAsync = ref.watch(staffLeaveRequestsProvider(staffId));
-    final leaveRequests = leaveRequestsAsync.valueOrNull ?? const <LeaveRequest>[];
+    final leaveRequests =
+        leaveRequestsAsync.valueOrNull ?? const <LeaveRequest>[];
 
     return configsAsync.when(
       loading: () => const Center(
@@ -170,14 +183,18 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
           orElse: () => ShiftConfiguration.defaultMorning,
         );
         final afternoonConfig = configs.firstWhere(
-          (c) => c.shift.toLowerCase() == 'afternoon' || c.shift.toLowerCase() == 'night',
+          (c) =>
+              c.shift.toLowerCase() == 'afternoon' ||
+              c.shift.toLowerCase() == 'night',
           orElse: () => ShiftConfiguration.defaultAfternoon,
         );
 
         final shiftsToDisplay = effectiveShift == 'both'
             ? [morningConfig, afternoonConfig]
             : [
-                (effectiveShift == 'afternoon' || effectiveShift == 'evening' || effectiveShift == 'night')
+                (effectiveShift == 'afternoon' ||
+                        effectiveShift == 'evening' ||
+                        effectiveShift == 'night')
                     ? afternoonConfig
                     : morningConfig
               ];
@@ -191,15 +208,18 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.secondary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    border: Border.all(color: AppColors.secondary.withValues(alpha: 0.4)),
+                    border: Border.all(
+                        color: AppColors.secondary.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.schedule_send_outlined, size: 18, color: AppColors.secondary),
+                      const Icon(Icons.schedule_send_outlined,
+                          size: 18, color: AppColors.secondary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -218,16 +238,19 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppColors.primaryContainer.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.all_inclusive, size: 16, color: AppColors.primary),
+                      const Icon(Icons.all_inclusive,
+                          size: 16, color: AppColors.primary),
                       const SizedBox(width: 6),
                       Text(
                         'Assigned Duty: Morning & Evening Sessions (Both)',
@@ -269,8 +292,10 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
     final approvedLeave = leaveRequests.where((req) {
       if (req.status.toLowerCase() != 'approved') return false;
       final check = DateTime(now.year, now.month, now.day);
-      final start = DateTime(req.startDate.year, req.startDate.month, req.startDate.day);
-      final end = DateTime(req.endDate.year, req.endDate.month, req.endDate.day);
+      final start =
+          DateTime(req.startDate.year, req.startDate.month, req.startDate.day);
+      final end =
+          DateTime(req.endDate.year, req.endDate.month, req.endDate.day);
       if (check.isBefore(start) || check.isAfter(end)) return false;
       return req.coversShift(config.shift);
     }).firstOrNull;
@@ -401,12 +426,14 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              const Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
+              const Icon(Icons.check_circle_outline,
+                  color: Colors.green, size: 20),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
                   'Approved ${leave.dutyPeriodDisplayName} Leave: ${leave.reason.isNotEmpty ? leave.reason : "Authorized leave approved by administration."} Attendance is not required for this shift session.',
-                  style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+                  style: AppTypography.bodyMd
+                      .copyWith(color: AppColors.onSurfaceVariant),
                 ),
               ),
             ],
@@ -450,7 +477,9 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isMorning ? Icons.wb_sunny_outlined : Icons.nightlight_round_outlined,
+                  isMorning
+                      ? Icons.wb_sunny_outlined
+                      : Icons.nightlight_round_outlined,
                   color: themeColor,
                   size: 24,
                 ),
@@ -469,7 +498,8 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
                     ),
                     Text(
                       assignedConfig.formattedTiming,
-                      style: AppTypography.headlineMd.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: AppTypography.headlineMd
+                          .copyWith(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -486,24 +516,27 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
               Expanded(
                 child: Text(
                   'Outside Shift Hours: Clock-in is only available during your assigned shift hours (${assignedConfig.formattedTiming}).',
-                  style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+                  style: AppTypography.bodyMd
+                      .copyWith(color: AppColors.onSurfaceVariant),
                 ),
               ),
             ],
           ),
           // If already completed today, show note
           todayAsync.whenData((record) {
-            if (record != null && record.checkOutTime != null) {
-              return Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.sm),
-                child: Text(
-                  'You have already completed attendance for today with ${record.workingHours?.toStringAsFixed(1) ?? "0"} hours logged.',
-                  style: AppTypography.bodySm.copyWith(color: Colors.green.shade700),
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          }).valueOrNull ?? const SizedBox.shrink(),
+                if (record != null && record.checkOutTime != null) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: Text(
+                      'You have already completed attendance for today with ${record.workingHours?.toStringAsFixed(1) ?? "0"} hours logged.',
+                      style: AppTypography.bodySm
+                          .copyWith(color: Colors.green.shade700),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }).valueOrNull ??
+              const SizedBox.shrink(),
         ],
       ),
     );
@@ -561,7 +594,8 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
         ),
         Text(
           'Checked in at $checkInStr. Tap Clock Out when completing your shift.',
-          style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+          style:
+              AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
         ),
       ],
     );
@@ -639,7 +673,8 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
       child: todayAsync.when(
         data: (record) {
           final isClockedIn = record != null && record.checkOutTime == null;
-          final hasCompletedShift = record != null && record.checkOutTime != null;
+          final hasCompletedShift =
+              record != null && record.checkOutTime != null;
           final isLeave = record != null && record.status == 'leave';
           final isHoliday = record != null && record.status == 'holiday';
 
@@ -648,8 +683,11 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Text(
-                  isLeave ? 'YOU ARE ON LEAVE FOR THIS SHIFT' : 'TODAY IS A HOLIDAY',
-                  style: AppTypography.headlineMd.copyWith(color: AppColors.primary),
+                  isLeave
+                      ? 'YOU ARE ON LEAVE FOR THIS SHIFT'
+                      : 'TODAY IS A HOLIDAY',
+                  style: AppTypography.headlineMd
+                      .copyWith(color: AppColors.primary),
                 ),
               ),
             );
@@ -659,18 +697,21 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildShiftTimingHeader(config.name, config.formattedTiming, isMorning),
+                _buildShiftTimingHeader(
+                    config.name, config.formattedTiming, isMorning),
                 const SizedBox(height: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: Colors.green.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green.shade700, size: 28),
+                      Icon(Icons.check_circle,
+                          color: Colors.green.shade700, size: 28),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Column(
@@ -700,7 +741,8 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
           final statusContent = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildShiftTimingHeader(config.name, config.formattedTiming, isMorning),
+              _buildShiftTimingHeader(
+                  config.name, config.formattedTiming, isMorning),
               const SizedBox(height: AppSpacing.sm),
               Row(
                 children: [
@@ -715,9 +757,13 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      isClockedIn ? 'CLOCKED IN — ON DUTY' : 'CLOCKED OUT — OFF DUTY',
+                      isClockedIn
+                          ? 'CLOCKED IN — ON DUTY'
+                          : 'CLOCKED OUT — OFF DUTY',
                       style: AppTypography.labelCaps.copyWith(
-                        color: isClockedIn ? Colors.green.shade800 : AppColors.error,
+                        color: isClockedIn
+                            ? Colors.green.shade800
+                            : AppColors.error,
                         fontWeight: FontWeight.bold,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -737,7 +783,8 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
                 isClockedIn
                     ? 'Check-in: ${record.checkInTime?.hour.toString().padLeft(2, '0')}:${record.checkInTime?.minute.toString().padLeft(2, '0')}'
                     : 'Tap Clock In below to record your ${config.name} attendance.',
-                style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                style: AppTypography.bodySm
+                    .copyWith(color: AppColors.onSurfaceVariant),
               ),
             ],
           );
@@ -786,7 +833,8 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
     );
   }
 
-  Widget _buildShiftTimingHeader(String shiftTitle, String shiftTiming, bool isMorning) {
+  Widget _buildShiftTimingHeader(
+      String shiftTitle, String shiftTiming, bool isMorning) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -799,7 +847,9 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isMorning ? Icons.wb_sunny_outlined : Icons.nightlight_round_outlined,
+            isMorning
+                ? Icons.wb_sunny_outlined
+                : Icons.nightlight_round_outlined,
             size: 16,
             color: isMorning ? AppColors.primary : AppColors.secondary,
           ),
@@ -831,19 +881,26 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
               setState(() => _actionInProgressShift = shift);
               try {
                 if (isClockedIn) {
-                  await ref.read(attendanceProvider(staffId).notifier).checkOut(shift: shift, config: config);
+                  await ref
+                      .read(attendanceProvider(staffId).notifier)
+                      .checkOut(shift: shift, config: config);
                 } else {
-                  await ref.read(attendanceProvider(staffId).notifier).checkIn(shift: shift, config: config);
+                  await ref
+                      .read(attendanceProvider(staffId).notifier)
+                      .checkIn(shift: shift, config: config);
                 }
                 ref.invalidate(todayShiftAttendanceProvider);
                 ref.invalidate(staffActiveAttendanceProvider(staffId));
                 ref.invalidate(attendanceProvider(staffId));
-                await ref.read(attendanceProvider(staffId).notifier).fetchCurrentMonth();
+                await ref
+                    .read(attendanceProvider(staffId).notifier)
+                    .fetchCurrentMonth();
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Error: ${e.toString().replaceAll("Exception: ", "")}'),
+                      content: Text(
+                          'Error: ${e.toString().replaceAll("Exception: ", "")}'),
                       backgroundColor: AppColors.error,
                     ),
                   );
@@ -867,12 +924,19 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
       label: Text(
         isLoading
             ? (isClockedIn ? 'Clocking Out...' : 'Clocking In...')
-            : (isClockedIn ? 'Clock Out (${config.name})' : 'Clock In (${config.name})'),
+            : (isClockedIn
+                ? 'Clock Out (${config.name})'
+                : 'Clock In (${config.name})'),
       ),
       style: FilledButton.styleFrom(
-        backgroundColor: isClockedIn ? AppColors.error : (config.shift == 'night' ? AppColors.secondary : AppColors.primary),
+        backgroundColor: isClockedIn
+            ? AppColors.error
+            : (config.shift == 'night'
+                ? AppColors.secondary
+                : AppColors.primary),
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       ),
     );
   }
@@ -912,7 +976,8 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
               padding: const EdgeInsets.all(AppSpacing.xl),
               child: Text(
                 'No attendance logs recorded for this period.',
-                style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+                style: AppTypography.bodyLg
+                    .copyWith(color: AppColors.onSurfaceVariant),
               ),
             ),
           );
@@ -940,7 +1005,8 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
                       : AppColors.primary.withValues(alpha: 0.15),
                   child: Icon(
                     isAfternoon ? Icons.nightlight_round : Icons.wb_sunny,
-                    color: isAfternoon ? AppColors.secondary : AppColors.primary,
+                    color:
+                        isAfternoon ? AppColors.secondary : AppColors.primary,
                     size: 18,
                   ),
                 ),
@@ -948,11 +1014,13 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
                   children: [
                     Text(
                       '${r.date.day.toString().padLeft(2, '0')}/${r.date.month.toString().padLeft(2, '0')}/${r.date.year}',
-                      style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
+                      style: AppTypography.bodyMd
+                          .copyWith(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: isAfternoon
                             ? AppColors.secondary.withValues(alpha: 0.1)
@@ -968,7 +1036,9 @@ class _StaffAttendanceScreenState extends ConsumerState<StaffAttendanceScreen> {
                         r.shiftDisplayName,
                         style: AppTypography.labelCaps.copyWith(
                           fontSize: 10,
-                          color: isAfternoon ? AppColors.secondary : AppColors.primary,
+                          color: isAfternoon
+                              ? AppColors.secondary
+                              : AppColors.primary,
                         ),
                       ),
                     ),

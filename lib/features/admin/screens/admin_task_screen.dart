@@ -64,7 +64,8 @@ class AdminTaskScreen extends ConsumerWidget {
         data: (tasks) {
           if (tasks.isEmpty) {
             return RefreshIndicator(
-              onRefresh: () => ref.read(adminTasksProvider.notifier).fetchTasks(),
+              onRefresh: () =>
+                  ref.read(adminTasksProvider.notifier).fetchTasks(),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
@@ -74,11 +75,14 @@ class AdminTaskScreen extends ConsumerWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.assignment_outlined, size: 48, color: AppColors.outline),
+                          const Icon(Icons.assignment_outlined,
+                              size: 48, color: AppColors.outline),
                           const SizedBox(height: AppSpacing.sm),
-                          Text('No tasks found.', style: AppTypography.headlineMd),
+                          Text('No tasks found.',
+                              style: AppTypography.headlineMd),
                           const SizedBox(height: AppSpacing.xs),
-                          const Text('Create and assign a new task to get started.'),
+                          const Text(
+                              'Create and assign a new task to get started.'),
                         ],
                       ),
                     ),
@@ -97,8 +101,11 @@ class AdminTaskScreen extends ConsumerWidget {
               itemCount: tasks.length,
               itemBuilder: (context, index) {
                 final task = tasks[index];
-                final assignedStaff = users.where((u) => u.id == task.assignedTo).firstOrNull;
-                final staffLabel = assignedStaff?.fullName ?? task.staffName ?? task.assignedTo;
+                final assignedStaff =
+                    users.where((u) => u.id == task.assignedTo).firstOrNull;
+                final staffLabel = assignedStaff?.fullName ??
+                    task.staffName ??
+                    task.assignedTo;
 
                 Color priorityColor;
                 if (task.priority == 'critical' || task.priority == 'high') {
@@ -135,7 +142,8 @@ class AdminTaskScreen extends ConsumerWidget {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: priorityColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
@@ -153,7 +161,8 @@ class AdminTaskScreen extends ConsumerWidget {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (task.description != null && task.description!.isNotEmpty) ...[
+                        if (task.description != null &&
+                            task.description!.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
                             task.description!,
@@ -167,15 +176,18 @@ class AdminTaskScreen extends ConsumerWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.person_outline, size: 14, color: AppColors.outline),
+                            const Icon(Icons.person_outline,
+                                size: 14, color: AppColors.outline),
                             const SizedBox(width: 4),
                             Text(
                               staffLabel,
-                              style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
+                              style: AppTypography.bodySm
+                                  .copyWith(fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
                               decoration: BoxDecoration(
                                 color: task.status == 'completed'
                                     ? Colors.green.withValues(alpha: 0.15)
@@ -197,15 +209,21 @@ class AdminTaskScreen extends ConsumerWidget {
                               Icon(
                                 Icons.access_time,
                                 size: 13,
-                                color: task.isOverdue ? AppColors.error : AppColors.outline,
+                                color: task.isOverdue
+                                    ? AppColors.error
+                                    : AppColors.outline,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 DateFormat('MMM d').format(task.dueDate!),
                                 style: AppTypography.bodySm.copyWith(
                                   fontSize: 11,
-                                  color: task.isOverdue ? AppColors.error : AppColors.outline,
-                                  fontWeight: task.isOverdue ? FontWeight.bold : FontWeight.normal,
+                                  color: task.isOverdue
+                                      ? AppColors.error
+                                      : AppColors.outline,
+                                  fontWeight: task.isOverdue
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ],
@@ -214,7 +232,8 @@ class AdminTaskScreen extends ConsumerWidget {
                       ],
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                      icon: const Icon(Icons.edit_outlined,
+                          color: AppColors.primary),
                       tooltip: 'Edit Task',
                       onPressed: () {
                         showDialog(
@@ -247,7 +266,8 @@ class AdminTaskScreen extends ConsumerWidget {
               FilledButton.icon(
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry'),
-                onPressed: () => ref.read(adminTasksProvider.notifier).fetchTasks(),
+                onPressed: () =>
+                    ref.read(adminTasksProvider.notifier).fetchTasks(),
               ),
             ],
           ),

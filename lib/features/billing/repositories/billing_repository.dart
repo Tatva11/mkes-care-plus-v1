@@ -24,13 +24,12 @@ class BillingRepository {
   }) async {
     final normDept = department.trim().toLowerCase();
     if (normDept != 'eye' && normDept != 'dental') {
-      throw ArgumentError.value(department, 'department', 'Must be eye or dental.');
+      throw ArgumentError.value(
+          department, 'department', 'Must be eye or dental.');
     }
 
-    var query = _supabase
-        .from('billing_services')
-        .select()
-        .eq('department', normDept);
+    var query =
+        _supabase.from('billing_services').select().eq('department', normDept);
 
     if (activeOnly) {
       query = query.eq('is_active', true);
@@ -38,10 +37,12 @@ class BillingRepository {
 
     final response = await query.order('name', ascending: true);
     final list = (response as List)
-        .map((json) => BillingServiceModel.fromJson(json as Map<String, dynamic>))
+        .map((json) =>
+            BillingServiceModel.fromJson(json as Map<String, dynamic>))
         .toList();
 
-    debugPrint('BillingRepository.fetchServices department=$normDept returned=${list.length}');
+    debugPrint(
+        'BillingRepository.fetchServices department=$normDept returned=${list.length}');
     return list;
   }
 
@@ -58,7 +59,8 @@ class BillingRepository {
   }) async {
     final normDept = department.trim().toLowerCase();
     if (normDept != 'eye' && normDept != 'dental') {
-      throw ArgumentError.value(department, 'department', 'Must be eye or dental.');
+      throw ArgumentError.value(
+          department, 'department', 'Must be eye or dental.');
     }
     if (items.isEmpty) {
       throw ArgumentError('Invoice must contain at least one line item.');
@@ -79,6 +81,8 @@ class BillingRepository {
       } catch (_) {}
     }
 
+    final isSurgery = surgeryIdTrimmed != null && surgeryIdTrimmed.isNotEmpty;
+
     final params = <String, dynamic>{
       'p_patient_id': patientId,
       'p_department': normDept,
@@ -90,19 +94,58 @@ class BillingRepository {
         'p_payment': null,
       if (invoiceDate != null)
         'p_invoice_date': invoiceDate.toIso8601String().split('T').first,
-      if (notes != null && notes.trim().isNotEmpty)
-        'p_notes': notes.trim(),
-      if (surgeryIdTrimmed != null && surgeryIdTrimmed.isNotEmpty)
-        'p_eye_surgery_id': surgeryIdTrimmed,
+      if (notes != null && notes.trim().isNotEmpty) 'p_notes': notes.trim(),
+      'p_eye_surgery_id': isSurgery ? surgeryIdTrimmed : null,
     };
 
-    debugPrint('BillingRepository.createInvoice calling create_billing_invoice RPC: $params');
+    debugPrint(
+        'BillingRepository.createInvoice calling RPC (isSurgery=$isSurgery): $params');
 
     try {
-      final response = await _supabase.rpc(
-        'create_billing_invoice',
-        params: params,
-      );
+      dynamic response;
+      if (isSurgery) {
+        try {
+          // 1. Try dedicated unambiguous surgery RPC first
+          response = await _supabase.rpc(
+            'create_surgery_billing_invoice',
+            params: params,
+          );
+        } catch (rpcErr) {
+          final errLower = rpcErr.toString().toLowerCase();
+          if (errLower.contains('does not exist') ||
+              errLower.contains('not found') ||
+              errLower.contains('404')) {
+            // Fall back to canonical create_billing_invoice
+            response = await _supabase.rpc(
+              'create_billing_invoice',
+              params: params,
+            );
+          } else {
+            rethrow;
+          }
+        }
+      } else {
+        // Normal invoice: call canonical create_billing_invoice with explicit 8 params to prevent PGRST203
+        try {
+          response = await _supabase.rpc(
+            'create_billing_invoice',
+            params: params,
+          );
+        } catch (normalErr) {
+          final errLower = normalErr.toString().toLowerCase();
+          if (errLower.contains('pgrst203') ||
+              errLower.contains('candidate function') ||
+              errLower.contains('p_eye_surgery_id')) {
+            // Fallback for older schemas with strictly 7 parameters
+            final fallbackParams = Map<String, dynamic>.from(params)
+              ..remove('p_eye_surgery_id');
+            response = await _supabase.rpc('create_billing_invoice',
+                params: fallbackParams);
+          } else {
+            rethrow;
+          }
+        }
+      }
 
       debugPrint('BillingRepository.createInvoice RPC response: $response');
       final invoiceJson = response as Map<String, dynamic>;
@@ -117,20 +160,23 @@ class BillingRepository {
       }
 
       // Fallback: If RPC without p_eye_surgery_id was not yet updated in remote DB
-      if (params.containsKey('p_eye_surgery_id') &&
-          (errStr.contains('p_eye_surgery_id') || errStr.contains('schema cache'))) {
-        debugPrint('BillingRepository.createInvoice retrying without p_eye_surgery_id fallback');
-        final fallbackParams = Map<String, dynamic>.from(params)..remove('p_eye_surgery_id');
-        final response = await _supabase.rpc('create_billing_invoice', params: fallbackParams);
+      if (isSurgery &&
+          (errStr.contains('p_eye_surgery_id') ||
+              errStr.contains('schema cache') ||
+              errStr.contains('pgrst203'))) {
+        debugPrint(
+            'BillingRepository.createInvoice retrying without p_eye_surgery_id fallback');
+        final fallbackParams = Map<String, dynamic>.from(params)
+          ..remove('p_eye_surgery_id');
+        final response = await _supabase.rpc('create_billing_invoice',
+            params: fallbackParams);
         final invoiceJson = response as Map<String, dynamic>;
         final created = BillingInvoiceModel.fromJson(invoiceJson);
 
         // Attempt to link eye_surgery_id directly
         try {
-          await _supabase
-              .from('billing')
-              .update({'eye_surgery_id': surgeryIdTrimmed})
-              .eq('id', created.id);
+          await _supabase.from('billing').update(
+              {'eye_surgery_id': surgeryIdTrimmed}).eq('id', created.id);
           return created.copyWith(eyeSurgeryId: surgeryIdTrimmed);
         } catch (_) {
           return created;
@@ -181,7 +227,9 @@ class BillingRepository {
       query = query.eq('patient_id', patientId);
     }
 
-    if (paymentStatus != null && paymentStatus.isNotEmpty && paymentStatus != 'all') {
+    if (paymentStatus != null &&
+        paymentStatus.isNotEmpty &&
+        paymentStatus != 'all') {
       query = query.eq('payment_status', paymentStatus.toLowerCase());
     }
 
@@ -200,13 +248,16 @@ class BillingRepository {
       );
     }
 
-    final response = await query.order('created_at', ascending: false).limit(limit);
+    final response =
+        await query.order('created_at', ascending: false).limit(limit);
 
     final list = (response as List)
-        .map((json) => BillingInvoiceModel.fromJson(json as Map<String, dynamic>))
+        .map((json) =>
+            BillingInvoiceModel.fromJson(json as Map<String, dynamic>))
         .toList();
 
-    debugPrint('BillingRepository.fetchInvoices returned ${list.length} records');
+    debugPrint(
+        'BillingRepository.fetchInvoices returned ${list.length} records');
     return list;
   }
 
@@ -221,10 +272,12 @@ class BillingRepository {
   }) async {
     final normMode = paymentMode.trim().toLowerCase();
     if (!['cash', 'upi', 'bank_transfer', 'other'].contains(normMode)) {
-      throw ArgumentError.value(paymentMode, 'paymentMode', 'Invalid payment mode.');
+      throw ArgumentError.value(
+          paymentMode, 'paymentMode', 'Invalid payment mode.');
     }
     if (amount <= 0) {
-      throw ArgumentError.value(amount, 'amount', 'Payment amount must be greater than zero.');
+      throw ArgumentError.value(
+          amount, 'amount', 'Payment amount must be greater than zero.');
     }
 
     final params = <String, dynamic>{
@@ -245,7 +298,8 @@ class BillingRepository {
         'p_notes': null,
     };
 
-    debugPrint('BillingRepository.recordPayment calling record_billing_payment RPC: $params');
+    debugPrint(
+        'BillingRepository.recordPayment calling record_billing_payment RPC: $params');
 
     final response = await _supabase.rpc(
       'record_billing_payment',
@@ -363,7 +417,9 @@ class BillingRepository {
       query = query.eq('department', department.toLowerCase());
     }
 
-    if (paymentStatus != null && paymentStatus.isNotEmpty && paymentStatus != 'all') {
+    if (paymentStatus != null &&
+        paymentStatus.isNotEmpty &&
+        paymentStatus != 'all') {
       query = query.eq('payment_status', paymentStatus.toLowerCase());
     }
 
@@ -378,22 +434,23 @@ class BillingRepository {
     final response = await query.order('created_at', ascending: false);
 
     final list = (response as List)
-        .map((json) => BillingInvoiceModel.fromJson(json as Map<String, dynamic>))
+        .map((json) =>
+            BillingInvoiceModel.fromJson(json as Map<String, dynamic>))
         .toList();
 
-    debugPrint('BillingRepository.fetchInvoicesForReports returned ${list.length} records');
+    debugPrint(
+        'BillingRepository.fetchInvoicesForReports returned ${list.length} records');
     return list;
   }
 
   /// Fetch all unpaid or partially-paid invoices for a patient with outstanding balances.
-  Future<List<BillingInvoiceModel>> fetchPatientOutstandingInvoices(String patientId) async {
+  Future<List<BillingInvoiceModel>> fetchPatientOutstandingInvoices(
+      String patientId) async {
     if (patientId.trim().isEmpty) return const [];
     final invoices = await fetchInvoices(patientId: patientId, limit: 100);
     return invoices
         .where((inv) =>
-            !inv.isCancelled &&
-            !inv.isPaid &&
-            inv.remainingAmount > 0.01)
+            !inv.isCancelled && !inv.isPaid && inv.remainingAmount > 0.01)
         .toList();
   }
 
@@ -413,7 +470,8 @@ class BillingRepository {
           paymentMode: 'other',
           paymentReference: 'Consolidated to $newInvoiceNumber',
           paidAt: DateTime.now(),
-          notes: 'Balance transferred to new invoice #$newInvoiceNumber (ID: $newInvoiceId)',
+          notes:
+              'Balance transferred to new invoice #$newInvoiceNumber (ID: $newInvoiceId)',
         );
       } catch (e) {
         debugPrint('Warning consolidating invoice ${prev.invoiceNumber}: $e');
@@ -472,4 +530,3 @@ class BillingRepository {
     }
   }
 }
-

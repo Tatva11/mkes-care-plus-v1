@@ -8,6 +8,10 @@ import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/notification_center_modal.dart';
 import '../../../shared/widgets/user_profile_menu.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/repositories/auth_repository.dart';
+import '../../staff/models/shift_configuration.dart';
+import '../../staff/providers/attendance_provider.dart';
+import '../../staff/repositories/attendance_repository.dart';
 
 enum StaffNavItem { schedule, patients, tasks, attendance, billing }
 
@@ -32,8 +36,10 @@ class StaffShell extends ConsumerWidget {
       data: (role) {
         if (Supabase.instance.client.auth.currentSession == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
-              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            if (context.mounted &&
+                Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true)
+                  .popUntil((route) => route.isFirst);
             }
           });
           return const Scaffold(
@@ -44,8 +50,10 @@ class StaffShell extends ConsumerWidget {
         if (role != 'staff') {
           // Redirect to login if not staff
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
-              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+            if (context.mounted &&
+                Navigator.of(context, rootNavigator: true).canPop()) {
+              Navigator.of(context, rootNavigator: true)
+                  .popUntil((route) => route.isFirst);
             }
             if (Supabase.instance.client.auth.currentSession == null) return;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -58,6 +66,54 @@ class StaffShell extends ConsumerWidget {
           });
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
+        }
+
+        // Automatic shift-end sign-out safeguard
+        final profile = ref.watch(currentProfileProvider).valueOrNull;
+        final configs = ref.watch(shiftConfigurationsProvider).valueOrNull;
+        if (profile != null && configs != null && configs.isNotEmpty) {
+          final now = DateTime.now();
+          final assignedShift = profile.getShiftForDate(now);
+          ShiftConfiguration? targetConfig;
+          if (assignedShift.toLowerCase() == 'both') {
+            targetConfig = configs.firstWhere(
+              (c) =>
+                  c.name.toLowerCase() == 'afternoon' ||
+                  c.name.toLowerCase() == 'evening',
+              orElse: () => configs.last,
+            );
+          } else {
+            final norm = (assignedShift.toLowerCase() == 'evening' ||
+                    assignedShift.toLowerCase() == 'night')
+                ? 'afternoon'
+                : assignedShift.toLowerCase();
+            targetConfig =
+                configs.where((c) => c.name.toLowerCase() == norm).firstOrNull;
+          }
+
+          if (targetConfig != null && targetConfig.isTimePastShiftEnd(now)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (!context.mounted) return;
+              try {
+                final repo = ref.read(attendanceRepositoryProvider);
+                await repo.autoTerminateOverdueAttendance();
+              } catch (_) {}
+
+              if (context.mounted &&
+                  Supabase.instance.client.auth.currentSession != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Your assigned ${targetConfig!.name.toUpperCase()} Shift reached its scheduled end time. You have been signed out.',
+                    ),
+                    backgroundColor: AppColors.primary,
+                    duration: const Duration(seconds: 4),
+                  ),
+                );
+                await ref.read(authRepositoryProvider).signOut();
+              }
+            });
+          }
         }
 
         final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;

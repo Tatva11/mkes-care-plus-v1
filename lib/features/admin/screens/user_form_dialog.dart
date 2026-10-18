@@ -137,15 +137,18 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
             final effStr = DateFormat('d MMMM yyyy').format(tomorrow);
             final shiftLabel = newShift == 'both'
                 ? 'Both (Morning & Evening)'
-                : (newShift == 'afternoon' || newShift == 'evening' ? 'Evening' : 'Morning');
+                : (newShift == 'afternoon' || newShift == 'evening'
+                    ? 'Evening'
+                    : 'Morning');
 
             await ref.read(notificationRepositoryProvider).insertNotification(
-              userId: widget.user!.id,
-              title: 'Duty Assignment Updated',
-              message: 'Your shift effective $effStr has been changed to $shiftLabel.',
-              type: 'duty_assignment',
-              idempotent: true,
-            );
+                  userId: widget.user!.id,
+                  title: 'Duty Assignment Updated',
+                  message:
+                      'Your shift effective $effStr has been changed to $shiftLabel.',
+                  type: 'duty_assignment',
+                  idempotent: true,
+                );
           } catch (notifErr) {
             debugPrint('Failed to send duty change notification: $notifErr');
           }
@@ -378,13 +381,18 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                     decoration: InputDecoration(
                       labelText: 'Assigned Duty',
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusMd),
                       ),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'morning', child: Text('Morning Shift')),
-                      DropdownMenuItem(value: 'afternoon', child: Text('Evening Shift')),
-                      DropdownMenuItem(value: 'both', child: Text('Both (Morning & Evening)')),
+                      DropdownMenuItem(
+                          value: 'morning', child: Text('Morning Shift')),
+                      DropdownMenuItem(
+                          value: 'afternoon', child: Text('Evening Shift')),
+                      DropdownMenuItem(
+                          value: 'both',
+                          child: Text('Both (Morning & Evening)')),
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _assignedShift = val);
