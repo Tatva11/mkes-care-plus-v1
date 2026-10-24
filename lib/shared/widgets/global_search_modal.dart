@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -37,7 +38,10 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
+    final size = MediaQuery.sizeOf(context);
+    final isDesktop = size.width >= 768.0;
+    final dialogWidth = math.min(size.width - 32.0, 600.0);
+    final dialogHeight = math.min(size.height * 0.85, 500.0);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -49,8 +53,8 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
       child: Align(
         alignment: Alignment.topCenter,
         child: Container(
-          width: 600,
-          constraints: const BoxConstraints(maxHeight: 500),
+          width: dialogWidth,
+          constraints: BoxConstraints(maxHeight: dialogHeight),
           decoration: BoxDecoration(
             color: AppColors.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
@@ -128,47 +132,52 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
                 ),
                 child: Row(
                   children: [
-                    Text(
-                      'Search powered by MKES Copilot',
-                      style: AppTypography.labelCaps.copyWith(
-                        color: AppColors.outline,
-                        fontSize: 10,
+                    Expanded(
+                      child: Text(
+                        'Search powered by MKES Copilot',
+                        style: AppTypography.labelCaps.copyWith(
+                          color: AppColors.outline,
+                          fontSize: 10,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Spacer(),
-                    const Icon(
-                      Icons.keyboard_arrow_down,
-                      size: 16,
-                      color: AppColors.outline,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    const Icon(
-                      Icons.keyboard_arrow_up,
-                      size: 16,
-                      color: AppColors.outline,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      'to navigate',
-                      style: AppTypography.labelCaps.copyWith(
+                    if (isDesktop) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      const Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 16,
                         color: AppColors.outline,
-                        fontSize: 10,
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    const Icon(
-                      Icons.keyboard_return,
-                      size: 14,
-                      color: AppColors.outline,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      'to select',
-                      style: AppTypography.labelCaps.copyWith(
+                      const SizedBox(width: AppSpacing.xs),
+                      const Icon(
+                        Icons.keyboard_arrow_up,
+                        size: 16,
                         color: AppColors.outline,
-                        fontSize: 10,
                       ),
-                    ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        'to navigate',
+                        style: AppTypography.labelCaps.copyWith(
+                          color: AppColors.outline,
+                          fontSize: 10,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      const Icon(
+                        Icons.keyboard_return,
+                        size: 14,
+                        color: AppColors.outline,
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        'to select',
+                        style: AppTypography.labelCaps.copyWith(
+                          color: AppColors.outline,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

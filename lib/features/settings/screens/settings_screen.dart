@@ -17,7 +17,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _emailAlerts = true;
   bool _pushNotifications = true;
-  bool _aiAutoTriage = true;
   bool _autoSaveNotes = true;
   String _defaultView = 'Dashboard';
 
@@ -40,13 +39,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    },
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    'Application Settings',
-                    style: AppTypography.displayLg.copyWith(
-                      color: AppColors.onBackground,
+                  Expanded(
+                    child: Text(
+                      'Application Settings',
+                      style: (isDesktop
+                              ? AppTypography.displayLg
+                              : AppTypography.displayLg.copyWith(fontSize: 24))
+                          .copyWith(color: AppColors.onBackground),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -112,14 +119,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildNotificationSettings() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+    return Material(
+      color: AppColors.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.outlineVariant),
+        side: const BorderSide(color: AppColors.outlineVariant),
       ),
-      child: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -127,7 +135,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const Icon(Icons.notifications_active_outlined,
                   color: AppColors.primary, size: 20),
               const SizedBox(width: AppSpacing.xs),
-              Text('Notification Preferences', style: AppTypography.headlineMd),
+              Expanded(
+                child: Text(
+                  'Notification Preferences',
+                  style: AppTypography.headlineMd,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -157,18 +171,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildClinicalDefaults() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+    return Material(
+      color: AppColors.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.outlineVariant),
+        side: const BorderSide(color: AppColors.outlineVariant),
       ),
-      child: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -176,23 +192,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const Icon(Icons.tune_outlined,
                   color: AppColors.secondary, size: 20),
               const SizedBox(width: AppSpacing.xs),
-              Text('Clinic Defaults & AI Controls',
-                  style: AppTypography.headlineMd),
+              Expanded(
+                child: Text(
+                  'Clinic Defaults',
+                  style: AppTypography.headlineMd,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           const Divider(height: 1),
-          SwitchListTile(
-            title: Text('AI Auto-Triage Assistance',
-                style:
-                    AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600)),
-            subtitle: Text('Enable real-time AI copilot recommendations',
-                style: AppTypography.bodySm
-                    .copyWith(color: AppColors.onSurfaceVariant)),
-            value: _aiAutoTriage,
-            activeThumbColor: AppColors.secondary,
-            onChanged: (val) => setState(() => _aiAutoTriage = val),
-          ),
           SwitchListTile(
             title: Text('Auto-Save Clinical Notes',
                 style:
@@ -207,11 +217,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Default Landing View',
+                Expanded(
+                  child: Text(
+                    'Default Landing View',
                     style: AppTypography.bodyMd
-                        .copyWith(fontWeight: FontWeight.w600)),
+                        .copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
                 DropdownButton<String>(
                   value: _defaultView,
                   items: const [
@@ -231,18 +245,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildSecuritySettings() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+    return Material(
+      color: AppColors.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.outlineVariant),
+        side: const BorderSide(color: AppColors.outlineVariant),
       ),
-      child: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -250,7 +266,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const Icon(Icons.lock_outline,
                   color: AppColors.primaryContainer, size: 20),
               const SizedBox(width: AppSpacing.xs),
-              Text('Security & Passwords', style: AppTypography.headlineMd),
+              Expanded(
+                child: Text(
+                  'Security & Passwords',
+                  style: AppTypography.headlineMd,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -269,7 +291,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Future<void> _sendPasswordResetEmail(BuildContext context) async {
@@ -316,7 +339,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const Icon(Icons.info_outline,
                   color: AppColors.outline, size: 20),
               const SizedBox(width: AppSpacing.xs),
-              Text('System & Build Info', style: AppTypography.headlineMd),
+              Expanded(
+                child: Text(
+                  'System & Build Info',
+                  style: AppTypography.headlineMd,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
 import '../../../shared/widgets/mkes_primary_button.dart';
 import '../../../shared/widgets/mkes_text_field.dart';
+import '../../../shared/widgets/responsive_form_row.dart';
 import '../../eye/widgets/eye_surgery_form_dialog.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/repositories/patient_repository.dart';
@@ -162,9 +165,10 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
           existing.doctorName, _selectedDepartment)) {
         _selectedDoctorName = existing.doctorName;
         _selectedDoctorSpecialty = existing.specialty;
-        _selectedDoctorId = DepartmentDoctorConfig.isValidUuid(existing.doctorId)
-            ? existing.doctorId
-            : null;
+        _selectedDoctorId =
+            DepartmentDoctorConfig.isValidUuid(existing.doctorId)
+                ? existing.doctorId
+                : null;
       } else if (DepartmentDoctorConfig.isValidDoctorForDepartment(
           existing.doctorId, _selectedDepartment)) {
         _selectedDoctorId = existing.doctorId;
@@ -522,13 +526,14 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final viewInsets = MediaQuery.viewInsetsOf(context);
-
-    final dialogMaxWidth = (screenWidth - 32).clamp(280.0, 580.0);
-    final dialogMaxHeight =
-        (screenHeight - viewInsets.bottom - 60).clamp(320.0, 780.0);
+    final dialogConstraints = AdaptiveDialogConstraints.getConstraints(
+      context: context,
+      maxPhoneWidth: AppBreakpoints.maxDialogWidthMobile,
+      maxTabletWidth: 540.0,
+      maxDesktopWidth: 580.0,
+      minWidth: 280.0,
+      minHeight: 320.0,
+    );
 
     final isEditing = widget.isEditing;
 
@@ -538,10 +543,7 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogMaxWidth,
-          maxHeight: dialogMaxHeight,
-        ),
+        constraints: dialogConstraints,
         child: Form(
           key: _formKey,
           child: Column(
@@ -558,28 +560,35 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryContainer
-                                .withValues(alpha: 0.15),
-                            borderRadius:
-                                BorderRadius.circular(AppSpacing.radiusSm),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer
+                                  .withValues(alpha: 0.15),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusSm),
+                            ),
+                            child: const Icon(
+                              Icons.calendar_month,
+                              color: AppColors.primaryContainer,
+                              size: 20,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.calendar_month,
-                            color: AppColors.primaryContainer,
-                            size: 20,
+                          const SizedBox(width: AppSpacing.sm),
+                          Flexible(
+                            child: Text(
+                              isEditing
+                                  ? 'Edit Appointment'
+                                  : 'New Appointment',
+                              style: AppTypography.headlineMd,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Text(
-                          isEditing ? 'Edit Appointment' : 'New Appointment',
-                          style: AppTypography.headlineMd,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, size: 20),
@@ -603,112 +612,108 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                         style: AppTypography.labelCaps
                             .copyWith(color: AppColors.primary),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Row(
+                      ResponsiveFormRow(
+                        breakpoint: 440,
                         children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _selectedDepartment,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                labelText: 'Department *',
-                                prefixIcon:
-                                    const Icon(Icons.local_hospital_outlined),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(
-                                      AppSpacing.radiusMd),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedDepartment,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: 'Department *',
+                              prefixIcon:
+                                  const Icon(Icons.local_hospital_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusMd),
+                              ),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'eye',
+                                child: Text(
+                                  'Eye Clinic',
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'eye',
-                                  child: Text(
-                                    'Eye Clinic',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                              DropdownMenuItem(
+                                value: 'dental',
+                                child: Text(
+                                  'Dental Clinic',
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                DropdownMenuItem(
-                                  value: 'dental',
-                                  child: Text(
-                                    'Dental Clinic',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                              onChanged: (val) {
-                                if (val != null) _onDepartmentChanged(val);
-                              },
-                            ),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) _onDepartmentChanged(val);
+                            },
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Builder(
-                              builder: (context) {
-                                final availableForDept = AppointmentFormDialog
-                                    .getAvailableAppointmentTypes(
-                                        _selectedDepartment);
-                                final Map<String, String> typesMap = {
-                                  for (final item in availableForDept)
-                                    item.id: item.label,
-                                };
-                                final canonicalSelected =
-                                    normalizeAppointmentType(_selectedType);
-                                if (!typesMap.containsKey(canonicalSelected)) {
-                                  if (_selectedDepartment == 'eye') {
-                                    typesMap[canonicalSelected] = canonicalSelected
-                                        .split('_')
-                                        .map((w) => w.isEmpty
-                                            ? ''
-                                            : '${w[0].toUpperCase()}${w.substring(1)}')
-                                        .join(' ');
-                                  }
+                          Builder(
+                            builder: (context) {
+                              final availableForDept = AppointmentFormDialog
+                                  .getAvailableAppointmentTypes(
+                                      _selectedDepartment);
+                              final Map<String, String> typesMap = {
+                                for (final item in availableForDept)
+                                  item.id: item.label,
+                              };
+                              final canonicalSelected =
+                                  normalizeAppointmentType(_selectedType);
+                              if (!typesMap.containsKey(canonicalSelected)) {
+                                if (_selectedDepartment == 'eye') {
+                                  typesMap[canonicalSelected] = canonicalSelected
+                                      .split('_')
+                                      .map((w) => w.isEmpty
+                                          ? ''
+                                          : '${w[0].toUpperCase()}${w.substring(1)}')
+                                      .join(' ');
                                 }
-                                final safeValue =
-                                    typesMap.containsKey(canonicalSelected)
-                                        ? canonicalSelected
-                                        : 'regular';
+                              }
+                              final safeValue =
+                                  typesMap.containsKey(canonicalSelected)
+                                      ? canonicalSelected
+                                      : 'regular';
 
-                                return DropdownButtonFormField<String>(
-                                  key: ValueKey(
-                                      '$_selectedDepartment:$safeValue'),
-                                  initialValue: safeValue,
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    labelText: 'Type *',
-                                    prefixIcon: const Icon(
-                                        Icons.medical_services_outlined),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          AppSpacing.radiusMd),
-                                    ),
+                              return DropdownButtonFormField<String>(
+                                key:
+                                    ValueKey('$_selectedDepartment:$safeValue'),
+                                initialValue: safeValue,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  labelText: 'Type *',
+                                  prefixIcon: const Icon(
+                                      Icons.medical_services_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        AppSpacing.radiusMd),
                                   ),
-                                  items: typesMap.entries.map((entry) {
-                                    return DropdownMenuItem<String>(
-                                      value: entry.key,
-                                      child: Text(
-                                        entry.value,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      setState(() {
-                                        _selectedType =
-                                            normalizeAppointmentType(val);
-                                        if (_selectedType == 'surgery' &&
-                                            _selectedDepartment != 'eye') {
-                                          _selectedType = 'regular';
-                                        }
-                                      });
-                                    }
-                                  },
-                                );
-                              },
-                            ),
+                                ),
+                                items: typesMap.entries.map((entry) {
+                                  return DropdownMenuItem<String>(
+                                    value: entry.key,
+                                    child: Text(
+                                      entry.value,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _selectedType =
+                                          normalizeAppointmentType(val);
+                                      if (_selectedType == 'surgery' &&
+                                          _selectedDepartment != 'eye') {
+                                        _selectedType = 'regular';
+                                      }
+                                    });
+                                  }
+                                },
+                              );
+                            },
                           ),
                         ],
                       ),
+                      const SizedBox(height: AppSpacing.xs),
 
                       if (_selectedType == 'surgery') ...[
                         const SizedBox(height: AppSpacing.sm),
@@ -833,13 +838,16 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                                   created.department == 'dental') {
                                 final oldDept = _selectedDepartment;
                                 _selectedDepartment = created.department!;
-                                if (_selectedDepartment.toLowerCase() == 'dental' &&
+                                if (_selectedDepartment.toLowerCase() ==
+                                        'dental' &&
                                     _selectedType == 'surgery') {
                                   _selectedType = 'regular';
                                 }
                                 if (oldDept != _selectedDepartment &&
-                                    !DepartmentDoctorConfig.isValidDoctorNameForDepartment(
-                                        _selectedDoctorName, _selectedDepartment)) {
+                                    !DepartmentDoctorConfig
+                                        .isValidDoctorNameForDepartment(
+                                            _selectedDoctorName,
+                                            _selectedDepartment)) {
                                   _selectedDoctorId = null;
                                   _selectedDoctorName = null;
                                   _selectedDoctorSpecialty = null;
@@ -870,8 +878,8 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                           final configuredDoctors = ref.watch(
                               departmentDoctorsProvider(_selectedDepartment));
 
-                          final isSelectedValid = configuredDoctors
-                              .any((doc) => doc.fullName == _selectedDoctorName);
+                          final isSelectedValid = configuredDoctors.any(
+                              (doc) => doc.fullName == _selectedDoctorName);
                           final effectiveDoctorName =
                               isSelectedValid ? _selectedDoctorName : null;
 
@@ -882,8 +890,7 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                             isExpanded: true,
                             decoration: InputDecoration(
                               labelText: 'Attending Doctor',
-                              prefixIcon:
-                                  const Icon(Icons.person_pin_outlined),
+                              prefixIcon: const Icon(Icons.person_pin_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(
                                   AppSpacing.radiusMd,
@@ -954,72 +961,68 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
                         ),
                         const SizedBox(height: AppSpacing.sm),
                       ],
-                      Row(
+                      ResponsiveFormRow(
+                        breakpoint: 440,
                         children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _selectedDate,
-                                  firstDate: DateTime.now()
-                                      .subtract(const Duration(days: 30)),
-                                  lastDate: DateTime.now()
-                                      .add(const Duration(days: 365)),
-                                );
-                                if (picked != null) {
-                                  setState(() {
-                                    _selectedDate = picked;
-                                    _selectedTime = AppointmentFormDialog
-                                        .calculateSuggestedTime(
-                                      selectedDate: picked,
-                                    );
-                                  });
-                                }
-                              },
-                              child: InputDecorator(
-                                decoration: InputDecoration(
-                                  labelText: 'Date *',
-                                  prefixIcon:
-                                      const Icon(Icons.calendar_today_outlined),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        AppSpacing.radiusMd),
-                                  ),
+                          InkWell(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _selectedDate,
+                                firstDate: DateTime.now()
+                                    .subtract(const Duration(days: 30)),
+                                lastDate: DateTime.now()
+                                    .add(const Duration(days: 365)),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _selectedDate = picked;
+                                  _selectedTime = AppointmentFormDialog
+                                      .calculateSuggestedTime(
+                                    selectedDate: picked,
+                                  );
+                                });
+                              }
+                            },
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: 'Date *',
+                                prefixIcon:
+                                    const Icon(Icons.calendar_today_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusMd),
                                 ),
-                                child: Text(
-                                  '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                                  style: AppTypography.bodyMd,
-                                ),
+                              ),
+                              child: Text(
+                                '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                                style: AppTypography.bodyMd,
                               ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () async {
-                                final picked = await showTimePicker(
-                                  context: context,
-                                  initialTime: _selectedTime,
-                                );
-                                if (picked != null) {
-                                  setState(() => _selectedTime = picked);
-                                }
-                              },
-                              child: InputDecorator(
-                                decoration: InputDecoration(
-                                  labelText: 'Time Slot *',
-                                  prefixIcon:
-                                      const Icon(Icons.access_time_outlined),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        AppSpacing.radiusMd),
-                                  ),
+                          InkWell(
+                            onTap: () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime: _selectedTime,
+                              );
+                              if (picked != null) {
+                                setState(() => _selectedTime = picked);
+                              }
+                            },
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: 'Time Slot *',
+                                prefixIcon:
+                                    const Icon(Icons.access_time_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusMd),
                                 ),
-                                child: Text(
-                                  _formatDisplayTime(_selectedTime),
-                                  style: AppTypography.bodyMd,
-                                ),
+                              ),
+                              child: Text(
+                                _formatDisplayTime(_selectedTime),
+                                style: AppTypography.bodyMd,
                               ),
                             ),
                           ),

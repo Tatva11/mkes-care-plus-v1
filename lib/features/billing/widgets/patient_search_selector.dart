@@ -144,7 +144,8 @@ class _PatientSearchSelectorState extends ConsumerState<PatientSearchSelector> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryContainer.withValues(alpha: 0.15),
+                          color: AppColors.primaryContainer
+                              .withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -189,8 +190,10 @@ class _PatientSearchSelectorState extends ConsumerState<PatientSearchSelector> {
           focusNode: _focusNode,
           onChanged: _onSearchChanged,
           decoration: InputDecoration(
-            hintText: 'Search ${widget.department.toUpperCase()} patient by Name, Number (e.g. ${widget.department.toLowerCase() == 'dental' ? 'D-0001' : 'E-0001'}), or Mobile...',
-            prefixIcon: const Icon(Icons.person_search_outlined, color: AppColors.primary),
+            hintText:
+                'Search ${widget.department.toUpperCase()} patient by Name, Number (e.g. ${widget.department.toLowerCase() == 'dental' ? 'D-0001' : 'E-0001'}), or Mobile...',
+            prefixIcon: const Icon(Icons.person_search_outlined,
+                color: AppColors.primary),
             suffixIcon: _isLoading
                 ? const SizedBox(
                     width: 20,
@@ -277,10 +280,13 @@ class _PatientSearchSelectorState extends ConsumerState<PatientSearchSelector> {
                         ),
                         title: Row(
                           children: [
-                            Text(
-                              p.name,
-                              style: AppTypography.bodyMd.copyWith(
-                                fontWeight: FontWeight.w600,
+                            Flexible(
+                              child: Text(
+                                p.name,
+                                style: AppTypography.bodyMd.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
@@ -290,7 +296,8 @@ class _PatientSearchSelectorState extends ConsumerState<PatientSearchSelector> {
                                 vertical: 1,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.primaryContainer.withValues(alpha: 0.12),
+                                color: AppColors.primaryContainer
+                                    .withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(

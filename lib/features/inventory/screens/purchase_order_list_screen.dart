@@ -42,6 +42,9 @@ class PurchaseOrderManagementScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.onSurface,
         elevation: 0,
+        leading: Navigator.of(context).canPop()
+            ? BackButton(onPressed: () => Navigator.of(context).pop())
+            : null,
       ),
       body: const PurchaseOrderManagementContent(),
     );
@@ -191,6 +194,67 @@ class _PurchaseOrderManagementContentState
   }
 
   Widget _buildHeader(bool isDesktop) {
+    if (!isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (Navigator.of(context).canPop()) ...[
+                IconButton.filledTonal(
+                  tooltip: 'Back to previous screen',
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(Icons.arrow_back),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Expanded(
+                child: Text(
+                  'Purchase Orders',
+                  style: AppTypography.headlineMd.copyWith(
+                    color: AppColors.onBackground,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton.outlined(
+                tooltip: 'Refresh Purchase Orders',
+                onPressed: () =>
+                    ref.read(purchaseOrdersProvider.notifier).fetchOrders(),
+                icon: const Icon(Icons.refresh, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Manage supplier orders, delivery tracking, and atomic inventory stock receiving',
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _openCreateDialog,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('New Purchase Order'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -342,64 +406,115 @@ class _PurchaseOrderManagementContentState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Search bar & Vendor Dropdown
-        Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by PO number, vendor, notes, product...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            ref
-                                .read(purchaseOrderSearchQueryProvider.notifier)
-                                .state = '';
-                          },
-                        )
-                      : null,
-                  fillColor: AppColors.surfaceContainerLow,
-                ),
-                onChanged: (val) {
-                  ref.read(purchaseOrderSearchQueryProvider.notifier).state = val;
-                },
-              ),
+        if (!isDesktop) ...[
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search by PO number, vendor, notes, product...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        ref
+                            .read(purchaseOrderSearchQueryProvider.notifier)
+                            .state = '';
+                      },
+                    )
+                  : null,
+              fillColor: AppColors.surfaceContainerLow,
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              flex: 2,
-              child: DropdownButtonFormField<String?>(
-                isExpanded: true,
-                initialValue: selectedVendorId,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.local_shipping_outlined, size: 20),
-                  fillColor: AppColors.surfaceContainerLow,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                ),
-                hint: const Text('All Vendors'),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('All Vendors'),
+            onChanged: (val) {
+              ref.read(purchaseOrderSearchQueryProvider.notifier).state = val;
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          DropdownButtonFormField<String?>(
+            isExpanded: true,
+            initialValue: selectedVendorId,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.local_shipping_outlined, size: 20),
+              fillColor: AppColors.surfaceContainerLow,
+              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            hint: const Text('All Vendors'),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('All Vendors'),
+              ),
+              ...allVendors.map((v) {
+                return DropdownMenuItem<String?>(
+                  value: v.id,
+                  child: Text(v.name, overflow: TextOverflow.ellipsis),
+                );
+              }),
+            ],
+            onChanged: (val) {
+              ref.read(purchaseOrderVendorFilterProvider.notifier).state = val;
+            },
+          ),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search by PO number, vendor, notes, product...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              ref
+                                  .read(purchaseOrderSearchQueryProvider.notifier)
+                                  .state = '';
+                            },
+                          )
+                        : null,
+                    fillColor: AppColors.surfaceContainerLow,
                   ),
-                  ...allVendors.map((v) {
-                    return DropdownMenuItem<String?>(
-                      value: v.id,
-                      child: Text(v.name, overflow: TextOverflow.ellipsis),
-                    );
-                  }),
-                ],
-                onChanged: (val) {
-                  ref.read(purchaseOrderVendorFilterProvider.notifier).state = val;
-                },
+                  onChanged: (val) {
+                    ref.read(purchaseOrderSearchQueryProvider.notifier).state = val;
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<String?>(
+                  isExpanded: true,
+                  initialValue: selectedVendorId,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.local_shipping_outlined, size: 20),
+                    fillColor: AppColors.surfaceContainerLow,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  hint: const Text('All Vendors'),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All Vendors'),
+                    ),
+                    ...allVendors.map((v) {
+                      return DropdownMenuItem<String?>(
+                        value: v.id,
+                        child: Text(v.name, overflow: TextOverflow.ellipsis),
+                      );
+                    }),
+                  ],
+                  onChanged: (val) {
+                    ref.read(purchaseOrderVendorFilterProvider.notifier).state = val;
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: AppSpacing.sm),
 
         // Status Chips Filter
@@ -706,8 +821,11 @@ class _PurchaseOrderManagementContentState
                   ],
                 ),
                 const Divider(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     TextButton.icon(
                       onPressed: () => _openDetailsDialog(po),

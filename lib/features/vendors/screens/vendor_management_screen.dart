@@ -4,59 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../admin/screens/administration_screen.dart';
-import '../../admin/widgets/admin_shell.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../patients/screens/patient_list_screen.dart';
-import '../../staff/screens/staff_management_screen.dart';
 import '../models/vendor.dart';
 import '../providers/vendor_provider.dart';
 import '../widgets/vendor_details_dialog.dart';
 import '../widgets/vendor_form_dialog.dart';
 
-/// Full screen for Vendor Management with role-aware shell and navigation.
+/// Full screen for Vendor Management with clean scaffold and back navigation for Admin and Staff.
 class VendorManagementScreen extends ConsumerWidget {
   const VendorManagementScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final role = ref.watch(currentUserRoleProvider).valueOrNull;
-
-    if (role == 'admin') {
-      return AdminShell(
-        selectedItem: AdminNavItem.operations,
-        onNavItemSelected: (item) {
-          if (item == AdminNavItem.dashboard) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-            return;
-          }
-          if (item == AdminNavItem.staff) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const StaffManagementScreen()),
-            );
-            return;
-          }
-          if (item == AdminNavItem.patients) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const PatientListScreen()),
-            );
-            return;
-          }
-          if (item == AdminNavItem.administration) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const AdministrationScreen()),
-            );
-            return;
-          }
-        },
-        body: const VendorManagementContent(),
-      );
-    }
-
     return Scaffold(
       backgroundColor: AppColors.surfaceContainerLowest,
       appBar: AppBar(
-        title: const Text('Vendor Management'),
+        title: const Text('Vendor Directory'),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.onSurface,
         elevation: 0,
@@ -481,7 +444,7 @@ class _VendorManagementContentState
                   ],
                 ],
               ),
-              const Spacer(),
+              const SizedBox(height: AppSpacing.xs),
 
               // Contact detail line (Phone / Email)
               if (vendor.phone != null || vendor.email != null) ...[
@@ -560,7 +523,7 @@ class _VendorManagementContentState
                     ),
                 ),
               ],
-              const Spacer(),
+              const SizedBox(height: AppSpacing.xs),
 
               // Bottom Row: Last Delivery Info
               const Divider(height: 12),

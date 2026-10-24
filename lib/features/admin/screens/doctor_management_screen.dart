@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/responsive_page_header.dart';
 import '../../appointments/models/department_doctor_config.dart';
 import '../widgets/admin_shell.dart';
 
@@ -129,34 +130,13 @@ class _DoctorManagementContentState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Header & Breadcrumbs ─────────────────────────────────────────
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.of(context).pop(),
-                tooltip: 'Back to Administration',
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Doctor Management',
-                      style: AppTypography.displayLg.copyWith(
-                        color: AppColors.onBackground,
-                        fontSize: isDesktop ? null : 24,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Configure department static doctors for appointment booking. No Auth accounts required.',
-                      style: AppTypography.bodyLg
-                          .copyWith(color: AppColors.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
+          ResponsivePageHeader(
+            title: 'Doctor Management',
+            subtitle:
+                'Configure department static doctors for appointment booking. No Auth accounts required.',
+            showBackButton: true,
+            onBack: () => Navigator.of(context).pop(),
+            actions: [
               FilledButton.icon(
                 onPressed: () => _showDoctorDialog(),
                 icon: const Icon(Icons.add, size: 18),
@@ -167,33 +147,92 @@ class _DoctorManagementContentState
           const SizedBox(height: AppSpacing.lg),
 
           // ── Filters & Search Bar ─────────────────────────────────────────
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              ChoiceChip(
-                label: const Text('All Departments'),
-                selected: _selectedDepartmentFilter == 'all',
-                onSelected: (_) =>
-                    setState(() => _selectedDepartmentFilter = 'all'),
-              ),
-              ChoiceChip(
-                label: const Text('Eye Department'),
-                selected: _selectedDepartmentFilter == 'eye',
-                onSelected: (_) =>
-                    setState(() => _selectedDepartmentFilter = 'eye'),
-              ),
-              ChoiceChip(
-                label: const Text('Dental Department'),
-                selected: _selectedDepartmentFilter == 'dental',
-                onSelected: (_) =>
-                    setState(() => _selectedDepartmentFilter = 'dental'),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              SizedBox(
-                width: isDesktop ? 280 : double.infinity,
-                child: TextField(
+          if (isDesktop)
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ChoiceChip(
+                  label: const Text('All Departments'),
+                  selected: _selectedDepartmentFilter == 'all',
+                  onSelected: (_) =>
+                      setState(() => _selectedDepartmentFilter = 'all'),
+                ),
+                ChoiceChip(
+                  label: const Text('Eye Department'),
+                  selected: _selectedDepartmentFilter == 'eye',
+                  onSelected: (_) =>
+                      setState(() => _selectedDepartmentFilter = 'eye'),
+                ),
+                ChoiceChip(
+                  label: const Text('Dental Department'),
+                  selected: _selectedDepartmentFilter == 'dental',
+                  onSelected: (_) =>
+                      setState(() => _selectedDepartmentFilter = 'dental'),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                SizedBox(
+                  width: 280,
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) =>
+                        setState(() => _searchQuery = val.trim()),
+                    decoration: InputDecoration(
+                      hintText: 'Search doctor name or specialty...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      isDense: true,
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusMd),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('All Departments'),
+                        selected: _selectedDepartmentFilter == 'all',
+                        onSelected: (_) =>
+                            setState(() => _selectedDepartmentFilter = 'all'),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      ChoiceChip(
+                        label: const Text('Eye Department'),
+                        selected: _selectedDepartmentFilter == 'eye',
+                        onSelected: (_) =>
+                            setState(() => _selectedDepartmentFilter = 'eye'),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      ChoiceChip(
+                        label: const Text('Dental Department'),
+                        selected: _selectedDepartmentFilter == 'dental',
+                        onSelected: (_) => setState(
+                            () => _selectedDepartmentFilter = 'dental'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
                   controller: _searchController,
                   onChanged: (val) => setState(() => _searchQuery = val.trim()),
                   decoration: InputDecoration(
@@ -214,9 +253,8 @@ class _DoctorManagementContentState
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           const SizedBox(height: AppSpacing.lg),
 
           // ── Doctor List ──────────────────────────────────────────────────
@@ -326,23 +364,23 @@ class _DoctorManagementContentState
                           size: 20,
                         ),
                       ),
-                      title: Row(
+                      title: Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Flexible(
-                            child: Text(
-                              doctor.fullName,
-                              style: AppTypography.bodyLg.copyWith(
-                                fontWeight: FontWeight.bold,
-                                decoration: doctor.isActive
-                                    ? null
-                                    : TextDecoration.lineThrough,
-                                color: doctor.isActive
-                                    ? AppColors.onSurface
-                                    : AppColors.onSurfaceVariant,
-                              ),
+                          Text(
+                            doctor.fullName,
+                            style: AppTypography.bodyLg.copyWith(
+                              fontWeight: FontWeight.bold,
+                              decoration: doctor.isActive
+                                  ? null
+                                  : TextDecoration.lineThrough,
+                              color: doctor.isActive
+                                  ? AppColors.onSurface
+                                  : AppColors.onSurfaceVariant,
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.sm),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
@@ -363,7 +401,6 @@ class _DoctorManagementContentState
                               ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.xs),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
@@ -529,83 +566,86 @@ class _DoctorFormDialogState extends ConsumerState<_DoctorFormDialog> {
       title: Text(isEditing ? 'Edit Doctor' : 'Add New Doctor'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Doctor Name *',
-                  hintText: 'e.g. Dr Mitesh Jain',
-                  prefixIcon: const Icon(Icons.person_pin_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Doctor Name *',
+                    hintText: 'e.g. Dr Mitesh Jain',
+                    prefixIcon: const Icon(Icons.person_pin_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
                   ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please enter doctor name';
+                    }
+                    if (!val.trim().toLowerCase().startsWith('dr')) {
+                      // Optional gentle suggestion but allow standard entry
+                    }
+                    return null;
+                  },
                 ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Please enter doctor name';
-                  }
-                  if (!val.trim().toLowerCase().startsWith('dr')) {
-                    // Optional gentle suggestion but allow standard entry
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedDepartment,
-                decoration: InputDecoration(
-                  labelText: 'Department *',
-                  prefixIcon: const Icon(Icons.local_hospital_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'eye', child: Text('Eye Department')),
-                  DropdownMenuItem(
-                      value: 'dental', child: Text('Dental Department')),
-                ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedDepartment = val);
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextFormField(
-                controller: _specialtyController,
-                decoration: InputDecoration(
-                  labelText: 'Specialty (Optional)',
-                  hintText: 'e.g. Ophthalmology, Dental Surgery',
-                  prefixIcon: const Icon(Icons.medical_services_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  ),
-                ),
-              ),
-              if (isEditing) ...[
                 const SizedBox(height: AppSpacing.md),
-                SwitchListTile(
-                  title: const Text('Active for Bookings'),
-                  subtitle: const Text(
-                      'When inactive, doctor cannot be chosen for new appointments.'),
-                  value: _isActive,
-                  onChanged: (val) => setState(() => _isActive = val),
-                  contentPadding: EdgeInsets.zero,
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedDepartment,
+                  decoration: InputDecoration(
+                    labelText: 'Department *',
+                    prefixIcon: const Icon(Icons.local_hospital_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'eye', child: Text('Eye Department')),
+                    DropdownMenuItem(
+                        value: 'dental', child: Text('Dental Department')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedDepartment = val);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: _specialtyController,
+                  decoration: InputDecoration(
+                    labelText: 'Specialty (Optional)',
+                    hintText: 'e.g. Ophthalmology, Dental Surgery',
+                    prefixIcon: const Icon(Icons.medical_services_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                  ),
+                ),
+                if (isEditing) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  SwitchListTile(
+                    title: const Text('Active for Bookings'),
+                    subtitle: const Text(
+                        'When inactive, doctor cannot be chosen for new appointments.'),
+                    value: _isActive,
+                    onChanged: (val) => setState(() => _isActive = val),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Static doctors appear in the booking dropdown without creating user accounts or auth logins.',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Static doctors appear in the booking dropdown without creating user accounts or auth logins.',
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

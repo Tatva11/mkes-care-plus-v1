@@ -7,6 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/mkes_primary_button.dart';
 import '../../../shared/widgets/mkes_text_field.dart';
+import '../../../shared/widgets/responsive_form_row.dart';
 import '../models/patient_model.dart';
 import '../providers/patients_provider.dart';
 
@@ -238,29 +239,34 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.15),
-                            borderRadius:
-                                BorderRadius.circular(AppSpacing.radiusSm),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.15),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusSm),
+                            ),
+                            child: Icon(
+                              _isEditing
+                                  ? Icons.edit_outlined
+                                  : Icons.person_add_alt_1,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                           ),
-                          child: Icon(
-                            _isEditing
-                                ? Icons.edit_outlined
-                                : Icons.person_add_alt_1,
-                            color: AppColors.primary,
-                            size: 20,
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              _isEditing ? 'Edit Patient' : 'Register New Patient',
+                              style: AppTypography.headlineMd,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Text(
-                          _isEditing ? 'Edit Patient' : 'Register New Patient',
-                          style: AppTypography.headlineMd,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, size: 20),
@@ -325,51 +331,47 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                       const SizedBox(height: AppSpacing.md),
 
                       // Contact & Department
-                      Row(
+                      ResponsiveFormRow(
+                        breakpoint: 440,
                         children: [
-                          Expanded(
-                            child: MkesTextField(
-                              controller: _mobileController,
-                              label: 'Mobile Number',
-                              hintText: '9876543210',
-                              keyboardType: TextInputType.number,
-                              prefixIcon: Icons.phone_outlined,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'[\d\s+\-]')),
-                                LengthLimitingTextInputFormatter(16),
-                              ],
-                              validator: _validateIndianMobile,
-                            ),
+                          MkesTextField(
+                            controller: _mobileController,
+                            label: 'Mobile Number',
+                            hintText: '9876543210',
+                            keyboardType: TextInputType.number,
+                            prefixIcon: Icons.phone_outlined,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'[\d\s+\-]')),
+                              LengthLimitingTextInputFormatter(16),
+                            ],
+                            validator: _validateIndianMobile,
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _selectedDepartment,
-                              decoration: InputDecoration(
-                                labelText: 'Department *',
-                                prefixIcon:
-                                    const Icon(Icons.local_hospital_outlined),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(
-                                      AppSpacing.radiusMd),
-                                ),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedDepartment,
+                            decoration: InputDecoration(
+                              labelText: 'Department *',
+                              prefixIcon:
+                                  const Icon(Icons.local_hospital_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd),
                               ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'eye',
-                                  child: Text('Eye Clinic'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'dental',
-                                  child: Text('Dental Clinic'),
-                                ),
-                              ],
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() => _selectedDepartment = val);
-                                }
-                              },
                             ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'eye',
+                                child: Text('Eye Clinic'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'dental',
+                                child: Text('Dental Clinic'),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _selectedDepartment = val);
+                              }
+                            },
                           ),
                         ],
                       ),

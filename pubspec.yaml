@@ -15,6 +15,10 @@ dependencies:
   flutter_riverpod: ^2.6.1
   intl: ^0.20.3
   url_launcher: ^6.3.1
+  pdf: ^3.13.1
+  path_provider: ^2.1.6
+  open_filex: ^5.0.0
+  printing: ^5.15.1
 
 dev_dependencies:
   flutter_test:

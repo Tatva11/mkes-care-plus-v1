@@ -57,27 +57,28 @@ class PatientSummaryCard extends ConsumerWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.xs,
+                  runSpacing: 4,
                   children: [
-                    Flexible(
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.people_alt_outlined,
-                            color: AppColors.primary,
-                            size: 22,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.people_alt_outlined,
+                          color: AppColors.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: Text(
+                            'Patient Statistics',
+                            style: AppTypography.headlineMd,
                           ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Flexible(
-                            child: Text(
-                              'Patient Statistics',
-                              style: AppTypography.headlineMd,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                     TextButton(
                       onPressed: () {

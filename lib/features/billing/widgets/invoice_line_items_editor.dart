@@ -49,7 +49,8 @@ class InvoiceLineItemsEditor extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final servicesAsync = ref.watch(departmentBillingServicesProvider(department));
+    final servicesAsync =
+        ref.watch(departmentBillingServicesProvider(department));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,13 +58,17 @@ class InvoiceLineItemsEditor extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Services & Line Items',
-              style: AppTypography.bodyMd.copyWith(
-                color: AppColors.onSurface,
-                fontWeight: FontWeight.w700,
+            Expanded(
+              child: Text(
+                'Services & Line Items',
+                style: AppTypography.bodyMd.copyWith(
+                  color: AppColors.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SizedBox(width: AppSpacing.xs),
             OutlinedButton.icon(
               onPressed: _addItem,
               icon: const Icon(Icons.add, size: 16),
@@ -71,7 +76,8 @@ class InvoiceLineItemsEditor extends ConsumerWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               ),
             ),
           ],
@@ -92,7 +98,8 @@ class InvoiceLineItemsEditor extends ConsumerWidget {
             ),
             child: Text(
               'Error loading ${department.toUpperCase()} services: $error',
-              style: AppTypography.bodySm.copyWith(color: AppColors.onErrorContainer),
+              style: AppTypography.bodySm
+                  .copyWith(color: AppColors.onErrorContainer),
             ),
           ),
           data: (services) {
@@ -100,7 +107,8 @@ class InvoiceLineItemsEditor extends ConsumerWidget {
               children: [
                 for (int i = 0; i < items.length; i++)
                   _LineItemCard(
-                    key: ValueKey('item_${i}_${items[i].serviceId}_${items[i].isCustom}'),
+                    key: ValueKey(
+                        'item_${i}_${items[i].serviceId}_${items[i].isCustom}'),
                     index: i,
                     item: items[i],
                     services: services,
@@ -152,9 +160,12 @@ class _LineItemCardState extends State<_LineItemCard> {
     _customNameController = TextEditingController(
       text: widget.item.isCustom ? widget.item.serviceName : '',
     );
-    _qtyController = TextEditingController(text: widget.item.quantity.toString());
+    _qtyController =
+        TextEditingController(text: widget.item.quantity.toString());
     _priceController = TextEditingController(
-      text: widget.item.unitPrice > 0 ? widget.item.unitPrice.toStringAsFixed(0) : '',
+      text: widget.item.unitPrice > 0
+          ? widget.item.unitPrice.toStringAsFixed(0)
+          : '',
     );
   }
 
@@ -172,8 +183,9 @@ class _LineItemCardState extends State<_LineItemCard> {
     }
     if (oldWidget.item.unitPrice != widget.item.unitPrice &&
         _priceController.text != widget.item.unitPrice.toStringAsFixed(0)) {
-      _priceController.text =
-          widget.item.unitPrice > 0 ? widget.item.unitPrice.toStringAsFixed(0) : '';
+      _priceController.text = widget.item.unitPrice > 0
+          ? widget.item.unitPrice.toStringAsFixed(0)
+          : '';
     }
   }
 
@@ -204,7 +216,7 @@ class _LineItemCardState extends State<_LineItemCard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Flexible(
+              Expanded(
                 child: Text(
                   s.name,
                   overflow: TextOverflow.ellipsis,
@@ -233,11 +245,14 @@ class _LineItemCardState extends State<_LineItemCard> {
           children: [
             Icon(Icons.edit_note, size: 18, color: AppColors.secondary),
             const SizedBox(width: 8),
-            Text(
-              'Custom Service...',
-              style: TextStyle(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.w700,
+            const Expanded(
+              child: Text(
+                'Custom Service...',
+                style: TextStyle(
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -245,6 +260,31 @@ class _LineItemCardState extends State<_LineItemCard> {
       ),
     );
 
+    return list;
+  }
+
+  List<Widget> _buildSelectedItemBuilder(BuildContext context) {
+    final list = <Widget>[];
+    for (final s in widget.services) {
+      list.add(
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            s.name,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+    list.add(
+      const Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'Custom Service...',
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
     return list;
   }
 
@@ -277,21 +317,25 @@ class _LineItemCardState extends State<_LineItemCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 600;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(
-          color: widget.item.isCustom
-              ? AppColors.secondary.withValues(alpha: 0.4)
-              : AppColors.outlineVariant,
-        ),
-      ),
-      child: isDesktop ? _buildDesktopRow() : _buildMobileColumn(),
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            border: Border.all(
+              color: widget.item.isCustom
+                  ? AppColors.secondary.withValues(alpha: 0.4)
+                  : AppColors.outlineVariant,
+            ),
+          ),
+          child: isDesktop ? _buildDesktopRow() : _buildMobileColumn(),
+        );
+      },
     );
   }
 
@@ -338,6 +382,7 @@ class _LineItemCardState extends State<_LineItemCard> {
                   isDense: true,
                 ),
                 items: _buildDropdownItems(),
+                selectedItemBuilder: _buildSelectedItemBuilder,
                 onChanged: _onDropdownChanged,
               ),
               if (widget.item.isCustom) ...[
@@ -362,7 +407,7 @@ class _LineItemCardState extends State<_LineItemCard> {
 
         // Quantity
         SizedBox(
-          width: 85,
+          width: 75,
           child: TextField(
             controller: _qtyController,
             keyboardType: TextInputType.number,
@@ -373,7 +418,8 @@ class _LineItemCardState extends State<_LineItemCard> {
             ),
             onChanged: (val) {
               final qty = int.tryParse(val) ?? 1;
-              widget.onUpdate(widget.item.copyWith(quantity: qty.clamp(1, 9999)));
+              widget
+                  .onUpdate(widget.item.copyWith(quantity: qty.clamp(1, 9999)));
             },
           ),
         ),
@@ -381,7 +427,7 @@ class _LineItemCardState extends State<_LineItemCard> {
 
         // Unit Price
         SizedBox(
-          width: 120,
+          width: 105,
           child: TextField(
             controller: _priceController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -395,7 +441,8 @@ class _LineItemCardState extends State<_LineItemCard> {
             ),
             onChanged: (val) {
               final price = double.tryParse(val) ?? 0.0;
-              widget.onUpdate(widget.item.copyWith(unitPrice: price.clamp(0.0, 1000000.0)));
+              widget.onUpdate(
+                  widget.item.copyWith(unitPrice: price.clamp(0.0, 1000000.0)));
             },
           ),
         ),
@@ -403,20 +450,24 @@ class _LineItemCardState extends State<_LineItemCard> {
 
         // Line Total
         SizedBox(
-          width: 110,
+          width: 95,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'Total',
-                style: AppTypography.labelCaps.copyWith(color: AppColors.outline),
+                style:
+                    AppTypography.labelCaps.copyWith(color: AppColors.outline),
               ),
-              Text(
-                '₹${widget.item.totalAmount.toStringAsFixed(2)}',
-                style: AppTypography.bodyMd.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.onSurface,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '₹${widget.item.totalAmount.toStringAsFixed(2)}',
+                  style: AppTypography.bodyMd.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurface,
+                  ),
                 ),
               ),
             ],
@@ -429,10 +480,11 @@ class _LineItemCardState extends State<_LineItemCard> {
             icon: const Icon(Icons.delete_outline, size: 20),
             color: AppColors.error,
             tooltip: 'Remove Line Item',
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             onPressed: widget.onDelete,
           )
         else
-          const SizedBox(width: 40),
+          const SizedBox(width: 44),
       ],
     );
   }
@@ -444,19 +496,24 @@ class _LineItemCardState extends State<_LineItemCard> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Item #${widget.index + 1}${widget.item.isCustom ? " (Custom)" : ""}',
-              style: AppTypography.labelCaps.copyWith(
-                fontWeight: FontWeight.bold,
-                color: widget.item.isCustom ? AppColors.secondary : AppColors.primary,
+            Expanded(
+              child: Text(
+                'Item #${widget.index + 1}${widget.item.isCustom ? " (Custom)" : ""}',
+                style: AppTypography.labelCaps.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: widget.item.isCustom
+                      ? AppColors.secondary
+                      : AppColors.primary,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             if (widget.canDelete)
               IconButton(
-                icon: const Icon(Icons.delete_outline, size: 18),
+                icon: const Icon(Icons.delete_outline, size: 20),
                 color: AppColors.error,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+                tooltip: 'Remove Line Item',
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 onPressed: widget.onDelete,
               ),
           ],
@@ -470,6 +527,7 @@ class _LineItemCardState extends State<_LineItemCard> {
             isDense: true,
           ),
           items: _buildDropdownItems(),
+          selectedItemBuilder: _buildSelectedItemBuilder,
           onChanged: _onDropdownChanged,
         ),
         if (widget.item.isCustom) ...[
@@ -490,6 +548,7 @@ class _LineItemCardState extends State<_LineItemCard> {
         Row(
           children: [
             Expanded(
+              flex: 2,
               child: TextField(
                 controller: _qtyController,
                 keyboardType: TextInputType.number,
@@ -500,16 +559,18 @@ class _LineItemCardState extends State<_LineItemCard> {
                 ),
                 onChanged: (val) {
                   final qty = int.tryParse(val) ?? 1;
-                  widget.onUpdate(widget.item.copyWith(quantity: qty.clamp(1, 9999)));
+                  widget.onUpdate(
+                      widget.item.copyWith(quantity: qty.clamp(1, 9999)));
                 },
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: TextField(
                 controller: _priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
@@ -520,23 +581,35 @@ class _LineItemCardState extends State<_LineItemCard> {
                 ),
                 onChanged: (val) {
                   final price = double.tryParse(val) ?? 0.0;
-                  widget.onUpdate(widget.item.copyWith(unitPrice: price.clamp(0.0, 1000000.0)));
+                  widget.onUpdate(widget.item
+                      .copyWith(unitPrice: price.clamp(0.0, 1000000.0)));
                 },
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('Total', style: AppTypography.labelCaps.copyWith(color: AppColors.outline)),
-                Text(
-                  '₹${widget.item.totalAmount.toStringAsFixed(2)}',
-                  style: AppTypography.bodyMd.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.onSurface,
-                  ),
+            Expanded(
+              flex: 2,
+              child: Container(
+                alignment: Alignment.centerRight,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('Total',
+                        style: AppTypography.labelCaps
+                            .copyWith(color: AppColors.outline)),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '₹${widget.item.totalAmount.toStringAsFixed(2)}',
+                        style: AppTypography.bodyMd.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),

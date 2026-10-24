@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
+import '../../../shared/widgets/responsive_form_row.dart';
 import '../../inventory/models/inventory_item.dart';
 import '../../inventory/providers/inventory_provider.dart';
 import '../models/vendor.dart';
@@ -223,7 +225,6 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width > 600;
     final allInventory = ref.watch(inventoryProvider).value ?? [];
 
     return Dialog(
@@ -236,9 +237,9 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
         vertical: AppSpacing.lg,
       ),
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: isDesktop ? 620 : 440,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        constraints: AdaptiveDialogShell.constraintsFor(
+          context,
+          maxWidth: 620,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -282,6 +283,7 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
@@ -362,144 +364,136 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
                       const SizedBox(height: AppSpacing.md),
 
                       // 2. Contact Person & Phone Row
-                      Row(
+                      ResponsiveFormRow(
+                        breakpoint: 480,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'CONTACT PERSON',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'CONTACT PERSON',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                TextFormField(
-                                  controller: _contactPersonController,
-                                  decoration: InputDecoration(
-                                    hintText: 'E.g. John Doe',
-                                    prefixIcon: const Icon(Icons.person_outline),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                    ),
-                                    filled: true,
-                                    fillColor: AppColors.surfaceContainerLow,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              TextFormField(
+                                controller: _contactPersonController,
+                                decoration: InputDecoration(
+                                  hintText: 'E.g. John Doe',
+                                  prefixIcon: const Icon(Icons.person_outline),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                   ),
+                                  filled: true,
+                                  fillColor: AppColors.surfaceContainerLow,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'PHONE NUMBER',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'PHONE NUMBER',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                TextFormField(
-                                  controller: _phoneController,
-                                  keyboardType: TextInputType.phone,
-                                  decoration: InputDecoration(
-                                    hintText: 'E.g. +91 9876543210',
-                                    prefixIcon: const Icon(Icons.phone_outlined),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                    ),
-                                    filled: true,
-                                    fillColor: AppColors.surfaceContainerLow,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              TextFormField(
+                                controller: _phoneController,
+                                keyboardType: TextInputType.phone,
+                                decoration: InputDecoration(
+                                  hintText: 'E.g. +91 9876543210',
+                                  prefixIcon: const Icon(Icons.phone_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                   ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return null;
-                                    }
-                                    final phoneDigits =
-                                        value.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
-                                    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
-                                      return 'Enter a valid phone number.';
-                                    }
+                                  filled: true,
+                                  fillColor: AppColors.surfaceContainerLow,
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
                                     return null;
-                                  },
-                                ),
-                              ],
-                            ),
+                                  }
+                                  final phoneDigits =
+                                      value.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+                                  if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+                                    return 'Enter a valid phone number.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),
 
                       // 3. Email & Address Row
-                      Row(
+                      ResponsiveFormRow(
+                        breakpoint: 480,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'EMAIL ADDRESS',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'EMAIL ADDRESS',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                TextFormField(
-                                  controller: _emailController,
-                                  keyboardType: TextInputType.emailAddress,
-                                  decoration: InputDecoration(
-                                    hintText: 'vendor@domain.com',
-                                    prefixIcon: const Icon(Icons.email_outlined),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                    ),
-                                    filled: true,
-                                    fillColor: AppColors.surfaceContainerLow,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              TextFormField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: InputDecoration(
+                                  hintText: 'vendor@domain.com',
+                                  prefixIcon: const Icon(Icons.email_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                   ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return null;
-                                    }
-                                    final emailRegex =
-                                        RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                                    if (!emailRegex.hasMatch(value.trim())) {
-                                      return 'Enter a valid email address.';
-                                    }
+                                  filled: true,
+                                  fillColor: AppColors.surfaceContainerLow,
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
                                     return null;
-                                  },
-                                ),
-                              ],
-                            ),
+                                  }
+                                  final emailRegex =
+                                      RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                                  if (!emailRegex.hasMatch(value.trim())) {
+                                    return 'Enter a valid email address.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'ADDRESS / LOCATION',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ADDRESS / LOCATION',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                TextFormField(
-                                  controller: _addressController,
-                                  decoration: InputDecoration(
-                                    hintText: 'City, Warehouse or Address',
-                                    prefixIcon: const Icon(Icons.location_on_outlined),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                    ),
-                                    filled: true,
-                                    fillColor: AppColors.surfaceContainerLow,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              TextFormField(
+                                controller: _addressController,
+                                decoration: InputDecoration(
+                                  hintText: 'City, Warehouse or Address',
+                                  prefixIcon: const Icon(Icons.location_on_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                   ),
+                                  filled: true,
+                                  fillColor: AppColors.surfaceContainerLow,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -510,98 +504,94 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
                       const SizedBox(height: AppSpacing.md),
 
                       // 5. Last Order & Last Delivery Dates
-                      Row(
+                      ResponsiveFormRow(
+                        breakpoint: 480,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'LAST ORDER DATE',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'LAST ORDER DATE',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                InkWell(
-                                  onTap: () => _pickDate(isOrderDate: true),
-                                  borderRadius:
-                                      BorderRadius.circular(AppSpacing.radiusMd),
-                                  child: InputDecorator(
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(Icons.calendar_today_outlined),
-                                      suffixIcon: _lastOrderDate != null
-                                          ? IconButton(
-                                              icon: const Icon(Icons.clear, size: 18),
-                                              onPressed: () =>
-                                                  setState(() => _lastOrderDate = null),
-                                            )
-                                          : null,
-                                      border: OutlineInputBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(AppSpacing.radiusMd),
-                                      ),
-                                      filled: true,
-                                      fillColor: AppColors.surfaceContainerLow,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              InkWell(
+                                onTap: () => _pickDate(isOrderDate: true),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusMd),
+                                child: InputDecorator(
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.calendar_today_outlined),
+                                    suffixIcon: _lastOrderDate != null
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear, size: 18),
+                                            onPressed: () =>
+                                                setState(() => _lastOrderDate = null),
+                                          )
+                                        : null,
+                                    border: OutlineInputBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(AppSpacing.radiusMd),
                                     ),
-                                    child: Text(
-                                      _formatDate(_lastOrderDate),
-                                      style: TextStyle(
-                                        color: _lastOrderDate != null
-                                            ? AppColors.onSurface
-                                            : AppColors.onSurfaceVariant,
-                                      ),
+                                    filled: true,
+                                    fillColor: AppColors.surfaceContainerLow,
+                                  ),
+                                  child: Text(
+                                    _formatDate(_lastOrderDate),
+                                    style: TextStyle(
+                                      color: _lastOrderDate != null
+                                          ? AppColors.onSurface
+                                          : AppColors.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'LAST DELIVERY DATE',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'LAST DELIVERY DATE',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                InkWell(
-                                  onTap: () => _pickDate(isOrderDate: false),
-                                  borderRadius:
-                                      BorderRadius.circular(AppSpacing.radiusMd),
-                                  child: InputDecorator(
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(Icons.local_shipping_outlined),
-                                      suffixIcon: _lastDeliveryDate != null
-                                          ? IconButton(
-                                              icon: const Icon(Icons.clear, size: 18),
-                                              onPressed: () =>
-                                                  setState(() => _lastDeliveryDate = null),
-                                            )
-                                          : null,
-                                      border: OutlineInputBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(AppSpacing.radiusMd),
-                                      ),
-                                      filled: true,
-                                      fillColor: AppColors.surfaceContainerLow,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              InkWell(
+                                onTap: () => _pickDate(isOrderDate: false),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusMd),
+                                child: InputDecorator(
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.local_shipping_outlined),
+                                    suffixIcon: _lastDeliveryDate != null
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear, size: 18),
+                                            onPressed: () =>
+                                                setState(() => _lastDeliveryDate = null),
+                                          )
+                                        : null,
+                                    border: OutlineInputBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(AppSpacing.radiusMd),
                                     ),
-                                    child: Text(
-                                      _formatDate(_lastDeliveryDate),
-                                      style: TextStyle(
-                                        color: _lastDeliveryDate != null
-                                            ? AppColors.onSurface
-                                            : AppColors.onSurfaceVariant,
-                                      ),
+                                    filled: true,
+                                    fillColor: AppColors.surfaceContainerLow,
+                                  ),
+                                  child: Text(
+                                    _formatDate(_lastDeliveryDate),
+                                    style: TextStyle(
+                                      color: _lastDeliveryDate != null
+                                          ? AppColors.onSurface
+                                          : AppColors.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -758,14 +748,16 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
             // Footer Actions
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
                 children: [
                   TextButton(
                     onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
                   FilledButton.icon(
                     onPressed: _isSubmitting ? null : _submit,
                     icon: _isSubmitting

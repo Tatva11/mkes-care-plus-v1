@@ -5,6 +5,10 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../billing/screens/billing_management_screen.dart';
 import '../../reports/screens/admin_reports_screen.dart';
+import '../../settings/screens/settings_screen.dart';
+import '../../staff/screens/staff_management_screen.dart';
+import '../../patients/screens/patient_list_screen.dart';
+import '../../department/screens/department_management_screen.dart';
 import '../../admin/widgets/admin_shell.dart';
 import 'user_management_screen.dart';
 import 'shift_management_screen.dart';
@@ -20,6 +24,26 @@ class AdministrationScreen extends StatelessWidget {
       onNavItemSelected: (item) {
         if (item == AdminNavItem.dashboard) {
           Navigator.of(context).popUntil((route) => route.isFirst);
+          return;
+        }
+        if (item == AdminNavItem.staff) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const StaffManagementScreen()),
+          );
+          return;
+        }
+        if (item == AdminNavItem.patients) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const PatientListScreen()),
+          );
+          return;
+        }
+        if (item == AdminNavItem.operations) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const DepartmentManagementScreen(),
+            ),
+          );
           return;
         }
       },
@@ -81,15 +105,17 @@ class AdministrationContent extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.md),
                           _buildSettingCard(
-                            Icons.security_outlined,
-                            'Roles & Permissions',
-                            'Manage staff access levels and system permissions.',
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          _buildSettingCard(
-                            Icons.restore_outlined,
-                            'Backup & Restore',
-                            'Manage automated backups and data retention.',
+                            Icons.medical_information_outlined,
+                            'Doctor Management',
+                            'Manage Eye and Dental department static doctors for appointment booking.',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const DoctorManagementScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -102,9 +128,9 @@ class AdministrationContent extends StatelessWidget {
                           _buildSettingCard(
                             Icons.manage_accounts_outlined,
                             'Users',
-                            'Add, remove, or modify user accounts.',
+                            'Add, remove, or modify user accounts and roles.',
                             onTap: () {
-                              Navigator.of(context).pushReplacement(
+                              Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => const UserManagementScreen(),
                                 ),
@@ -126,29 +152,16 @@ class AdministrationContent extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.md),
                           _buildSettingCard(
-                            Icons.medical_information_outlined,
-                            'Doctor Management',
-                            'Manage Eye and Dental department static doctors for appointment booking.',
+                            Icons.settings_suggest_outlined,
+                            'Clinic Settings',
+                            'Configure clinic defaults, notification preferences, and system settings.',
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      const DoctorManagementScreen(),
+                                  builder: (_) => const SettingsScreen(),
                                 ),
                               );
                             },
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          _buildSettingCard(
-                            Icons.settings_suggest_outlined,
-                            'Clinic Settings',
-                            'Configure clinic details, locations, and defaults.',
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          _buildSettingCard(
-                            Icons.history_outlined,
-                            'Audit Logs',
-                            'Review system activity and security events.',
                           ),
                         ],
                       ),
@@ -186,23 +199,11 @@ class AdministrationContent extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     _buildSettingCard(
-                      Icons.security_outlined,
-                      'Roles & Permissions',
-                      'Manage staff access levels and system permissions.',
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _buildSettingCard(
-                      Icons.restore_outlined,
-                      'Backup & Restore',
-                      'Manage automated backups and data retention.',
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _buildSettingCard(
                       Icons.manage_accounts_outlined,
                       'Users',
-                      'Add, remove, or modify user accounts.',
+                      'Add, remove, or modify user accounts and roles.',
                       onTap: () {
-                        Navigator.of(context).pushReplacement(
+                        Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => const UserManagementScreen(),
                           ),
@@ -239,13 +240,14 @@ class AdministrationContent extends StatelessWidget {
                     _buildSettingCard(
                       Icons.settings_suggest_outlined,
                       'Clinic Settings',
-                      'Configure clinic details, locations, and defaults.',
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _buildSettingCard(
-                      Icons.history_outlined,
-                      'Audit Logs',
-                      'Review system activity and security events.',
+                      'Configure clinic defaults, notification preferences, and system settings.',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

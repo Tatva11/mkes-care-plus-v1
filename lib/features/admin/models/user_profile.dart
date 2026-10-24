@@ -148,15 +148,31 @@ class UserProfile {
     );
   }
 
-  bool get isMorningShift => assignedShift.toLowerCase() == 'morning';
-  bool get isAfternoonShift =>
-      assignedShift.toLowerCase() == 'afternoon' ||
-      assignedShift.toLowerCase() == 'evening' ||
-      assignedShift.toLowerCase() == 'night';
-  bool get isEveningShift => isAfternoonShift;
-  bool get isBothShifts => assignedShift.toLowerCase() == 'both';
+  /// Effective shift for today considering scheduled effective dates.
+  String get activeShift => getShiftForDate(DateTime.now());
 
-  /// Returns true if a future shift assignment is scheduled to take effect.
+  bool get isMorningShift => activeShift.toLowerCase() == 'morning';
+  bool get isAfternoonShift =>
+      activeShift.toLowerCase() == 'afternoon' ||
+      activeShift.toLowerCase() == 'evening' ||
+      activeShift.toLowerCase() == 'night';
+  bool get isEveningShift => isAfternoonShift;
+  bool get isBothShifts => activeShift.toLowerCase() == 'both';
+
+  /// Returns true only if a scheduled shift change genuinely exists in the future (after today).
+  bool isUpcomingShiftChange([DateTime? referenceDate]) {
+    if (nextShift == null || shiftEffectiveDate == null) return false;
+    final now = referenceDate ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final effOnly = DateTime(
+      shiftEffectiveDate!.year,
+      shiftEffectiveDate!.month,
+      shiftEffectiveDate!.day,
+    );
+    return effOnly.isAfter(today);
+  }
+
+  /// Returns true if a shift assignment record is scheduled on this profile.
   bool get hasScheduledShift => nextShift != null && shiftEffectiveDate != null;
 
   /// Returns the effective shift for a specific date (calendar date comparison).
@@ -193,9 +209,9 @@ class UserProfile {
     }
   }
 
-  /// Current working shift display name (or for a specific date).
+  /// Current working shift display name for today.
   String get shiftDisplayName =>
-      formatShiftLabel(assignedShift, includeSuffix: true);
+      formatShiftLabel(activeShift, includeSuffix: true);
 
   /// Scheduled future shift display name.
   String? get scheduledShiftDisplayName =>

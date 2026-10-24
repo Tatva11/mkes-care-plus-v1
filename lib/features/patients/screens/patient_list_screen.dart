@@ -54,9 +54,10 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
       builder: (_) => PatientFormDialog(initialDepartment: _department),
     );
     if (created != null && mounted) {
-      final targetDept = (created.department == 'eye' || created.department == 'dental')
-          ? created.department!
-          : _department;
+      final targetDept =
+          (created.department == 'eye' || created.department == 'dental')
+              ? created.department!
+              : _department;
       setState(() => _department = targetDept);
       ref.invalidate(patientSearchProvider);
       ref.invalidate(patientsByDepartmentProvider('eye'));
@@ -86,7 +87,9 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
               const SizedBox(height: AppSpacing.lg),
               _buildFilterAndSearch(isDesktop),
               const SizedBox(height: AppSpacing.md),
-              _buildPatientTable(patientsAsync),
+              isDesktop
+                  ? _buildPatientTable(patientsAsync)
+                  : _buildPatientCards(patientsAsync),
             ],
           ),
         );
@@ -303,6 +306,246 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
     );
   }
 
+  Widget _buildPatientCards(AsyncValue<List<PatientModel>> patientsAsync) {
+    return patientsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(AppSpacing.xl),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stackTrace) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          border: Border.all(color: AppColors.outlineVariant),
+        ),
+        child: Column(
+          children: [
+            Text('Unable to load patients: $error'),
+            const SizedBox(height: AppSpacing.xs),
+            TextButton(
+              onPressed: () => ref.invalidate(patientSearchProvider),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+      data: (patients) {
+        if (patients.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(color: AppColors.outlineVariant),
+            ),
+            child: Center(
+              child: Text(
+                _searchQuery.isNotEmpty
+                    ? 'No patients found matching "$_searchQuery".'
+                    : 'No patients in this department yet.',
+                style: AppTypography.bodyMd.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: patients.map((patient) {
+            final ageLabel = patient.dob == null
+                ? '—'
+                : '${DateTime.now().year - patient.dob!.year} yrs';
+            final visitDate = patient.visitDate == null
+                ? '—'
+                : DateFormat('MMM d, yyyy')
+                    .format(patient.visitDate!.toLocal());
+            final departmentLabel =
+                patient.department == 'eye' ? 'Eye' : 'Dental';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(color: AppColors.outlineVariant),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0A000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            PatientDetailsScreen(patientId: patient.id),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top row: ID badge, Department badge, Edit button, Chevron
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                    color: AppColors.outlineVariant
+                                        .withValues(alpha: 0.5)),
+                              ),
+                              child: Text(
+                                patient.patientNumber,
+                                style: AppTypography.dataMono.copyWith(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryContainer
+                                    .withValues(alpha: 0.1),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusSm),
+                              ),
+                              child: Text(
+                                departmentLabel,
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.primaryContainer,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              color: AppColors.primary,
+                              tooltip: 'Edit Patient',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () async {
+                                final updated = await showDialog<PatientModel>(
+                                  context: context,
+                                  builder: (_) =>
+                                      PatientFormDialog(patient: patient),
+                                );
+                                if (updated != null && mounted) {
+                                  ref.invalidate(patientSearchProvider);
+                                  ref.invalidate(
+                                      patientsByDepartmentProvider('eye'));
+                                  ref.invalidate(
+                                      patientsByDepartmentProvider('dental'));
+                                  ref.invalidate(patientsProvider);
+                                }
+                              },
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            const Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: AppColors.outline,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+
+                        // Patient Name
+                        Text(
+                          patient.name,
+                          style: AppTypography.headlineMd.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+
+                        // Age, Mobile, Last Visit
+                        Wrap(
+                          spacing: AppSpacing.md,
+                          runSpacing: 4,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.cake_outlined,
+                                    size: 13, color: AppColors.outline),
+                                const SizedBox(width: 4),
+                                Text(
+                                  ageLabel,
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (patient.mobile != null &&
+                                patient.mobile!.isNotEmpty)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.phone_outlined,
+                                      size: 13, color: AppColors.outline),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    patient.mobile!,
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.calendar_today_outlined,
+                                    size: 13, color: AppColors.outline),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Visit: $visitDate',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
   Widget _buildPatientTable(AsyncValue<List<PatientModel>> patientsAsync) {
     return Container(
       decoration: BoxDecoration(
@@ -379,7 +622,8 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
                       children: [
                         Text('Unable to load patients: $error'),
                         TextButton(
-                          onPressed: () => ref.invalidate(patientSearchProvider),
+                          onPressed: () =>
+                              ref.invalidate(patientSearchProvider),
                           child: const Text('Retry'),
                         ),
                       ],
@@ -399,7 +643,8 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
                             ),
                           ),
                         )
-                      : Column(children: patients.map(_buildPatientRow).toList()),
+                      : Column(
+                          children: patients.map(_buildPatientRow).toList()),
                 ),
               ),
             ],

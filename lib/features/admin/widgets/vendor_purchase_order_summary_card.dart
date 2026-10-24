@@ -89,39 +89,38 @@ class VendorPurchaseOrderSummaryCard extends ConsumerWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.xs,
+                  runSpacing: 4,
                   children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.xs),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryContainer
-                                  .withValues(alpha: 0.15),
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusSm),
-                            ),
-                            child: const Icon(
-                              Icons.storefront_outlined,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.xs),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryContainer
+                                .withValues(alpha: 0.15),
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusSm),
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'Vendors & Procurement',
-                              style: AppTypography.headlineMd,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          child: const Icon(
+                            Icons.storefront_outlined,
+                            color: AppColors.primary,
+                            size: 20,
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Flexible(
+                          child: Text(
+                            'Vendors & Procurement',
+                            style: AppTypography.headlineMd,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: AppSpacing.xs),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

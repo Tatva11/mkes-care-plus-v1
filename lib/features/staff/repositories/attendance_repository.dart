@@ -89,11 +89,11 @@ class ManualAttendanceSource implements AttendanceSource {
         'staff_id': staffId,
         'record_date': dateStr,
         'shift': normalizedShift,
-        'check_in_time': time.toIso8601String(),
+        'check_in_time': time.toUtc().toIso8601String(),
         'status': isLate ? 'late' : 'present',
         'is_late': isLate,
         'late_minutes': lateMinutes,
-        'updated_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
     } on PostgrestException catch (e) {
       if (e.code == '23505' ||
@@ -130,15 +130,17 @@ class ManualAttendanceSource implements AttendanceSource {
 
     if (active != null) {
       final checkInStr = active['check_in_time']?.toString();
-      final checkIn = checkInStr != null ? DateTime.tryParse(checkInStr) : null;
+      final checkIn = checkInStr != null ? DateTime.tryParse(checkInStr)?.toLocal() : null;
       if (checkIn != null) {
-        final workingHours =
-            (time.difference(checkIn).inMinutes / 60.0).clamp(0.0, 24.0);
+        final workingHours = double.parse(
+            (time.toLocal().difference(checkIn).inMinutes / 60.0)
+                .clamp(0.0, 24.0)
+                .toStringAsFixed(2));
 
         await _supabase.from('staff_attendance').update({
-          'check_out_time': time.toIso8601String(),
+          'check_out_time': time.toUtc().toIso8601String(),
           'working_hours': workingHours,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         }).eq('id', active['id']);
         return;
       }
@@ -210,6 +212,11 @@ class AttendanceRepository {
     DateTime date, {
     String? shift,
   }) async {
+    // Ensure any open overdue shifts are finalized so all views are synchronized
+    try {
+      await autoTerminateOverdueAttendance();
+    } catch (_) {}
+
     final dateKey = date.toIso8601String().split('T').first;
     var query = _supabase
         .from('staff_attendance')
@@ -293,18 +300,20 @@ class AttendanceRepository {
         try {
           await _supabase.rpc('auto_terminate_overdue_shifts');
         } catch (_) {
-          final endDateTime = config.getShiftEndDateTime(record.checkInTime!);
+          final endDateTime =
+              config.getShiftEndDateTime(record.checkInTime!.toLocal());
           final effectiveClose = now.isAfter(endDateTime) ? endDateTime : now;
-          final workingHours =
-              (effectiveClose.difference(record.checkInTime!).inMinutes / 60.0)
-                  .clamp(0.0, 24.0);
+          final workingHours = double.parse(
+              (effectiveClose.difference(record.checkInTime!.toLocal()).inMinutes / 60.0)
+                  .clamp(0.0, 24.0)
+                  .toStringAsFixed(2));
           await _supabase.from('staff_attendance').update({
-            'check_out_time': effectiveClose.toIso8601String(),
+            'check_out_time': effectiveClose.toUtc().toIso8601String(),
             'working_hours': workingHours,
             'notes': (record.notes == null || record.notes!.isEmpty)
                 ? 'Auto-clocked out at configured shift end time'
                 : '${record.notes} | Auto-clocked out at configured shift end time',
-            'updated_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
           }).eq('id', record.id);
         }
         final updatedResp = await _supabase
@@ -326,9 +335,75 @@ class AttendanceRepository {
   Future<int> autoTerminateOverdueAttendance() async {
     try {
       final res = await _supabase.rpc('auto_terminate_overdue_shifts');
-      return (res is int) ? res : int.tryParse(res?.toString() ?? '0') ?? 0;
+      final count =
+          (res is int) ? res : int.tryParse(res?.toString() ?? '0') ?? 0;
+      if (count > 0) return count;
     } catch (e) {
       debugPrint('autoTerminateOverdueAttendance RPC error: $e');
+    }
+
+    // Resilient fallback: query open attendance records and close if past shift end
+    try {
+      final configs = await fetchShiftConfigurations();
+      final now = DateTime.now();
+
+      final unclosedRecords = await _supabase
+          .from('staff_attendance')
+          .select()
+          .not('check_in_time', 'is', null)
+          .isFilter('check_out_time', null);
+
+      int closedCount = 0;
+      for (final raw in (unclosedRecords as List)) {
+        final rec = AttendanceRecord.fromJson(raw);
+        if (rec.status.toLowerCase() == 'leave' ||
+            rec.status.toLowerCase() == 'holiday' ||
+            rec.status.toLowerCase() == 'absent') {
+          continue;
+        }
+
+        final shiftName = (rec.shift.toLowerCase() == 'night' ||
+                rec.shift.toLowerCase() == 'evening')
+            ? 'afternoon'
+            : rec.shift.toLowerCase();
+        final config = configs.firstWhere(
+          (c) => c.shift.toLowerCase() == shiftName,
+          orElse: () => shiftName == 'morning'
+              ? ShiftConfiguration.defaultMorning
+              : ShiftConfiguration.defaultAfternoon,
+        );
+
+        if (rec.checkInTime != null && config.isTimePastShiftEnd(now)) {
+          final endDateTime =
+              config.getShiftEndDateTime(rec.checkInTime!.toLocal());
+          final effectiveClose = now.isAfter(endDateTime) ? endDateTime : now;
+          final workingHours = double.parse(
+              (effectiveClose.difference(rec.checkInTime!.toLocal()).inMinutes / 60.0)
+                  .clamp(0.0, 24.0)
+                  .toStringAsFixed(2));
+
+          await _supabase
+              .from('staff_attendance')
+              .update({
+                'check_out_time': effectiveClose.toUtc().toIso8601String(),
+                'working_hours': workingHours,
+                'notes': (rec.notes == null || rec.notes!.isEmpty)
+                    ? 'Auto-clocked out at configured shift end time'
+                    : (rec.notes!.contains('Auto-clocked out')
+                        ? rec.notes
+                        : '${rec.notes} | Auto-clocked out at configured shift end time'),
+                'updated_at': DateTime.now().toUtc().toIso8601String(),
+              })
+              .eq('id', rec.id)
+              .isFilter('check_out_time', null);
+
+          closedCount++;
+        }
+      }
+      return closedCount;
+    } catch (fallbackError) {
+      debugPrint(
+          'autoTerminateOverdueAttendance fallback error: $fallbackError');
       return 0;
     }
   }
@@ -374,22 +449,43 @@ class AttendanceRepository {
       final record = AttendanceRecord.fromJson(response);
 
       // If active session has passed scheduled shift end time, auto-close at shift end
+      ShiftConfiguration? activeConfig = config;
+      if (activeConfig == null) {
+        try {
+          final configs = await fetchShiftConfigurations();
+          final norm = (record.shift.toLowerCase() == 'night' ||
+                  record.shift.toLowerCase() == 'evening')
+              ? 'afternoon'
+              : record.shift.toLowerCase();
+          activeConfig = configs.firstWhere(
+            (c) => c.shift.toLowerCase() == norm,
+            orElse: () => norm == 'morning'
+                ? ShiftConfiguration.defaultMorning
+                : ShiftConfiguration.defaultAfternoon,
+          );
+        } catch (_) {}
+      }
+
       if (record.checkInTime != null &&
-          config != null &&
-          config.isTimePastShiftEnd(checkTime)) {
-        final endDateTime = config.getShiftEndDateTime(record.checkInTime!);
+          activeConfig != null &&
+          activeConfig.isTimePastShiftEnd(checkTime)) {
+        final endDateTime =
+            activeConfig.getShiftEndDateTime(record.checkInTime!.toLocal());
         final effectiveClose =
             checkTime.isAfter(endDateTime) ? endDateTime : checkTime;
-        final workingHours =
-            (effectiveClose.difference(record.checkInTime!).inMinutes / 60.0)
-                .clamp(0.0, 24.0);
+        final workingHours = double.parse(
+            (effectiveClose.difference(record.checkInTime!.toLocal()).inMinutes / 60.0)
+                .clamp(0.0, 24.0)
+                .toStringAsFixed(2));
         await _supabase.from('staff_attendance').update({
-          'check_out_time': effectiveClose.toIso8601String(),
+          'check_out_time': effectiveClose.toUtc().toIso8601String(),
           'working_hours': workingHours,
           'notes': (record.notes == null || record.notes!.isEmpty)
               ? 'Auto-clocked out at configured shift end time'
-              : '${record.notes} | Auto-clocked out at configured shift end time',
-          'updated_at': DateTime.now().toIso8601String(),
+              : (record.notes!.contains('Auto-clocked out')
+                  ? record.notes
+                  : '${record.notes} | Auto-clocked out at configured shift end time'),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         }).eq('id', record.id);
         return null;
       }

@@ -111,6 +111,38 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Staff Management',
+                  style: AppTypography.headlineMd.copyWith(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _AddStaffButton(isDesktop: false),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Track attendance and manage your clinical team.',
+            style: AppTypography.bodyLg,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const StaffNavButtonsRow(),
+        ],
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -120,16 +152,11 @@ class _PageHeader extends StatelessWidget {
             children: [
               Text(
                 'Staff Management',
-                style: isDesktop
-                    ? AppTypography.headlineMd.copyWith(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.01 * 32,
-                      )
-                    : AppTypography.headlineMd.copyWith(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
+                style: AppTypography.headlineMd.copyWith(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.01 * 32,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -144,40 +171,37 @@ class _PageHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Row(
-              children: [
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const AdminLeaveScreen())),
-                  child: const Text('Leave'),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const AdminTaskScreen())),
-                  child: const Text('Tasks'),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const AdminPerformanceScreen())),
-                  child: const Text('Performance'),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const ShiftManagementScreen())),
-                  child: const Text('Shifts'),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                _AddStaffButton(isDesktop: isDesktop),
-              ],
-            )
-          ],
-        )
+        Flexible(
+          child: Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const AdminLeaveScreen())),
+                child: const Text('Leave'),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const AdminTaskScreen())),
+                child: const Text('Tasks'),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const AdminPerformanceScreen())),
+                child: const Text('Performance'),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const ShiftManagementScreen())),
+                child: const Text('Shifts'),
+              ),
+              _AddStaffButton(isDesktop: isDesktop),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -233,8 +257,8 @@ class _StatRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final usersState = ref.watch(usersProvider);
     final users = (usersState.valueOrNull ?? const [])
-      .where((user) => user.role == 'staff')
-      .toList();
+        .where((user) => user.role == 'staff')
+        .toList();
     final inactiveCount = users.where((user) => !user.isActive).length;
 
     final today = DateTime.now();
@@ -327,6 +351,76 @@ class _MobileLayout extends StatelessWidget {
         StaffCopilotInsightsCard(),
         SizedBox(height: AppSpacing.md),
         StaffRosterCard(),
+      ],
+    );
+  }
+}
+
+class StaffNavButtonsRow extends StatelessWidget {
+  const StaffNavButtonsRow({super.key});
+
+  Widget _buildButton({
+    required BuildContext context,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          minimumSize: const Size(0, 36),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _buildButton(
+          context: context,
+          label: 'Leave',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AdminLeaveScreen()),
+          ),
+        ),
+        const SizedBox(width: 6),
+        _buildButton(
+          context: context,
+          label: 'Tasks',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AdminTaskScreen()),
+          ),
+        ),
+        const SizedBox(width: 6),
+        _buildButton(
+          context: context,
+          label: 'Performance',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AdminPerformanceScreen()),
+          ),
+        ),
+        const SizedBox(width: 6),
+        _buildButton(
+          context: context,
+          label: 'Shifts',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ShiftManagementScreen()),
+          ),
+        ),
       ],
     );
   }

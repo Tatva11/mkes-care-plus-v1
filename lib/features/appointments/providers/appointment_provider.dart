@@ -4,70 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/appointment_model.dart';
 import '../repositories/appointment_repository.dart';
 
-/// Fallback appointments matching the initial clinical schedule data.
-final List<AppointmentModel> initialFallbackAppointments = [
-  AppointmentModel(
-    id: 'APT-101',
-    appointmentTime: '09:00:00',
-    appointmentDate: DateTime.now(),
-    patientName: 'Sarah Jenkins',
-    patientNumber: 'E1',
-    department: 'eye',
-    appointmentType: 'regular',
-    room: 'Room 102',
-    status: 'confirmed',
-    createdAt: DateTime.now(),
-    updatedAt: DateTime.now(),
-  ),
-  AppointmentModel(
-    id: 'APT-102',
-    appointmentTime: '10:30:00',
-    appointmentDate: DateTime.now(),
-    patientName: 'Michael Chen',
-    patientNumber: 'E2',
-    department: 'eye',
-    appointmentType: 'regular',
-    room: 'Specialist Suite B',
-    status: 'waiting',
-    isVisitingDoctor: true,
-    doctorName: 'Dr. Robert Sterling',
-    specialty: 'Visiting Retina Specialist',
-    previousVisitSummary: 'Consulted May 04, 2026 for diabetic eye screening',
-    previousTreatment: 'Dilated Macular Exam & 3D Topography',
-    currentDiagnosis: 'Mild central macular edema flag; IOP 17 mmHg',
-    plannedTreatment: 'High-definition OCT scan & Anti-VEGF evaluation',
-    doctorNotes:
-        'Patient reports mild central blurring. Please review macular thickness scan before consultation.',
-    createdAt: DateTime.now(),
-    updatedAt: DateTime.now(),
-  ),
-  AppointmentModel(
-    id: 'APT-103',
-    appointmentTime: '13:15:00',
-    appointmentDate: DateTime.now(),
-    patientName: 'Elena Rodriguez',
-    patientNumber: 'E3',
-    department: 'eye',
-    appointmentType: 'follow_up',
-    room: 'Room 204',
-    status: 'scheduled',
-    createdAt: DateTime.now(),
-    updatedAt: DateTime.now(),
-  ),
-  AppointmentModel(
-    id: 'APT-104',
-    appointmentTime: '14:30:00',
-    appointmentDate: DateTime.now(),
-    patientName: 'James Wilson',
-    patientNumber: 'D1',
-    department: 'eye',
-    appointmentType: 'regular',
-    room: 'Room 105',
-    status: 'scheduled',
-    createdAt: DateTime.now(),
-    updatedAt: DateTime.now(),
-  ),
-];
 
 final appointmentsNotifierProvider = StateNotifierProvider<AppointmentsNotifier,
     AsyncValue<List<AppointmentModel>>>((ref) {
@@ -85,40 +21,43 @@ final appointmentStaffCandidatesProvider =
 class AppointmentsNotifier
     extends StateNotifier<AsyncValue<List<AppointmentModel>>> {
   final AppointmentRepository _repository;
+  DateTime _currentDate;
 
-  AppointmentsNotifier(this._repository) : super(const AsyncValue.loading()) {
+  AppointmentsNotifier(this._repository)
+      : _currentDate = DateTime.now(),
+        super(const AsyncValue.loading()) {
     loadTodayAppointments();
   }
 
+  DateTime get currentDate => _currentDate;
+
   Future<void> loadTodayAppointments(
       {String? doctorId, String? department}) async {
+    await loadAppointmentsForDate(DateTime.now(),
+        doctorId: doctorId, department: department);
+  }
+
+  Future<void> loadAppointmentsForDate(DateTime date,
+      {String? doctorId, String? department}) async {
+    _currentDate = date;
+    state = const AsyncValue.loading();
     try {
-      final items = await _repository.fetchTodayAppointments(
+      final items = await _repository.fetchAppointments(
+        date: date,
         doctorId: doctorId,
         department: department,
       );
 
-      // If backend returns data, use it; otherwise fallback to preserve initial schedule UI.
-      if (items.isNotEmpty) {
-        items.sort(AppointmentModel.compareAppointments);
-        state = AsyncValue.data(items);
-      } else {
-        final fallback =
-            List<AppointmentModel>.from(initialFallbackAppointments)
-              ..sort(AppointmentModel.compareAppointments);
-        state = AsyncValue.data(fallback);
-      }
-    } catch (e) {
+      items.sort(AppointmentModel.compareAppointments);
+      state = AsyncValue.data(items);
+    } catch (e, st) {
       debugPrint('Error loading appointments from Supabase: $e');
-      // If error or network offline, provide fallback gracefully
-      final fallback = List<AppointmentModel>.from(initialFallbackAppointments)
-        ..sort(AppointmentModel.compareAppointments);
-      state = AsyncValue.data(fallback);
+      state = AsyncValue.error(e, st);
     }
   }
 
   Future<void> updateStatus(String appointmentId, String newStatus) async {
-    final currentList = state.value ?? initialFallbackAppointments;
+    final currentList = state.value ?? [];
 
     // Optimistic UI update
     final updatedList = currentList.map((item) {

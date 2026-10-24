@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
+import '../../../shared/widgets/responsive_form_row.dart';
 import '../../appointments/models/appointment_model.dart';
 import '../../appointments/repositories/appointment_repository.dart';
 import '../../patients/models/patient_model.dart';
@@ -244,6 +246,12 @@ class _DentalTreatmentFormDialogState
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.initialRecord != null;
+    final dialogConstraints = AdaptiveDialogShell.constraintsFor(
+      context,
+      maxMobileWidth: double.infinity,
+      maxTabletWidth: 540.0,
+      maxDesktopWidth: 640.0,
+    );
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -254,7 +262,10 @@ class _DentalTreatmentFormDialogState
         vertical: AppSpacing.lg,
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
+        constraints: BoxConstraints(
+          maxWidth: dialogConstraints.maxWidth,
+          maxHeight: dialogConstraints.maxHeight,
+        ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Form(
@@ -289,8 +300,9 @@ class _DentalTreatmentFormDialogState
                                 : 'Record Dental Clinical Treatment',
                             style: AppTypography.headlineMd.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 20,
+                              fontSize: 18,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -298,6 +310,7 @@ class _DentalTreatmentFormDialogState
                             style: AppTypography.bodySm.copyWith(
                               color: AppColors.onSurfaceVariant,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -339,42 +352,38 @@ class _DentalTreatmentFormDialogState
                 ],
 
                 // Date & Time
-                Row(
+                ResponsiveFormRow(
+                  breakpoint: 480,
                   children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: _selectDate,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Treatment Date *',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today_outlined),
-                          ),
-                          child: Text(
-                            DateFormat('dd MMM yyyy').format(_treatmentDate),
-                            style: AppTypography.bodyMd,
-                          ),
+                    InkWell(
+                      onTap: _selectDate,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Treatment Date *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_today_outlined),
+                        ),
+                        child: Text(
+                          DateFormat('dd MMM yyyy').format(_treatmentDate),
+                          style: AppTypography.bodyMd,
                         ),
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: InkWell(
-                        onTap: _selectTime,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Treatment Time',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.access_time_outlined),
-                          ),
-                          child: Text(
-                            _treatmentTime != null
-                                ? _treatmentTime!.format(context)
-                                : 'Select Time',
-                            style: AppTypography.bodyMd,
-                          ),
+                    InkWell(
+                      onTap: _selectTime,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Treatment Time',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.access_time_outlined),
+                        ),
+                        child: Text(
+                          _treatmentTime != null
+                              ? _treatmentTime!.format(context)
+                              : 'Select Time',
+                          style: AppTypography.bodyMd,
                         ),
                       ),
                     ),
@@ -406,50 +415,46 @@ class _DentalTreatmentFormDialogState
                 const SizedBox(height: AppSpacing.md),
 
                 // Tooth Number / Quadrant and Procedure Status row
-                Row(
+                ResponsiveFormRow(
+                  breakpoint: 480,
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _toothNumberController,
-                        decoration: const InputDecoration(
-                          labelText: 'Tooth No. / Quadrant',
-                          border: OutlineInputBorder(),
-                          hintText: 'e.g. 16, 21, UR4, Upper Right',
-                          prefixIcon: Icon(Icons.tag_outlined),
-                        ),
+                    TextFormField(
+                      controller: _toothNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tooth No. / Quadrant',
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g. 16, 21, UR4, Upper Right',
+                        prefixIcon: Icon(Icons.tag_outlined),
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _procedureStatus,
-                        decoration: const InputDecoration(
-                          labelText: 'Procedure Status *',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.task_alt_outlined),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'completed',
-                            child: Text('Completed'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'in_progress',
-                            child: Text('In Progress'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'planned',
-                            child: Text('Planned'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'cancelled',
-                            child: Text('Cancelled'),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) setState(() => _procedureStatus = val);
-                        },
+                    DropdownButtonFormField<String>(
+                      initialValue: _procedureStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Procedure Status *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.task_alt_outlined),
                       ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'completed',
+                          child: Text('Completed'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'in_progress',
+                          child: Text('In Progress'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'planned',
+                          child: Text('Planned'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'cancelled',
+                          child: Text('Cancelled'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _procedureStatus = val);
+                      },
                     ),
                   ],
                 ),
@@ -600,14 +605,16 @@ class _DentalTreatmentFormDialogState
                 const SizedBox(height: AppSpacing.lg),
 
                 // Actions
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     TextButton(
                       onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
                       child: const Text('Cancel'),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
                     FilledButton.icon(
                       onPressed: _isSaving ? null : _save,
                       icon: _isSaving

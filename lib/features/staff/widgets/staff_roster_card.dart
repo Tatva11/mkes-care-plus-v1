@@ -161,7 +161,7 @@ class _StaffRosterCardState extends ConsumerState<StaffRosterCard> {
                   ),
                 ),
                 Text(
-                  'Status / Contact',
+                  'Status / Check-in',
                   style: AppTypography.labelCaps.copyWith(
                     color: AppColors.onSurfaceVariant,
                     fontWeight: FontWeight.w500,

@@ -31,7 +31,8 @@ class CreateInvoiceScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<CreateInvoiceScreen> createState() => _CreateInvoiceScreenState();
+  ConsumerState<CreateInvoiceScreen> createState() =>
+      _CreateInvoiceScreenState();
 }
 
 class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
@@ -175,7 +176,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     // 1. Patient validation
     if (_selectedPatient == null) {
       setState(() {
-        _validationError = 'Please search and select a patient for this invoice.';
+        _validationError =
+            'Please search and select a patient for this invoice.';
       });
       return;
     }
@@ -199,13 +201,15 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       }
       if (item.quantity <= 0) {
         setState(() {
-          _validationError = 'Quantity for "${item.serviceName}" must be at least 1.';
+          _validationError =
+              'Quantity for "${item.serviceName}" must be at least 1.';
         });
         return;
       }
       if (item.unitPrice < 0) {
         setState(() {
-          _validationError = 'Price for "${item.serviceName}" cannot be negative.';
+          _validationError =
+              'Price for "${item.serviceName}" cannot be negative.';
         });
         return;
       }
@@ -266,10 +270,10 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         // If previous balance was included, consolidate previous invoices atomically
         if (_includePreviousBalance && _outstandingInvoices.isNotEmpty) {
           await ref.read(billingRepositoryProvider).consolidateInvoices(
-            previousInvoices: _outstandingInvoices,
-            newInvoiceNumber: createdInvoice.invoiceNumber,
-            newInvoiceId: createdInvoice.id,
-          );
+                previousInvoices: _outstandingInvoices,
+                newInvoiceNumber: createdInvoice.invoiceNumber,
+                newInvoiceId: createdInvoice.id,
+              );
           ref.invalidate(billingInvoicesProvider);
         }
 
@@ -361,45 +365,91 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Department selector card
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLowest,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    border: Border.all(color: AppColors.outlineVariant),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Department:',
-                        style: AppTypography.bodyMd.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.onSurface,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 560;
+
+                    final segmentedButton = SegmentedButton<String>(
+                      segments: [
+                        ButtonSegment(
+                          value: 'eye',
+                          label: isNarrow
+                              ? const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text('Eye (Opthalmology)'),
+                                )
+                              : const Text('Eye Department (Opthalmology)'),
+                          icon: const Icon(Icons.visibility_outlined, size: 18),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: SegmentedButton<String>(
-                          segments: const [
-                            ButtonSegment(
-                              value: 'eye',
-                              label: Text('Eye Department (Opthalmology)'),
-                              icon: Icon(Icons.visibility_outlined, size: 18),
+                        ButtonSegment(
+                          value: 'dental',
+                          label: isNarrow
+                              ? const FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text('Dental'),
+                                )
+                              : const Text('Dental Department'),
+                          icon: const Icon(Icons.medical_services_outlined,
+                              size: 18),
+                        ),
+                      ],
+                      selected: {_department},
+                      onSelectionChanged: (selection) {
+                        _onDepartmentChanged(selection.first);
+                      },
+                    );
+
+                    if (isNarrow) {
+                      return Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLowest,
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusMd),
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Department:',
+                              style: AppTypography.bodyMd.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.onSurface,
+                              ),
                             ),
-                            ButtonSegment(
-                              value: 'dental',
-                              label: Text('Dental Department'),
-                              icon: Icon(Icons.medical_services_outlined, size: 18),
-                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            segmentedButton,
                           ],
-                          selected: {_department},
-                          onSelectionChanged: (selection) {
-                            _onDepartmentChanged(selection.first);
-                          },
                         ),
+                      );
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLowest,
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusMd),
+                        border: Border.all(color: AppColors.outlineVariant),
                       ),
-                    ],
-                  ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Department:',
+                            style: AppTypography.bodyMd.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: segmentedButton,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.md),
 
@@ -419,7 +469,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                     setState(() {
                       _selectedPatient = p;
                       if (p?.department != null &&
-                          (p!.department == 'eye' || p.department == 'dental')) {
+                          (p!.department == 'eye' ||
+                              p.department == 'dental')) {
                         _department = p.department!;
                       }
                       _includePreviousBalance = false;
@@ -475,7 +526,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                   maxLines: 2,
                   decoration: const InputDecoration(
                     labelText: 'Notes / Remarks (Optional)',
-                    hintText: 'e.g. Referred by Dr. Smith, special instructions...',
+                    hintText:
+                        'e.g. Referred by Dr. Smith, special instructions...',
                     prefixIcon: Icon(Icons.notes_outlined),
                   ),
                 ),
@@ -492,7 +544,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: AppColors.error, size: 20),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Text(
@@ -510,43 +563,102 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                 ],
 
                 // Action Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(
-                      onPressed: createInvoiceState.isLoading
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    FilledButton.icon(
-                      onPressed: createInvoiceState.isLoading ? null : _submitInvoice,
-                      icon: createInvoiceState.isLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                LayoutBuilder(
+                  builder: (context, actionConstraints) {
+                    final isNarrow = actionConstraints.maxWidth < 480;
+
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: createInvoiceState.isLoading
+                                ? null
+                                : _submitInvoice,
+                            icon: createInvoiceState.isLoading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.receipt_outlined, size: 18),
+                            label: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                createInvoiceState.isLoading
+                                    ? 'Creating Invoice...'
+                                    : 'Create Invoice (₹${_finalTotal.toStringAsFixed(2)})',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
                               ),
-                            )
-                          : const Icon(Icons.receipt_outlined, size: 18),
-                      label: Text(
-                        createInvoiceState.isLoading
-                            ? 'Creating Invoice...'
-                            : 'Create Invoice (₹${_finalTotal.toStringAsFixed(2)})',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                      ),
-                    ),
-                  ],
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          OutlinedButton(
+                            onPressed: createInvoiceState.isLoading
+                                ? null
+                                : () => Navigator.of(context).pop(),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 14),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: createInvoiceState.isLoading
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 14),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        FilledButton.icon(
+                          onPressed: createInvoiceState.isLoading
+                              ? null
+                              : _submitInvoice,
+                          icon: createInvoiceState.isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.receipt_outlined, size: 18),
+                          label: Text(
+                            createInvoiceState.isLoading
+                                ? 'Creating Invoice...'
+                                : 'Create Invoice (₹${_finalTotal.toStringAsFixed(2)})',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 28, vertical: 14),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.xl),
               ],
@@ -608,10 +720,13 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
                 Icons.account_balance_wallet_outlined,
-                color: _includePreviousBalance ? AppColors.primary : const Color(0xFFB25E00),
+                color: _includePreviousBalance
+                    ? AppColors.primary
+                    : const Color(0xFFB25E00),
                 size: 22,
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -635,11 +750,15 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                   ],
                 ),
               ),
-              Text(
-                '₹${_outstandingBalance.toStringAsFixed(2)}',
-                style: AppTypography.bodyLg.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.error,
+              const SizedBox(width: AppSpacing.xs),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '₹${_outstandingBalance.toStringAsFixed(2)}',
+                  style: AppTypography.bodyLg.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.error,
+                  ),
                 ),
               ),
             ],
@@ -651,19 +770,24 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
             children: _outstandingInvoices.map((inv) {
               return Chip(
                 padding: EdgeInsets.zero,
-                labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                labelPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                 backgroundColor: AppColors.surfaceContainerLow,
                 side: const BorderSide(color: AppColors.outlineVariant),
                 label: Text(
                   '${inv.invoiceNumber}: due ₹${inv.remainingAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w500),
                 ),
               );
             }).toList(),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
             children: [
               if (!_includePreviousBalance)
                 FilledButton.icon(
@@ -683,7 +807,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                 const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.check_circle, color: AppColors.primary, size: 16),
+                    Icon(Icons.check_circle,
+                        color: AppColors.primary, size: 16),
                     SizedBox(width: 4),
                     Text(
                       'Added to Invoice',
@@ -695,7 +820,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(width: AppSpacing.md),
                 OutlinedButton.icon(
                   onPressed: () {
                     setState(() {

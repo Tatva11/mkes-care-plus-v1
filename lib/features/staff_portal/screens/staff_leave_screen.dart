@@ -124,58 +124,79 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: _startDate ?? DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate:
-                                  DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (date != null) {
-                              setState(() {
-                                _startDate = date;
-                                if (_endDate != null && _endDate!.isBefore(date)) {
-                                  _endDate = date;
-                                }
-                              });
-                            }
-                          },
-                          icon: const Icon(Icons.calendar_today),
-                          label: Text(
-                            _startDate != null
-                                ? DateFormat('MMM d, yyyy').format(_startDate!)
-                                : 'Start Date',
-                          ),
+                  LayoutBuilder(
+                    builder: (context, dateConstraints) {
+                      final isNarrow = dateConstraints.maxWidth < 340;
+                      final startBtn = OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: _startDate ?? DateTime.now(),
+                            firstDate: DateTime.now(),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date != null) {
+                            setState(() {
+                              _startDate = date;
+                              if (_endDate != null && _endDate!.isBefore(date)) {
+                                _endDate = date;
+                              }
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.calendar_today, size: 16),
+                        label: Text(
+                          _startDate != null
+                              ? DateFormat('MMM d, yyyy').format(_startDate!)
+                              : 'Start Date',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final initial = _endDate ?? _startDate ?? DateTime.now();
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: initial,
-                              firstDate: _startDate ?? DateTime.now(),
-                              lastDate:
-                                  DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (date != null) setState(() => _endDate = date);
-                          },
-                          icon: const Icon(Icons.calendar_today),
-                          label: Text(
-                            _endDate != null
-                                ? DateFormat('MMM d, yyyy').format(_endDate!)
-                                : 'End Date',
-                          ),
+                      );
+
+                      final endBtn = OutlinedButton.icon(
+                        onPressed: () async {
+                          final initial =
+                              _endDate ?? _startDate ?? DateTime.now();
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: initial,
+                            firstDate: _startDate ?? DateTime.now(),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date != null) setState(() => _endDate = date);
+                        },
+                        icon: const Icon(Icons.calendar_today, size: 16),
+                        label: Text(
+                          _endDate != null
+                              ? DateFormat('MMM d, yyyy').format(_endDate!)
+                              : 'End Date',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            startBtn,
+                            const SizedBox(height: AppSpacing.xs),
+                            endBtn,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: startBtn),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(child: endBtn),
+                        ],
+                      );
+                    },
                   ),
 
                   const SizedBox(height: AppSpacing.md),
@@ -214,34 +235,62 @@ class _StaffLeaveScreenState extends ConsumerState<StaffLeaveScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.event_note,
-                                  size: 16, color: AppColors.primaryContainer),
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Icon(Icons.event_note,
+                                    size: 16, color: AppColors.primaryContainer),
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
-                                child: Text(
-                                  '${workingDays.toStringAsFixed(workingDays.truncateToDouble() == workingDays ? 0 : 1)} working day(s) requested (${_dutyPeriod == 'full_day' ? 'Full Day' : _dutyPeriod == 'morning' ? 'Morning Only' : 'Evening Only'}, Sundays excluded)',
-                                  style: AppTypography.bodySm.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primaryContainer,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${workingDays.toStringAsFixed(workingDays.truncateToDouble() == workingDays ? 0 : 1)} working day(s) requested',
+                                      style: AppTypography.bodySm.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primaryContainer,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _dutyPeriod == 'morning'
+                                          ? 'Morning only'
+                                          : _dutyPeriod == 'afternoon'
+                                              ? 'Evening only'
+                                              : 'Full day',
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: AppColors.onSurfaceVariant,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                           if (estimatedDeduction > 0) ...[
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.payments_outlined,
-                                    size: 16, color: AppColors.error),
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 2),
+                                  child: Icon(Icons.payments_outlined,
+                                      size: 16, color: AppColors.error),
+                                ),
                                 const SizedBox(width: 6),
-                                Text(
-                                  'Est. salary deduction if unpaid: ₹${estimatedDeduction.toStringAsFixed(2)} (@ ₹${dailyRate.toStringAsFixed(2)}/day)',
-                                  style: AppTypography.bodySm.copyWith(
-                                    color: AppColors.error,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
+                                Expanded(
+                                  child: Text(
+                                    'Est. salary deduction if unpaid: ₹${estimatedDeduction.toStringAsFixed(2)} (@ ₹${dailyRate.toStringAsFixed(2)}/day)',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.error,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],

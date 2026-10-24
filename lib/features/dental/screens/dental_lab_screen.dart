@@ -47,20 +47,26 @@ class _DentalLabContentState extends ConsumerState<DentalLabContent> {
     super.dispose();
   }
 
-  void _openCreateDialog() {
-    showDialog(
+  void _openCreateDialog() async {
+    final result = await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const DentalLabFormDialog(),
     );
+    if (result != null && mounted) {
+      await ref.read(dentalLabListProvider.notifier).refresh();
+    }
   }
 
-  void _openEditDialog(DentalLabModel item) {
-    showDialog(
+  void _openEditDialog(DentalLabModel item) async {
+    final result = await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => DentalLabFormDialog(initialCase: item),
     );
+    if (result != null && mounted) {
+      await ref.read(dentalLabListProvider.notifier).refresh();
+    }
   }
 
   Future<void> _editLinkedAppointment(DentalLabModel item) async {
@@ -598,6 +604,10 @@ class _DentalLabCaseRow extends StatelessWidget {
     final readyStr = item.readyDate != null ? dateFormat.format(item.readyDate!) : '-';
     final deliveredStr = item.deliveredDate != null ? dateFormat.format(item.deliveredDate!) : '-';
 
+    if (!isDesktop) {
+      return _buildMobileCard(context, sentStr, readyStr, deliveredStr);
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       child: Row(
@@ -832,6 +842,324 @@ class _DentalLabCaseRow extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileCard(
+    BuildContext context,
+    String sentStr,
+    String readyStr,
+    String deliveredStr,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Row: Status indicator strip, Case Number, Case Type, Status badge, and menu
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 4,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _getStatusFg(),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            item.caseNumber,
+                            style: AppTypography.dataMono.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                              fontSize: 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusBg(),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            item.statusLabel.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: _getStatusFg(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.caseType,
+                      style: AppTypography.bodySm.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(
+                  Icons.more_vert,
+                  size: 20,
+                  color: AppColors.onSurfaceVariant,
+                ),
+                onSelected: (val) {
+                  if (val == 'edit') onEdit();
+                  if (val == 'edit_appointment') onEditAppointment();
+                  if (val == 'whatsapp') onWhatsApp();
+                  if (val == 'delete') onDelete();
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 16),
+                        SizedBox(width: 8),
+                        Text('Edit Case'),
+                      ],
+                    ),
+                  ),
+                  if (item.appointmentId != null)
+                    const PopupMenuItem(
+                      value: 'edit_appointment',
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_month_outlined, size: 16),
+                          SizedBox(width: 8),
+                          Text('Edit Linked Appointment'),
+                        ],
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'whatsapp',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.message_outlined,
+                          size: 16,
+                          color: Color(0xFF25D366),
+                        ),
+                        SizedBox(width: 8),
+                        Text('WhatsApp Notice'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                        SizedBox(width: 8),
+                        Text('Delete Case', style: TextStyle(color: AppColors.error)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+
+          // Patient Info & Notes
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.person_outline,
+                      size: 14,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        item.patientName ?? 'Unknown Patient',
+                        style: AppTypography.bodySm.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'ID: ${item.patientNumber ?? "-"} • Mobile: ${item.patientMobile ?? "None"}',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (item.remarks != null && item.remarks!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Notes: ${item.remarks!}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 4),
+                // Dates wrap
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      'Sent: $sentStr',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                    if (item.readyDate != null)
+                      Text(
+                        'Ready: $readyStr',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    if (item.appointmentDate != null)
+                      Text(
+                        'Appt: ${item.formattedAppointmentDateTime ?? item.formattedAppointmentDate ?? '-'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    if (item.deliveredDate != null)
+                      Text(
+                        'Delivered: $deliveredStr',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Action Buttons
+          if (item.isProcessing || item.isReady || item.isDelivered) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (item.isProcessing)
+                    OutlinedButton.icon(
+                      onPressed: () => onTransitionStatus('ready'),
+                      icon: const Icon(Icons.verified_outlined, size: 14),
+                      label: const Text('Mark Ready'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.secondary,
+                        side: const BorderSide(color: AppColors.secondary),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  if (item.isReady) ...[
+                    IconButton(
+                      icon: const Icon(
+                        Icons.message,
+                        color: Color(0xFF25D366),
+                        size: 20,
+                      ),
+                      tooltip: 'Patient WhatsApp Notice',
+                      onPressed: onWhatsApp,
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => onTransitionStatus('delivered'),
+                      icon: const Icon(Icons.check_circle_outline, size: 14),
+                      label: const Text('Mark Delivered'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.green.shade700,
+                        side: BorderSide(color: Colors.green.shade700),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
+                  if (item.isDelivered)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: Colors.green.shade700,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Completed',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -59,7 +59,8 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
     if (widget.payment == null && widget.finalTotal > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _amountPaid = widget.finalTotal;
-        _amountPaidController.text = _amountPaid > 0 ? _amountPaid.toStringAsFixed(0) : '';
+        _amountPaidController.text =
+            _amountPaid > 0 ? _amountPaid.toStringAsFixed(0) : '';
         _notifyPaymentChanged();
       });
     }
@@ -110,7 +111,8 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
 
   @override
   Widget build(BuildContext context) {
-    final remaining = (widget.finalTotal - _amountPaid).clamp(0.0, double.infinity);
+    final remaining =
+        (widget.finalTotal - _amountPaid).clamp(0.0, double.infinity);
     final isPaid = _amountPaid >= widget.finalTotal && widget.finalTotal > 0;
 
     return Container(
@@ -127,13 +129,17 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Financial Summary & Payment',
-                style: AppTypography.bodyMd.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
+              Expanded(
+                child: Text(
+                  'Financial Summary & Payment',
+                  style: AppTypography.bodyMd.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: AppSpacing.sm),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -154,25 +160,33 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
 
           if (widget.previousBalanceIncluded > 0) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               margin: const EdgeInsets.only(bottom: AppSpacing.md),
               decoration: BoxDecoration(
                 color: Colors.amber.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                 border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: AppSpacing.xs,
+                runSpacing: 4,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.history_toggle_off, size: 16, color: Colors.amber),
+                      const Icon(Icons.history_toggle_off,
+                          size: 16, color: Colors.amber),
                       const SizedBox(width: 8),
-                      Text(
-                        'Previous Outstanding Balance Included',
-                        style: AppTypography.bodySm.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.amber.shade900,
+                      Flexible(
+                        child: Text(
+                          'Previous Outstanding Balance Included',
+                          style: AppTypography.bodySm.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.amber.shade900,
+                          ),
                         ),
                       ),
                     ],
@@ -190,55 +204,94 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
           ],
 
           // Subtotal, Discount, Final Total
-          Row(
-            children: [
-              Expanded(
-                child: _SummaryBox(
-                  label: widget.previousBalanceIncluded > 0 ? 'Combined Subtotal' : 'Subtotal',
-                  amount: '₹${widget.subtotal.toStringAsFixed(2)}',
-                  color: AppColors.onSurface,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Discount (₹)',
-                      style: AppTypography.labelCaps.copyWith(color: AppColors.outline),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 440;
+              final discountField = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Discount (₹)',
+                    style: AppTypography.labelCaps
+                        .copyWith(color: AppColors.outline),
+                  ),
+                  const SizedBox(height: 2),
+                  TextField(
+                    controller: _discountController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}')),
+                    ],
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      prefixText: '₹ ',
+                      hintText: '0',
                     ),
-                    const SizedBox(height: 2),
-                    TextField(
-                      controller: _discountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                    onChanged: (val) {
+                      final disc = double.tryParse(val) ?? 0.0;
+                      final clamped = disc.clamp(0.0, widget.subtotal);
+                      widget.onDiscountChanged(clamped);
+                    },
+                  ),
+                ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SummaryBox(
+                            label: widget.previousBalanceIncluded > 0
+                                ? 'Combined Subtotal'
+                                : 'Subtotal',
+                            amount: '₹${widget.subtotal.toStringAsFixed(2)}',
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(child: discountField),
                       ],
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        prefixText: '₹ ',
-                        hintText: '0',
-                      ),
-                      onChanged: (val) {
-                        final disc = double.tryParse(val) ?? 0.0;
-                        final clamped = disc.clamp(0.0, widget.subtotal);
-                        widget.onDiscountChanged(clamped);
-                      },
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _SummaryBox(
+                      label: 'Payable Total',
+                      amount: '₹${widget.finalTotal.toStringAsFixed(2)}',
+                      color: AppColors.primary,
+                      isBold: true,
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _SummaryBox(
-                  label: 'Payable Total',
-                  amount: '₹${widget.finalTotal.toStringAsFixed(2)}',
-                  color: AppColors.primary,
-                  isBold: true,
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: _SummaryBox(
+                      label: widget.previousBalanceIncluded > 0
+                          ? 'Combined Subtotal'
+                          : 'Subtotal',
+                      amount: '₹${widget.subtotal.toStringAsFixed(2)}',
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: discountField),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _SummaryBox(
+                      label: 'Payable Total',
+                      amount: '₹${widget.finalTotal.toStringAsFixed(2)}',
+                      color: AppColors.primary,
+                      isBold: true,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.lg),
 
@@ -248,36 +301,39 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
             style: AppTypography.labelCaps.copyWith(color: AppColors.outline),
           ),
           const SizedBox(height: AppSpacing.xs),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
-                value: 'cash',
-                label: Text('Cash'),
-                icon: Icon(Icons.money_outlined, size: 16),
-              ),
-              ButtonSegment(
-                value: 'upi',
-                label: Text('UPI'),
-                icon: Icon(Icons.qr_code_2_outlined, size: 16),
-              ),
-              ButtonSegment(
-                value: 'bank_transfer',
-                label: Text('Bank Transfer'),
-                icon: Icon(Icons.account_balance_outlined, size: 16),
-              ),
-              ButtonSegment(
-                value: 'other',
-                label: Text('Other'),
-                icon: Icon(Icons.credit_card_outlined, size: 16),
-              ),
-            ],
-            selected: {_paymentMode},
-            onSelectionChanged: (selection) {
-              setState(() {
-                _paymentMode = selection.first;
-              });
-              _notifyPaymentChanged();
-            },
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: 'cash',
+                  label: Text('Cash'),
+                  icon: Icon(Icons.money_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: 'upi',
+                  label: Text('UPI'),
+                  icon: Icon(Icons.qr_code_2_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: 'bank_transfer',
+                  label: Text('Bank Transfer'),
+                  icon: Icon(Icons.account_balance_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: 'other',
+                  label: Text('Other'),
+                  icon: Icon(Icons.credit_card_outlined, size: 16),
+                ),
+              ],
+              selected: {_paymentMode},
+              onSelectionChanged: (selection) {
+                setState(() {
+                  _paymentMode = selection.first;
+                });
+                _notifyPaymentChanged();
+              },
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
 
@@ -301,92 +357,116 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
           ],
 
           // Amount Paid input & Remaining Balance Display (Presets removed, auto-determining Paid/Partially Paid)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: TextField(
-                  controller: _amountPaidController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                  decoration: InputDecoration(
-                    labelText: 'Amount Paid (₹) *',
-                    prefixText: '₹ ',
-                    isDense: true,
-                    errorText: _amountPaid > widget.finalTotal
-                        ? 'Amount cannot exceed ₹${widget.finalTotal.toStringAsFixed(2)}'
-                        : null,
-                  ),
-                  onChanged: (val) {
-                    final amt = double.tryParse(val) ?? 0.0;
-                    setState(() {
-                      _amountPaid = amt;
-                    });
-                    _notifyPaymentChanged();
-                  },
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 420;
+
+              final amountPaidField = TextField(
+                controller: _amountPaidController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Amount Paid (₹) *',
+                  prefixText: '₹ ',
+                  isDense: true,
+                  errorText: _amountPaid > widget.finalTotal
+                      ? 'Amount cannot exceed ₹${widget.finalTotal.toStringAsFixed(2)}'
+                      : null,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                flex: 3,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
+                onChanged: (val) {
+                  final amt = double.tryParse(val) ?? 0.0;
+                  setState(() {
+                    _amountPaid = amt;
+                  });
+                  _notifyPaymentChanged();
+                },
+              );
+
+              final remainingCard = Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isPaid
+                      ? Colors.green.withValues(alpha: 0.08)
+                      : Colors.orange.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  border: Border.all(
                     color: isPaid
-                        ? Colors.green.withValues(alpha: 0.08)
-                        : Colors.orange.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    border: Border.all(
-                      color: isPaid
-                          ? Colors.green.withValues(alpha: 0.3)
-                          : Colors.orange.withValues(alpha: 0.3),
-                    ),
+                        ? Colors.green.withValues(alpha: 0.3)
+                        : Colors.orange.withValues(alpha: 0.3),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Remaining:',
-                            style: AppTypography.labelCaps.copyWith(
-                              color: AppColors.outline,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Remaining:',
+                          style: AppTypography.labelCaps.copyWith(
+                            color: AppColors.outline,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isPaid ? Colors.green : Colors.orange,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isPaid ? 'PAID' : 'PARTIALLY PAID',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: isPaid ? Colors.green : Colors.orange,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              isPaid ? 'PAID' : 'PARTIALLY PAID',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
                         '₹${remaining.toStringAsFixed(2)}',
                         style: AppTypography.bodyMd.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: remaining > 0 ? AppColors.error : Colors.green[800],
+                          color: remaining > 0
+                              ? AppColors.error
+                              : Colors.green[800],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    amountPaidField,
+                    const SizedBox(height: AppSpacing.sm),
+                    remainingCard,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 3, child: amountPaidField),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(flex: 3, child: remainingCard),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -423,11 +503,15 @@ class _SummaryBox extends StatelessWidget {
             style: AppTypography.labelCaps.copyWith(color: AppColors.outline),
           ),
           const SizedBox(height: 2),
-          Text(
-            amount,
-            style: AppTypography.bodyMd.copyWith(
-              color: color,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              amount,
+              style: AppTypography.bodyMd.copyWith(
+                color: color,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              ),
             ),
           ),
         ],
