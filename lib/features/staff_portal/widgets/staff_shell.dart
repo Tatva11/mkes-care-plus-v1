@@ -12,6 +12,7 @@ import '../../auth/repositories/auth_repository.dart';
 import '../../staff/models/shift_configuration.dart';
 import '../../staff/providers/attendance_provider.dart';
 import '../../staff/repositories/attendance_repository.dart';
+import '../../whatsapp/widgets/whatsapp_inbox_button.dart';
 
 enum StaffNavItem { schedule, patients, tasks, attendance, billing }
 
@@ -206,6 +207,8 @@ class _StaffTopAppBar extends StatelessWidget {
                 ] else ...[
                   const Spacer(),
                 ],
+                const WhatsAppInboxButton(),
+                const SizedBox(width: AppSpacing.xs),
                 const NotificationCenterButton(),
                 const SizedBox(width: AppSpacing.xs),
                 const _StaffProfileMenuConsumer(),

@@ -115,19 +115,16 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen> {
   }
 
   Widget _buildHeader(bool isDesktop) {
+    final logoSize = isDesktop ? 72.0 : 64.0;
     return Column(
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFE8F5),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Icon(
-            Icons.badge_rounded,
-            color: AppColors.secondary,
-            size: 32,
+        Hero(
+          tag: 'mkes_logo',
+          child: Image.asset(
+            'assets/images/mkes_logo.png',
+            width: logoSize,
+            height: logoSize,
+            fit: BoxFit.contain,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),

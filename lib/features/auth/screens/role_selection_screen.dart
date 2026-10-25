@@ -82,27 +82,17 @@ class RoleSelectionScreen extends StatelessWidget {
   }
 
   Widget _buildBrandHeader(bool isDesktop) {
+    final logoSize = isDesktop ? 96.0 : 80.0;
     return Column(
       children: [
-        // Logo container
-        Container(
-          width: isDesktop ? 80 : 64,
-          height: isDesktop ? 80 : 64,
-          decoration: BoxDecoration(
-            color: AppColors.primaryFixed,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1F000000),
-                blurRadius: 16,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Icon(
-            Icons.local_hospital_rounded,
-            color: AppColors.primary,
-            size: isDesktop ? 44 : 36,
+        // MKES CARE+ Official Circular Logo
+        Hero(
+          tag: 'mkes_logo',
+          child: Image.asset(
+            'assets/images/mkes_logo.png',
+            width: logoSize,
+            height: logoSize,
+            fit: BoxFit.contain,
           ),
         ),
         SizedBox(height: isDesktop ? AppSpacing.md : AppSpacing.sm),

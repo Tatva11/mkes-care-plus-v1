@@ -8,15 +8,16 @@ import '../../eye/screens/eye_surgery_screen.dart';
 import '../../inventory/screens/inventory_screen.dart';
 import '../../inventory/screens/purchase_order_list_screen.dart';
 import '../../vendors/screens/vendor_management_screen.dart';
+import '../../whatsapp/widgets/whatsapp_requests_view.dart';
 
-/// Combined operations content providing tab switching between Inventory, Departments, Vendors, Purchase Orders, and Dental Lab.
+/// Combined operations content providing tab switching between Inventory, Departments, Vendors, Purchase Orders, Dental Lab, Eye Surgery, and WhatsApp Requests.
 class OperationsTabContent extends StatefulWidget {
   const OperationsTabContent({
     super.key,
     this.initialTab = 0,
   });
 
-  /// 0 = Inventory, 1 = Departments, 2 = Vendors, 3 = Purchase Orders, 4 = Dental Lab, 5 = Eye Surgery
+  /// 0 = Inventory, 1 = Departments, 2 = Vendors, 3 = Purchase Orders, 4 = Dental Lab, 5 = Eye Surgery, 6 = WhatsApp Requests
   final int initialTab;
 
   @override
@@ -85,6 +86,11 @@ class _OperationsTabContentState extends State<OperationsTabContent> {
                       label: Text('Eye Surgery'),
                       icon: Icon(Icons.visibility_outlined, size: 16),
                     ),
+                    ButtonSegment<int>(
+                      value: 6,
+                      label: Text('WhatsApp Requests'),
+                      icon: Icon(Icons.chat_bubble_outline, size: 16),
+                    ),
                   ],
                   selected: {_selectedTab},
                   onSelectionChanged: (newSelection) {
@@ -118,7 +124,9 @@ class _OperationsTabContentState extends State<OperationsTabContent> {
                           ? const PurchaseOrderManagementContent()
                           : _selectedTab == 4
                               ? const DentalLabContent()
-                              : const EyeSurgeryScreen(),
+                              : _selectedTab == 5
+                                  ? const EyeSurgeryScreen()
+                                  : const WhatsAppRequestsView(),
         ),
       ],
     );

@@ -482,9 +482,7 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                         : 'No pending tasks scheduled for this date.')
                                     : _filterIndex == 2
                                         ? 'No overdue carry-forward tasks.'
-                                        : (isViewingToday
-                                            ? 'No pending tasks for today'
-                                            : 'No tasks for this date'),
+                                        : 'No tasks assigned for this shift date.',
                                 style: AppTypography.bodyLg.copyWith(
                                     color: AppColors.onSurfaceVariant),
                               ),

@@ -117,19 +117,16 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
   }
 
   Widget _buildHeader(bool isDesktop) {
+    final logoSize = isDesktop ? 72.0 : 64.0;
     return Column(
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: AppColors.primaryFixed,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Icon(
-            Icons.admin_panel_settings_rounded,
-            color: AppColors.primary,
-            size: 32,
+        Hero(
+          tag: 'mkes_logo',
+          child: Image.asset(
+            'assets/images/mkes_logo.png',
+            width: logoSize,
+            height: logoSize,
+            fit: BoxFit.contain,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),

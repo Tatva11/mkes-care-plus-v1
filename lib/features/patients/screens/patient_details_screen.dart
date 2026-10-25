@@ -21,6 +21,8 @@ import '../../eye/providers/eye_examination_provider.dart';
 import '../../eye/providers/eye_surgery_provider.dart';
 import '../../eye/widgets/eye_examination_patient_section.dart';
 import '../../eye/widgets/eye_surgery_patient_section.dart';
+import '../../whatsapp/screens/whatsapp_inbox_screen.dart';
+import '../repositories/patient_repository.dart';
 
 /// Screen displaying complete details for a single patient, including
 /// personal/contact information and their attendance history.
@@ -158,7 +160,7 @@ class PatientDetailsScreen extends ConsumerWidget {
               children: [
                 _buildHeaderCard(context, ref, patient),
                 const SizedBox(height: AppSpacing.md),
-                _buildInfoCard(context, patient),
+                _buildInfoCard(context, ref, patient),
                 const SizedBox(height: AppSpacing.lg),
                 if (patient.department == 'dental' ||
                     ref
@@ -285,14 +287,42 @@ class PatientDetailsScreen extends ConsumerWidget {
           ),
           if (patient.mobile != null && patient.mobile!.trim().isNotEmpty) ...[
             const SizedBox(width: AppSpacing.sm),
-            FilledButton.tonalIcon(
-              onPressed: () => _makePhoneCall(context, patient.mobile!),
-              icon: const Icon(Icons.phone, size: 16),
-              label: const Text('Call'),
-              style: FilledButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: () => _makePhoneCall(context, patient.mobile!),
+                  icon: const Icon(Icons.phone, size: 16),
+                  label: const Text('Call'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => WhatsAppInboxScreen(
+                          initialPhoneNumber: patient.mobile,
+                          initialPatient: patient,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text('WhatsApp'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -300,7 +330,7 @@ class PatientDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, PatientModel patient) {
+  Widget _buildInfoCard(BuildContext context, WidgetRef ref, PatientModel patient) {
     final ageLabel = patient.dob != null
         ? '${DateTime.now().year - patient.dob!.year} yrs'
         : null;
@@ -404,6 +434,46 @@ class PatientDetailsScreen extends ConsumerWidget {
             icon: Icons.history_outlined,
             label: 'Registered On',
             value: registeredOnFormatted,
+          ),
+          _buildInfoRow(
+            context: context,
+            icon: Icons.mark_chat_read_outlined,
+            label: 'WhatsApp Status',
+            value: patient.whatsappOptOut ? 'Opted Out' : 'Active (Opted In)',
+            trailing: Switch.adaptive(
+              value: !patient.whatsappOptOut,
+              activeTrackColor: const Color(0xFF25D366),
+              onChanged: (bool optedIn) async {
+                try {
+                  await ref
+                      .read(patientRepositoryProvider)
+                      .setWhatsAppOptOut(patient.id, !optedIn);
+                  ref.invalidate(patientDetailsProvider(patient.id));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          optedIn
+                              ? 'WhatsApp communications enabled for ${patient.name}.'
+                              : 'Patient ${patient.name} opted out of automated WhatsApp messages.',
+                        ),
+                        backgroundColor:
+                            optedIn ? Colors.green : AppColors.outline,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to update WhatsApp status: $e'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
             isLast: true,
           ),
         ],

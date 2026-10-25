@@ -1,0 +1,29 @@
+{
+  "name": "mkes-whatsapp-service",
+  "version": "1.0.0",
+  "description": "MKES CARE+ WhatsApp Bridge Daemon for Windows PC Host",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "pair": "node scripts/pair.js",
+    "verify-session": "node scripts/verify_session.js",
+    "preflight": "node scripts/preflight_readiness.js",
+    "test-message": "node scripts/send_test_message.js",
+    "test": "node tests/unit_tests.js",
+    "test:rescheduling": "node tests/rescheduling_and_notifications_tests.js",
+    "validate": "node scripts/validate_service.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^14.5.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0",
+    "winston": "^3.14.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

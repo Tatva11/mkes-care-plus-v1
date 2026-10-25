@@ -73,6 +73,16 @@ class NotificationModel {
 
   IconData get icon {
     switch (type) {
+      case 'whatsapp_reply':
+        return Icons.chat_bubble_outline;
+      case 'appointment_rescheduled':
+        return Icons.edit_calendar_outlined;
+      case 'lab_ready':
+        return Icons.biotech_outlined;
+      case 'attendance_exception':
+        return Icons.person_off_outlined;
+      case 'inventory_alert':
+        return Icons.inventory_2_outlined;
       case 'duty_assignment':
       case 'shift_change':
         return Icons.event_available_outlined;
@@ -108,6 +118,16 @@ class NotificationModel {
 
   Color get iconColor {
     switch (type) {
+      case 'whatsapp_reply':
+        return Colors.green;
+      case 'appointment_rescheduled':
+        return Colors.orange;
+      case 'lab_ready':
+        return Colors.purple;
+      case 'attendance_exception':
+        return Colors.redAccent;
+      case 'inventory_alert':
+        return AppColors.error;
       case 'duty_assignment':
       case 'shift_change':
         return AppColors.primary;

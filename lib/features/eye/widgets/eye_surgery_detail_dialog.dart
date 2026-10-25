@@ -1635,11 +1635,16 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
               color: AppColors.onSurfaceVariant,
             ),
           ),
+          const SizedBox(width: AppSpacing.sm),
           const Spacer(),
-          Text(
-            value,
-            style: AppTypography.bodySm.copyWith(
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.bodySm.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           if (trailing != null) ...[

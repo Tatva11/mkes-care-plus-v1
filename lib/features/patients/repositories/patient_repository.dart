@@ -104,6 +104,7 @@ class PatientRepository {
       'dob': patient.dob?.toIso8601String().split('T').first,
       'address': patient.address,
       'reference': patient.reference,
+      'whatsapp_opt_out': patient.whatsappOptOut,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
 
@@ -115,6 +116,18 @@ class PatientRepository {
         .single();
 
     return PatientModel.fromJson(response);
+  }
+
+  /// Toggle or set WhatsApp opt-out preference for a patient.
+  Future<bool> setWhatsAppOptOut(String patientId, bool optOut) async {
+    await _supabase
+        .from('patients')
+        .update({
+          'whatsapp_opt_out': optOut,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', patientId);
+    return optOut;
   }
 }
 

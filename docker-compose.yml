@@ -1,0 +1,32 @@
+services:
+  mkes-care-plus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mkes-care-plus-compose
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+
+  whatsapp-service:
+    build:
+      context: ./whatsapp-service
+      dockerfile: Dockerfile
+    container_name: whatsapp-service
+    env_file:
+      - ./whatsapp-service/.env
+    environment:
+      - WA_SESSION_PATH=/app/wa_session
+      - DRY_RUN=false
+      - SCHEDULER_MODE=enabled
+    volumes:
+      - ${WA_SESSION_HOST_PATH:-C:/MKES_CARE_PLUS/wa_session}:/app/wa_session
+      - ./whatsapp-service/logs:/app/logs
+      - ./whatsapp-service/.temp:/app/.temp
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped

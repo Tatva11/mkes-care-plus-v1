@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../whatsapp/providers/whatsapp_inbox_provider.dart';
 import '../models/dental_lab_model.dart';
 
-class DentalLabWhatsAppDialog extends StatelessWidget {
+class DentalLabWhatsAppDialog extends ConsumerStatefulWidget {
   const DentalLabWhatsAppDialog({super.key, required this.caseItem});
 
   final DentalLabModel caseItem;
@@ -62,19 +64,68 @@ class DentalLabWhatsAppDialog extends StatelessWidget {
     return Uri.https('wa.me', '/$clean', {'text': buildMessage(caseItem)});
   }
 
+  @override
+  ConsumerState<DentalLabWhatsAppDialog> createState() =>
+      _DentalLabWhatsAppDialogState();
+}
+
+class _DentalLabWhatsAppDialogState
+    extends ConsumerState<DentalLabWhatsAppDialog> {
+  bool _isSending = false;
+
+  Future<void> _sendViaClinicOutbox(
+      BuildContext context, String phone, String text) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    setState(() => _isSending = true);
+    final success =
+        await ref.read(whatsappConversationsProvider.notifier).sendMessage(
+              phone: phone,
+              patientId: widget.caseItem.patientId,
+              department: 'dental',
+              messageText: text,
+            );
+    if (!mounted) return;
+    setState(() => _isSending = false);
+
+    if (success) {
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Dental Lab notification enqueued to clinic WhatsApp outbox.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Failed to enqueue WhatsApp notification. Please check permissions or opt-out status.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   Future<void> _openWhatsApp(BuildContext context, String rawPhone) async {
-    final clean = normalizePhoneNumber(rawPhone);
+    final clean = DentalLabWhatsAppDialog.normalizePhoneNumber(rawPhone);
     if (clean == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: AppColors.error,
-          content: Text('No valid mobile number is available for this patient. Please update their WhatsApp contact first.'),
+          content: Text(
+              'No valid mobile number is available for this patient. Please update their WhatsApp contact first.'),
         ),
       );
       return;
     }
 
-    final uri = generateWhatsAppUri(phone: clean, caseItem: caseItem);
+    final uri = DentalLabWhatsAppDialog.generateWhatsAppUri(
+        phone: clean, caseItem: widget.caseItem);
     if (uri == null) return;
 
     final messenger = ScaffoldMessenger.of(context);
@@ -113,10 +164,13 @@ class DentalLabWhatsAppDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone = caseItem.patientMobile ?? caseItem.patient?.mobile;
-    final normalizedPhone = normalizePhoneNumber(phone);
+    final phone =
+        widget.caseItem.patientMobile ?? widget.caseItem.patient?.mobile;
+    final normalizedPhone =
+        DentalLabWhatsAppDialog.normalizePhoneNumber(phone);
     final hasValidPhone = normalizedPhone != null;
-    final messagePreview = buildMessage(caseItem);
+    final messagePreview =
+        DentalLabWhatsAppDialog.buildMessage(widget.caseItem);
 
     final content = SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
@@ -136,12 +190,14 @@ class DentalLabWhatsAppDialog extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.phone_disabled_outlined, color: AppColors.error, size: 24),
+                    const Icon(Icons.phone_disabled_outlined,
+                        color: AppColors.error, size: 24),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        'No valid WhatsApp contact number is registered for patient "${caseItem.patientName ?? "Unknown"}". Please update their mobile number in Patient Details.',
-                        style: AppTypography.bodySm.copyWith(color: AppColors.error),
+                        'This patient has no valid phone number recorded. Please update their mobile number in Patient Management to enable WhatsApp notifications.',
+                        style: AppTypography.bodySm
+                            .copyWith(color: AppColors.error),
                       ),
                     ),
                   ],
@@ -149,19 +205,22 @@ class DentalLabWhatsAppDialog extends StatelessWidget {
               ),
             ] else ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF25D366).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                  border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.3)),
+                  border: Border.all(
+                      color: const Color(0xFF25D366).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.person, color: Color(0xFF128C7E), size: 18),
+                    const Icon(Icons.person,
+                        color: Color(0xFF128C7E), size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Recipient: ${caseItem.patientName ?? "Patient"} • +$normalizedPhone',
+                        'Recipient: ${widget.caseItem.patientName ?? "Patient"} • +$normalizedPhone',
                         style: AppTypography.bodySm.copyWith(
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF128C7E),
@@ -174,7 +233,8 @@ class DentalLabWhatsAppDialog extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Text(
                 'PREPARED MESSAGE PREVIEW',
-                style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant),
+                style: AppTypography.labelCaps
+                    .copyWith(color: AppColors.onSurfaceVariant),
               ),
               const SizedBox(height: 6),
               Container(
@@ -195,7 +255,7 @@ class DentalLabWhatsAppDialog extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Note: Clicking "Open in WhatsApp" will open WhatsApp with this message prefilled. You review and send it manually. Nothing is sent automatically.',
+                'Choose "Send via MKES WhatsApp" to enqueue through the clinic daemon, or "Personal Device" to open via WhatsApp directly.',
                 style: AppTypography.bodySm.copyWith(
                   color: AppColors.onSurfaceVariant,
                   fontSize: 11,
@@ -243,19 +303,36 @@ class DentalLabWhatsAppDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+          onPressed: _isSending ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
         ),
-        if (hasValidPhone)
-          FilledButton.icon(
-            onPressed: () => _openWhatsApp(context, phone!),
+        if (hasValidPhone) ...[
+          OutlinedButton.icon(
+            onPressed:
+                _isSending ? null : () => _openWhatsApp(context, phone!),
             icon: const Icon(Icons.open_in_new, size: 16),
-            label: const Text('Open in WhatsApp'),
+            label: const Text('Personal Device'),
+          ),
+          FilledButton.icon(
+            onPressed: _isSending
+                ? null
+                : () => _sendViaClinicOutbox(
+                    context, normalizedPhone, messagePreview),
+            icon: _isSending
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send, size: 16),
+            label: const Text('Send via MKES WhatsApp'),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF25D366),
               foregroundColor: Colors.white,
             ),
           ),
+        ],
       ],
     );
   }

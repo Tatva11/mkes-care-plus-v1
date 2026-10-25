@@ -18,6 +18,8 @@ import '../../patients/models/patient_model.dart';
 import '../../department/providers/departments_provider.dart';
 import '../../staff/models/shift_configuration.dart';
 import '../../staff/providers/attendance_provider.dart';
+import '../../whatsapp/providers/whatsapp_appointment_provider.dart';
+import '../../whatsapp/widgets/whatsapp_requests_view.dart';
 
 class StaffScheduleScreen extends ConsumerStatefulWidget {
   const StaffScheduleScreen({super.key});
@@ -213,6 +215,53 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
         initialPatientId: initialPatientId,
         initialPatientName: initialPatientName,
         initialAppointmentType: initialType,
+      ),
+    );
+  }
+
+  void _openWhatsAppRequestsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.85,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.chat_bubble_outline,
+                          color: Color(0xFF25D366)),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        'WhatsApp Booking Requests',
+                        style: AppTypography.headlineMd
+                            .copyWith(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            const Expanded(child: WhatsAppRequestsView()),
+          ],
+        ),
       ),
     );
   }
@@ -648,6 +697,51 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
+                OutlinedButton.icon(
+                  onPressed: _openWhatsAppRequestsSheet,
+                  icon: const Icon(Icons.chat_bubble_outline,
+                      size: 18, color: Color(0xFF25D366)),
+                  label: Consumer(
+                    builder: (context, ref, _) {
+                      final pendingCount =
+                          ref.watch(pendingWhatsAppRequestsCountProvider);
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('WhatsApp Requests'),
+                          if (pendingCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade800,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$pendingCount',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
                 FilledButton.icon(
                   onPressed: () => _openNewAppointmentDialog(),
                   icon: const Icon(Icons.add_circle_outline, size: 18),
@@ -714,6 +808,45 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                 else
                   const _UnassignedShiftBadge(),
               ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _openWhatsAppRequestsSheet,
+                icon: const Icon(Icons.chat_bubble_outline,
+                    size: 18, color: Color(0xFF25D366)),
+                label: Consumer(
+                  builder: (context, ref, _) {
+                    final pendingCount =
+                        ref.watch(pendingWhatsAppRequestsCountProvider);
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('WhatsApp Requests'),
+                        if (pendingCount > 0) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade800,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$pendingCount',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
             ),
           ],
 

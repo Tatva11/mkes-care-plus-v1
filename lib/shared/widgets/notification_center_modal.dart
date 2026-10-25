@@ -6,6 +6,14 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../features/notifications/models/notification_model.dart';
 import '../../features/notifications/providers/notifications_provider.dart';
+import '../../features/whatsapp/screens/whatsapp_inbox_screen.dart';
+import '../../features/dental/screens/dental_lab_screen.dart';
+import '../../features/eye/screens/eye_surgery_screen.dart';
+import '../../features/inventory/screens/inventory_screen.dart';
+import '../../features/staff_portal/screens/staff_tasks_screen.dart';
+import '../../features/staff_portal/screens/staff_schedule_screen.dart';
+import '../../features/staff_portal/screens/staff_leave_screen.dart';
+import '../../features/staff_portal/screens/staff_attendance_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Legacy helper class kept for API compatibility.
@@ -87,13 +95,20 @@ class NotificationCenterButton extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// The modal dialog that shows notifications from Supabase.
+// The modal dialog that shows notifications from Supabase with routing & filtering.
 // ---------------------------------------------------------------------------
-class _NotificationDialog extends ConsumerWidget {
+class _NotificationDialog extends ConsumerStatefulWidget {
   const _NotificationDialog();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_NotificationDialog> createState() => _NotificationDialogState();
+}
+
+class _NotificationDialogState extends ConsumerState<_NotificationDialog> {
+  String _selectedCategory = 'all'; // 'all' | 'unread' | 'whatsapp' | 'appointment' | 'clinical'
+
+  @override
+  Widget build(BuildContext context) {
     final notifAsync = ref.watch(notificationsProvider);
 
     return Dialog(
@@ -104,8 +119,8 @@ class _NotificationDialog extends ConsumerWidget {
         side: const BorderSide(color: AppColors.outlineVariant),
       ),
       child: Container(
-        width: 420,
-        constraints: const BoxConstraints(maxHeight: 560),
+        width: 440,
+        constraints: const BoxConstraints(maxHeight: 600),
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
@@ -115,95 +130,117 @@ class _NotificationDialog extends ConsumerWidget {
             // Header
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  // Title + unread badge
-                  Flexible(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Notifications',
-                            style: AppTypography.headlineMd,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        notifAsync.when(
-                          data: (items) {
-                            final unread = items.where((n) => !n.isRead).length;
-                            if (unread == 0) return const SizedBox.shrink();
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '$unread new',
-                                style: AppTypography.labelCaps.copyWith(
-                                  color: AppColors.onPrimaryContainer,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            );
-                          },
-                          loading: () => const SizedBox.shrink(),
-                          error: (_, __) => const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Actions
                   Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.refresh, size: 20),
-                        color: AppColors.onSurfaceVariant,
-                        tooltip: 'Refresh',
-                        onPressed: () =>
-                            ref.read(notificationsProvider.notifier).fetch(),
-                      ),
-                      notifAsync.maybeWhen(
-                        data: (items) {
-                          final hasUnread = items.any((n) => !n.isRead);
-                          if (!hasUnread) return const SizedBox.shrink();
-                          return TextButton(
-                            onPressed: () => ref
-                                .read(notificationsProvider.notifier)
-                                .markAllRead(),
-                            child: Text(
-                              'Mark all read',
-                              style: AppTypography.labelCaps
-                                  .copyWith(color: AppColors.primary),
+                      // Title + unread badge
+                      Flexible(
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Notifications',
+                                style: AppTypography.headlineMd,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          );
-                        },
-                        orElse: () => const SizedBox.shrink(),
+                            const SizedBox(width: AppSpacing.xs),
+                            notifAsync.when(
+                              data: (items) {
+                                final unread = items.where((n) => !n.isRead).length;
+                                if (unread == 0) return const SizedBox.shrink();
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryContainer,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '$unread new',
+                                    style: AppTypography.labelCaps.copyWith(
+                                      color: AppColors.onPrimaryContainer,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                );
+                              },
+                              loading: () => const SizedBox.shrink(),
+                              error: (_, __) => const SizedBox.shrink(),
+                            ),
+                          ],
+                        ),
                       ),
-                      notifAsync.maybeWhen(
-                        data: (items) {
-                          if (items.isEmpty) return const SizedBox.shrink();
-                          return IconButton(
-                            icon: const Icon(Icons.delete_sweep_outlined, size: 20),
+                      // Actions
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.refresh, size: 20),
                             color: AppColors.onSurfaceVariant,
-                            tooltip: 'Clear all',
-                            onPressed: () {
-                              ref
-                                  .read(notificationsProvider.notifier)
-                                  .deleteAll();
-                              Navigator.of(context).pop();
+                            tooltip: 'Refresh',
+                            onPressed: () =>
+                                ref.read(notificationsProvider.notifier).fetch(),
+                          ),
+                          notifAsync.maybeWhen(
+                            data: (items) {
+                              final hasUnread = items.any((n) => !n.isRead);
+                              if (!hasUnread) return const SizedBox.shrink();
+                              return TextButton(
+                                onPressed: () => ref
+                                    .read(notificationsProvider.notifier)
+                                    .markAllRead(),
+                                child: Text(
+                                  'Mark all read',
+                                  style: AppTypography.labelCaps
+                                      .copyWith(color: AppColors.primary),
+                                ),
+                              );
                             },
-                          );
-                        },
-                        orElse: () => const SizedBox.shrink(),
+                            orElse: () => const SizedBox.shrink(),
+                          ),
+                          notifAsync.maybeWhen(
+                            data: (items) {
+                              if (items.isEmpty) return const SizedBox.shrink();
+                              return IconButton(
+                                icon: const Icon(Icons.delete_sweep_outlined, size: 20),
+                                color: AppColors.onSurfaceVariant,
+                                tooltip: 'Clear all',
+                                onPressed: () {
+                                  ref
+                                      .read(notificationsProvider.notifier)
+                                      .deleteAll();
+                                  Navigator.of(context).pop();
+                                },
+                              );
+                            },
+                            orElse: () => const SizedBox.shrink(),
+                          ),
+                        ],
                       ),
                     ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  // Filter Chips
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip('All', 'all'),
+                        const SizedBox(width: AppSpacing.xs),
+                        _buildFilterChip('Unread', 'unread'),
+                        const SizedBox(width: AppSpacing.xs),
+                        _buildFilterChip('WhatsApp', 'whatsapp'),
+                        const SizedBox(width: AppSpacing.xs),
+                        _buildFilterChip('Appointments', 'appointment'),
+                        const SizedBox(width: AppSpacing.xs),
+                        _buildFilterChip('Clinical', 'clinical'),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -239,7 +276,9 @@ class _NotificationDialog extends ConsumerWidget {
                   ),
                 ),
                 data: (items) {
-                  if (items.isEmpty) {
+                  final filtered = _filterItems(items);
+
+                  if (filtered.isEmpty) {
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.all(AppSpacing.xl),
@@ -253,7 +292,9 @@ class _NotificationDialog extends ConsumerWidget {
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
-                              'No notifications',
+                              _selectedCategory == 'all'
+                                  ? 'No notifications'
+                                  : 'No $_selectedCategory notifications',
                               style: AppTypography.bodyMd.copyWith(
                                 color: AppColors.onSurfaceVariant,
                               ),
@@ -268,10 +309,10 @@ class _NotificationDialog extends ConsumerWidget {
                         ref.read(notificationsProvider.notifier).fetch(),
                     child: ListView.separated(
                       padding: EdgeInsets.zero,
-                      itemCount: items.length,
+                      itemCount: filtered.length,
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, index) {
-                        final item = items[index];
+                        final item = filtered[index];
                         return _NotificationTile(item: item);
                       },
                     ),
@@ -283,6 +324,46 @@ class _NotificationDialog extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _selectedCategory == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      labelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      ),
+      onSelected: (_) {
+        setState(() {
+          _selectedCategory = value;
+        });
+      },
+    );
+  }
+
+  List<NotificationModel> _filterItems(List<NotificationModel> all) {
+    switch (_selectedCategory) {
+      case 'unread':
+        return all.where((n) => !n.isRead).toList();
+      case 'whatsapp':
+        return all.where((n) => n.type == 'whatsapp_reply').toList();
+      case 'appointment':
+        return all
+            .where((n) =>
+                n.type == 'appointment' || n.type == 'appointment_rescheduled')
+            .toList();
+      case 'clinical':
+        return all
+            .where((n) =>
+                n.type == 'lab_ready' ||
+                n.type == 'eye_surgery' ||
+                n.type == 'eye_surgery_assigned')
+            .toList();
+      default:
+        return all;
+    }
   }
 }
 
@@ -350,6 +431,72 @@ class _NotificationTile extends ConsumerWidget {
         onTap: () {
           if (!item.isRead) {
             ref.read(notificationsProvider.notifier).markRead(item.id);
+          }
+          // Dismiss notification modal dialog
+          Navigator.of(context).pop();
+
+          // Intelligent navigation routing
+          if (item.type == 'whatsapp_reply') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const WhatsAppInboxScreen(),
+              ),
+            );
+          } else if (item.type == 'lab_ready' || item.type == 'eye_lab_ready') {
+            final isEye = item.title.toLowerCase().contains('eye') ||
+                item.message.toLowerCase().contains('eye') ||
+                item.message.toLowerCase().contains('lens') ||
+                item.type == 'eye_lab_ready';
+            if (isEye) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EyeSurgeryScreen(),
+                ),
+              );
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const DentalLabScreen(),
+                ),
+              );
+            }
+          } else if (item.type == 'eye_surgery' || item.type == 'eye_surgery_assigned') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const EyeSurgeryScreen(),
+              ),
+            );
+          } else if (item.type == 'inventory_alert' || item.type == 'low_stock') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const InventoryManagementScreen(),
+              ),
+            );
+          } else if (item.type.startsWith('task_')) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const StaffTasksScreen(),
+              ),
+            );
+          } else if (item.type == 'appointment' ||
+              item.type == 'appointment_rescheduled') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const StaffScheduleScreen(),
+              ),
+            );
+          } else if (item.type.startsWith('leave_')) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const StaffLeaveScreen(),
+              ),
+            );
+          } else if (item.type == 'attendance_exception') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const StaffAttendanceScreen(),
+              ),
+            );
           }
         },
       ),

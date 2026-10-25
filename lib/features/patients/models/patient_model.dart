@@ -10,6 +10,7 @@ class PatientModel {
   final DateTime? visitDate;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool whatsappOptOut;
 
   const PatientModel({
     required this.id,
@@ -23,6 +24,7 @@ class PatientModel {
     this.visitDate,
     required this.createdAt,
     required this.updatedAt,
+    this.whatsappOptOut = false,
   });
 
   factory PatientModel.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,7 @@ class PatientModel {
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
           : DateTime.now(),
+      whatsappOptOut: json['whatsapp_opt_out'] as bool? ?? false,
     );
   }
 
@@ -60,6 +63,7 @@ class PatientModel {
       'visit_date': visitDate?.toIso8601String().split('T').first,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'whatsapp_opt_out': whatsappOptOut,
     };
   }
 
@@ -67,6 +71,7 @@ class PatientModel {
     final map = <String, dynamic>{
       'patient_number': patientNumber,
       'name': name,
+      'whatsapp_opt_out': whatsappOptOut,
     };
     if (dob != null) map['dob'] = dob?.toIso8601String().split('T').first;
     if (address != null && address!.isNotEmpty) map['address'] = address;
@@ -95,6 +100,7 @@ class PatientModel {
     DateTime? visitDate,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? whatsappOptOut,
   }) {
     return PatientModel(
       id: id ?? this.id,
@@ -108,6 +114,7 @@ class PatientModel {
       visitDate: visitDate ?? this.visitDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      whatsappOptOut: whatsappOptOut ?? this.whatsappOptOut,
     );
   }
 }

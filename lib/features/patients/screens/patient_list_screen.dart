@@ -53,7 +53,8 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
       context: context,
       builder: (_) => PatientFormDialog(initialDepartment: _department),
     );
-    if (created != null && mounted) {
+    if (created != null) {
+      if (!mounted || !context.mounted) return;
       final targetDept = (created.department == 'eye' || created.department == 'dental')
           ? created.department!
           : _department;
@@ -62,6 +63,12 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
       ref.invalidate(patientsByDepartmentProvider('eye'));
       ref.invalidate(patientsByDepartmentProvider('dental'));
       ref.invalidate(patientsProvider);
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PatientDetailsScreen(patientId: created.id),
+        ),
+      );
     }
   }
 

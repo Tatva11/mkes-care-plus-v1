@@ -9,6 +9,7 @@ import '../../inventory/utils/phone_dialer_util.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patients_provider.dart';
 import '../../patients/screens/patient_details_screen.dart';
+import '../../patients/widgets/patient_form_dialog.dart';
 
 /// Staff-facing patient directory & search.
 ///
@@ -103,6 +104,29 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                       ),
                     ],
                   ),
+                ),
+                FilledButton.icon(
+                  onPressed: () async {
+                    final defaultDept = isRestrictedToDept
+                        ? staffDept
+                        : (_selectedDepartment == 'all' ? 'eye' : _selectedDepartment);
+                    final created = await showDialog<PatientModel>(
+                      context: context,
+                      builder: (_) => PatientFormDialog(initialDepartment: defaultDept),
+                    );
+                    if (created != null) {
+                      if (!context.mounted) return;
+                      ref.invalidate(patientSearchProvider);
+                      ref.invalidate(patientsProvider);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PatientDetailsScreen(patientId: created.id),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.person_add_outlined, size: 18),
+                  label: const Text('New Patient'),
                 ),
               ],
             ),

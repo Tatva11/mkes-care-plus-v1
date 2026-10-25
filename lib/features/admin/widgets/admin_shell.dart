@@ -9,6 +9,7 @@ import '../../../shared/widgets/global_search_modal.dart';
 import '../../../shared/widgets/notification_center_modal.dart';
 import '../../../shared/widgets/user_profile_menu.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../whatsapp/widgets/whatsapp_inbox_button.dart';
 
 enum AdminNavItem { dashboard, staff, patients, operations, administration }
 
@@ -207,6 +208,8 @@ class _AdminTopAppBar extends StatelessWidget {
                       },
                     ),
                   ],
+                  const WhatsAppInboxButton(),
+                  const SizedBox(width: AppSpacing.xs),
                   const NotificationCenterButton(),
                   const SizedBox(width: AppSpacing.xs),
                   const _ProfileMenuConsumer(),

@@ -4,6 +4,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Google Services Plugin for Firebase Cloud Messaging (FCM)
+// Safely applied whenever android/app/google-services.json is placed in the project
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.mkes_care"
     compileSdk = flutter.compileSdkVersion
