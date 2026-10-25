@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/eye_surgery_model.dart';
@@ -189,6 +190,7 @@ class EyeSurgeryRepository {
         );
       }
     }
+    _enqueueSurgeryBookingWhatsApp(createdSurgery);
     return createdSurgery;
   }
 
@@ -218,7 +220,11 @@ class EyeSurgeryRepository {
         .eq('id', surgery.id)
         .select(_select)
         .single();
-    return EyeSurgeryModel.fromJson(_stringMap(response));
+    final updated = EyeSurgeryModel.fromJson(_stringMap(response));
+    if (updated.status == 'discharged') {
+      _enqueueSurgeryPostOpWhatsApp(updated);
+    }
+    return updated;
   }
 
   Future<void> deleteSurgery(String id) async {
@@ -272,7 +278,117 @@ class EyeSurgeryRepository {
     if (newStatus == 'discharged') {
       payload['discharged_at'] = DateTime.now().toIso8601String();
     }
-    return _update(id, payload);
+    final updated = await _update(id, payload);
+    if (newStatus == 'discharged') {
+      _enqueueSurgeryPostOpWhatsApp(updated);
+    }
+    return updated;
+  }
+
+  void _enqueueSurgeryBookingWhatsApp(EyeSurgeryModel surgery) async {
+    try {
+      final pRes = await _client
+          .from('patients')
+          .select('name, mobile, whatsapp_opt_out')
+          .eq('id', surgery.patientId)
+          .maybeSingle();
+
+      if (pRes == null) return;
+      if (pRes['whatsapp_opt_out'] == true) return;
+
+      final rawMobile = pRes['mobile']?.toString() ?? '';
+      final digits = rawMobile.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length < 10) return;
+      final clean10 = digits.substring(digits.length - 10);
+
+      // Duplicate prevention
+      final existing = await _client
+          .from('whatsapp_messages_outbox')
+          .select('id')
+          .eq('template_key', 'eye_surgery_${surgery.id}')
+          .maybeSingle();
+
+      if (existing != null) return;
+
+      final patientName = pRes['name']?.toString() ?? surgery.patientName ?? 'Valued Patient';
+      final formattedDate = DateFormat('d MMMM yyyy').format(surgery.surgeryDate);
+      final surgeryTimeStr = (surgery.surgeryTime != null && surgery.surgeryTime!.trim().isNotEmpty)
+          ? surgery.surgeryTime!
+          : 'Morning Session';
+      final surgeon = surgery.assignedStaffName ?? 'Clinical Surgical Team';
+
+      final messageText = '🏥 *MKES Eye Surgery Booking Confirmation*\n\n'
+          'Dear $patientName,\n'
+          'Your ${surgery.surgeryTypeCategory} (${surgery.eyeSide.toUpperCase()} eye) has been scheduled with $surgeon.\n\n'
+          '📅 *Date:* $formattedDate\n'
+          '⏰ *Scheduled Time:* $surgeryTimeStr\n'
+          '👨‍⚕️ *Attending Surgeon / Team:* $surgeon\n\n'
+          '📋 *Pre-Operative Preparation Instructions:*\n'
+          '1. Fasting (NPO): Do not eat or drink anything for 6 hours prior to your scheduled time (light water permitted up to 2 hours prior unless instructed otherwise).\n'
+          '2. Medications: Take regular blood pressure medicines with a sip of water. Stop blood thinners only if explicitly directed by your surgeon.\n'
+          '3. Hygiene: Wash hair and face before arriving. Do not apply eye makeup, face creams, lotions, or perfume.\n'
+          '4. Escort: Please arrange for an accompanying adult to escort you home after the procedure.\n'
+          '5. Items to Bring: Bring all current eye drops and existing medical records.\n\n'
+          'Reply STOP to unsubscribe.';
+
+      await _client.from('whatsapp_messages_outbox').insert({
+        'recipient_phone': clean10,
+        'patient_id': surgery.patientId,
+        'department': 'eye',
+        'message_type': 'eye_surgery',
+        'template_key': 'eye_surgery_${surgery.id}',
+        'message_text': messageText,
+        'status': 'pending',
+      });
+    } catch (_) {}
+  }
+
+  void _enqueueSurgeryPostOpWhatsApp(EyeSurgeryModel surgery) async {
+    try {
+      final pRes = await _client
+          .from('patients')
+          .select('name, mobile, whatsapp_opt_out')
+          .eq('id', surgery.patientId)
+          .maybeSingle();
+
+      if (pRes == null) return;
+      if (pRes['whatsapp_opt_out'] == true) return;
+
+      final rawMobile = pRes['mobile']?.toString() ?? '';
+      final digits = rawMobile.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length < 10) return;
+      final clean10 = digits.substring(digits.length - 10);
+
+      // Duplicate prevention
+      final existing = await _client
+          .from('whatsapp_messages_outbox')
+          .select('id')
+          .eq('template_key', 'eye_postop_${surgery.id}')
+          .maybeSingle();
+
+      if (existing != null) return;
+
+      final patientName = pRes['name']?.toString() ?? surgery.patientName ?? 'Valued Patient';
+
+      final messageText = '👁️ *MKES Eye Surgery Post-Operative Instructions*\n\n'
+          'Dear $patientName,\n'
+          'Congratulations on completing your surgery. Please adhere strictly to the following post-operative care instructions:\n\n'
+          '1. Eye Protection: Wear your protective eye shield while sleeping as instructed.\n'
+          '2. Eye Drops: Instill your prescribed post-operative eye drops at the directed intervals. Wash your hands thoroughly before instilling drops.\n'
+          '3. Cleanliness: Do not splash water into the operated eye, rub the eye, or engage in strenuous activities.\n'
+          '4. Warning Signs: If you experience sudden vision deterioration, severe pain, or severe redness, contact our clinic immediately.\n\n'
+          'Reply STOP to unsubscribe.';
+
+      await _client.from('whatsapp_messages_outbox').insert({
+        'recipient_phone': clean10,
+        'patient_id': surgery.patientId,
+        'department': 'eye',
+        'message_type': 'eye_postop',
+        'template_key': 'eye_postop_${surgery.id}',
+        'message_text': messageText,
+        'status': 'pending',
+      });
+    } catch (_) {}
   }
 
   Future<EyeSurgeryModel> startSurgery(String id) async {

@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/providers/supabase_provider.dart';
 import '../../appointments/providers/appointment_provider.dart';
 import '../models/whatsapp_appointment_request.dart';
 import '../repositories/whatsapp_appointment_repository.dart';
@@ -7,7 +10,8 @@ import '../repositories/whatsapp_appointment_repository.dart';
 final whatsappRequestsProvider = StateNotifierProvider<
     WhatsAppRequestsNotifier, AsyncValue<List<WhatsAppAppointmentRequest>>>((ref) {
   final repository = ref.watch(whatsappAppointmentRepositoryProvider);
-  return WhatsAppRequestsNotifier(ref, repository);
+  final supabase = ref.watch(supabaseProvider);
+  return WhatsAppRequestsNotifier(ref, repository, supabase);
 });
 
 final pendingWhatsAppRequestsCountProvider = Provider<int>((ref) {
@@ -22,12 +26,44 @@ class WhatsAppRequestsNotifier
     extends StateNotifier<AsyncValue<List<WhatsAppAppointmentRequest>>> {
   final Ref _ref;
   final WhatsAppAppointmentRepository _repository;
+  final SupabaseClient _supabase;
   String _currentStatusFilter = 'pending_review';
   String _currentDeptFilter = 'all';
+  Timer? _periodicTimer;
+  RealtimeChannel? _requestsChannel;
 
-  WhatsAppRequestsNotifier(this._ref, this._repository)
+  WhatsAppRequestsNotifier(this._ref, this._repository, this._supabase)
       : super(const AsyncValue.loading()) {
     loadRequests();
+    _setupRealtimeAndTimer();
+  }
+
+  void _setupRealtimeAndTimer() {
+    try {
+      _requestsChannel = _supabase
+          .channel('public:whatsapp_appointment_requests')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'whatsapp_appointment_requests',
+            callback: (_) => silentRefresh(),
+          )
+          .subscribe();
+    } catch (_) {}
+
+    _periodicTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      silentRefresh();
+    });
+  }
+
+  Future<void> silentRefresh() async {
+    try {
+      final items = await _repository.fetchRequests(
+        status: _currentStatusFilter,
+        department: _currentDeptFilter,
+      );
+      state = AsyncValue.data(items);
+    } catch (_) {}
   }
 
   String get currentStatusFilter => _currentStatusFilter;
@@ -122,5 +158,12 @@ class WhatsAppRequestsNotifier
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }
+  }
+
+  @override
+  void dispose() {
+    _periodicTimer?.cancel();
+    _requestsChannel?.unsubscribe();
+    super.dispose();
   }
 }

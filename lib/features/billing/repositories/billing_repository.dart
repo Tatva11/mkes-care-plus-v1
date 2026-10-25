@@ -149,7 +149,9 @@ class BillingRepository {
 
       debugPrint('BillingRepository.createInvoice RPC response: $response');
       final invoiceJson = response as Map<String, dynamic>;
-      return BillingInvoiceModel.fromJson(invoiceJson);
+      final created = BillingInvoiceModel.fromJson(invoiceJson);
+      _enqueueInvoiceWhatsAppPdf(created);
+      return created;
     } catch (e) {
       final errStr = e.toString().toLowerCase();
       // If unique violation occurred or invoice already exists, recover existing invoice
@@ -172,6 +174,7 @@ class BillingRepository {
             params: fallbackParams);
         final invoiceJson = response as Map<String, dynamic>;
         final created = BillingInvoiceModel.fromJson(invoiceJson);
+        _enqueueInvoiceWhatsAppPdf(created);
 
         // Attempt to link eye_surgery_id directly
         try {
@@ -183,6 +186,58 @@ class BillingRepository {
         }
       }
       rethrow;
+    }
+  }
+
+  void _enqueueInvoiceWhatsAppPdf(BillingInvoiceModel invoice) async {
+    try {
+      final pRes = await _supabase
+          .from('patients')
+          .select('name, mobile, whatsapp_opt_out')
+          .eq('id', invoice.patientId)
+          .maybeSingle();
+
+      if (pRes == null) return;
+      if (pRes['whatsapp_opt_out'] == true) return;
+
+      final rawMobile = pRes['mobile']?.toString() ?? '';
+      final digits = rawMobile.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length < 10) return;
+      final clean10 = digits.substring(digits.length - 10);
+
+      // Duplicate check: ensure this invoice has not already been enqueued
+      final existing = await _supabase
+          .from('whatsapp_messages_outbox')
+          .select('id')
+          .eq('template_key', 'invoice_${invoice.id}')
+          .maybeSingle();
+
+      if (existing != null) return;
+
+      final patientName = pRes['name']?.toString() ?? 'Valued Patient';
+      final statusLabel = invoice.isPaid ? 'PAID' : 'PARTIALLY PAID';
+
+      final messageText = '🧾 *MKES CARE+ Invoice #${invoice.invoiceNumber}*\n\n'
+          'Dear $patientName,\n'
+          'Thank you for visiting MKES CARE+ Hospital. Your official clinical invoice for ₹${invoice.totalAmount.toStringAsFixed(2)} has been generated.\n\n'
+          'Status: $statusLabel\n'
+          'Amount Paid: ₹${invoice.amountPaid.toStringAsFixed(2)}\n'
+          'Remaining Balance: ₹${invoice.remainingAmount.toStringAsFixed(2)}\n\n'
+          'Please find your official invoice document attached. We wish you great health and a speedy recovery!\n\n'
+          'Reply STOP to unsubscribe.';
+
+      await _supabase.from('whatsapp_messages_outbox').insert({
+        'recipient_phone': clean10,
+        'patient_id': invoice.patientId,
+        'department': invoice.department.toLowerCase(),
+        'message_type': 'payment_receipt',
+        'template_key': 'invoice_${invoice.id}',
+        'media_url': 'invoice://${invoice.id}',
+        'message_text': messageText,
+        'status': 'pending',
+      });
+    } catch (_) {
+      // Non-blocking
     }
   }
 

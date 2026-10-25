@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const path = require('path');
@@ -283,6 +283,61 @@ class WhatsAppClientManager {
       return response;
     } catch (err) {
       logger.error(`Failed to send message to ${toJid}: ${err.message}`, err);
+      throw err;
+    }
+  }
+
+  /**
+   * Humanized Document/Media Dispatcher.
+   * Sends PDFs, images, or documents with optional caption and humanized delay.
+   */
+  async sendMediaWithHumanizedDelay(toJid, media, caption = '') {
+    const isDryRun = String(process.env.DRY_RUN || 'true').trim().toLowerCase() !== 'false';
+    if (isDryRun) {
+      logger.info(`[DRY RUN INTERCEPTED] Simulated media dispatch to ${toJid}: filename="${media?.filename || 'invoice.pdf'}", caption="${caption.replace(/\n/g, ' ').substring(0, 60)}..."`);
+      return {
+        id: { _serialized: `dry-run-media-${Date.now()}` },
+        simulated: true,
+        to: toJid,
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+    }
+
+    if (!this.isReady) {
+      throw new Error('WhatsApp client is not ready or authenticated.');
+    }
+
+    try {
+      let targetJid = toJid;
+      try {
+        const prep = RecipientValidator.prepareLookupNumber(toJid);
+        if (prep.success) {
+          const numberId = await this.client.getNumberId(prep.e164);
+          const validation = RecipientValidator.validateResolvedRecipient({
+            expectedE164: prep.e164,
+            expectedJid: prep.expectedJid,
+            resolvedNumberId: numberId,
+            connectedUser: this.client.info?.wid?.user,
+          });
+          if (validation.valid) {
+            targetJid = validation.targetJid;
+          } else {
+            targetJid = prep.expectedJid;
+          }
+        }
+      } catch (_) {}
+
+      try {
+        await this.client.sendPresenceAvailable();
+      } catch (_) {}
+
+      const options = {};
+      if (caption) options.caption = caption;
+
+      const response = await this.client.sendMessage(targetJid, media, options);
+      return response;
+    } catch (err) {
+      logger.error(`Failed to send media to ${toJid}: ${err.message}`, err);
       throw err;
     }
   }

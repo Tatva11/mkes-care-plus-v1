@@ -1,5 +1,6 @@
 const { supabase } = require('../config/supabase');
 const whatsappClient = require('./whatsapp_client');
+const invoicePdfService = require('./invoice_pdf_service');
 const PhoneNormalizer = require('../utils/phone_normalizer');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
@@ -193,7 +194,21 @@ class OutboxWorker {
 
     try {
       logger.info(`Dispatching outbox ${id} to ${jid} (type: ${outboxRecord.message_type})`);
-      const result = await whatsappClient.sendMessageWithHumanizedDelay(jid, message_text);
+      let result;
+
+      // Handle Invoice PDF Delivery (Requirement 6)
+      if (outboxRecord.message_type === 'payment_receipt' || (outboxRecord.media_url && outboxRecord.media_url.startsWith('invoice://'))) {
+        try {
+          const invRef = outboxRecord.media_url?.replace('invoice://', '') || outboxRecord.template_key?.replace('invoice_', '');
+          const { media } = await invoicePdfService.generateInvoicePdf(invRef, outboxRecord);
+          result = await whatsappClient.sendMediaWithHumanizedDelay(jid, media, message_text);
+        } catch (pdfErr) {
+          logger.error(`PDF generation failed for outbox ${id}: ${pdfErr.message}. Falling back to text receipt.`);
+          result = await whatsappClient.sendMessageWithHumanizedDelay(jid, message_text);
+        }
+      } else {
+        result = await whatsappClient.sendMessageWithHumanizedDelay(jid, message_text);
+      }
 
       // Mark Sent in Outbox
       await supabase

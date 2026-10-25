@@ -5,6 +5,7 @@
  */
 
 const { supabase } = require('../config/supabase');
+const SlotService = require('./slot_service');
 const logger = require('../utils/logger');
 
 class AutomationScheduler {
@@ -13,6 +14,7 @@ class AutomationScheduler {
     this.isRunning = false;
     this.checkIntervalMs = 60000; // Check every 60 seconds
     this.lastRuns = {
+      sameDay8amReminders: null,
       appointmentReminders: null,
       googleReviews: null,
       birthdays: null,
@@ -71,7 +73,15 @@ class AutomationScheduler {
     const minutes = ist.getMinutes();
     const todayStr = ist.toISOString().split('T')[0];
 
-    // 1. Appointment Reminders (Every 15 min between 08:00 and 20:00 IST) - In Scope
+    // 1. Same-Day 8:00 AM IST Appointment Reminders (Promptly at 08:00 AM on appointment date)
+    if (hours === 8 && minutes >= 0 && minutes < 15) {
+      if (this.lastRuns.sameDay8amReminders !== todayStr) {
+        this.lastRuns.sameDay8amReminders = todayStr;
+        await this.enqueueSameDay8amReminders(todayStr);
+      }
+    }
+
+    // 1b. Additional Appointment Reminders (Every 15 min between 08:00 and 20:00 IST) - In Scope
     if (hours >= 8 && hours <= 20) {
       const fifteenMinBlock = `${todayStr}-${hours}-${Math.floor(minutes / 15)}`;
       if (this.lastRuns.appointmentReminders !== fifteenMinBlock) {
@@ -147,6 +157,105 @@ class AutomationScheduler {
       }
     } catch (err) {
       logger.error(`Exception executing scheduler RPC for ${jobLabel}: ${err.message}`, err);
+    }
+  }
+
+  /**
+   * Enqueues appointment reminders at 08:00 AM IST on the appointment date.
+   * Excludes cancelled appointments, strictly prevents duplicate sends,
+   * and completely removes all clinic location text and location links.
+   */
+  async enqueueSameDay8amReminders(todayStr) {
+    try {
+      logger.info(`Scheduler executing: Same-Day 8:00 AM IST Appointment Reminders for ${todayStr}...`);
+      
+      const { data: appts, error } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          patient_id,
+          department,
+          appointment_date,
+          appointment_time,
+          doctor_name,
+          status,
+          patients (
+            id,
+            name,
+            mobile,
+            whatsapp_opt_out
+          )
+        `)
+        .eq('appointment_date', todayStr)
+        .in('status', ['scheduled', 'confirmed']);
+
+      if (error) {
+        logger.error(`Failed to query appointments for 8 AM reminders: ${error.message}`);
+        return { success: false, enqueued: 0, error: error.message };
+      }
+
+      if (!appts || appts.length === 0) {
+        logger.info(`No active appointments scheduled for today (${todayStr}) to remind.`);
+        return { success: true, enqueued: 0 };
+      }
+
+      let enqueuedCount = 0;
+      for (const a of appts) {
+        const patient = a.patients;
+        if (!patient || patient.whatsapp_opt_out || !patient.mobile) continue;
+        
+        const cleanMobile = patient.mobile.replace(/[^0-9]/g, '');
+        if (cleanMobile.length < 10) continue;
+
+        const timeFormatted = SlotService.formatTime12Hour(a.appointment_time);
+        const doctorName = a.doctor_name || 'Attending Specialist';
+        const patientName = patient.name || 'Valued Patient';
+        const dept = (a.department || 'clinic').toUpperCase();
+
+        // Prevent duplicate messages for same appointment
+        const templateKey = `reminder_sameday_8am_${a.id}`;
+        const { data: existing } = await supabase
+          .from('whatsapp_messages_outbox')
+          .select('id')
+          .eq('appointment_id', a.id)
+          .eq('template_key', templateKey)
+          .maybeSingle();
+
+        if (existing) {
+          logger.debug(`8 AM reminder already enqueued for appointment ${a.id}`);
+          continue;
+        }
+
+        // Clean reminder message text without ANY location text or location links
+        const messageText = 
+          `Good morning ${patientName},\n\n` +
+          `This is a reminder of your ${dept} appointment today, *${todayStr}* at *${timeFormatted}* with ${doctorName}.\n\n` +
+          `If you need to reschedule, please reply to this message.\n` +
+          `Reply STOP to unsubscribe.`;
+
+        const { error: insErr } = await supabase.from('whatsapp_messages_outbox').insert({
+          recipient_phone: cleanMobile,
+          patient_id: patient.id,
+          appointment_id: a.id,
+          department: (a.department || 'dental').toLowerCase(),
+          message_type: 'appointment_reminder',
+          template_key: templateKey,
+          message_text: messageText,
+          scheduled_for: new Date().toISOString(),
+        });
+
+        if (!insErr) {
+          enqueuedCount++;
+        } else {
+          logger.error(`Failed to enqueue 8 AM reminder for appointment ${a.id}: ${insErr.message}`);
+        }
+      }
+
+      logger.info(`Same-Day 8:00 AM IST reminders enqueued successfully. Total: ${enqueuedCount}`);
+      return { success: true, enqueued: enqueuedCount };
+    } catch (err) {
+      logger.error(`Exception in enqueueSameDay8amReminders: ${err.message}`, err);
+      return { success: false, error: err.message };
     }
   }
 

@@ -169,10 +169,19 @@ class BotEngine {
     }
 
     // 10. Check Rescheduling Intent in IDLE or Initial Messages
-    if (session.current_step === BOT_STEPS.IDLE && this._isReschedulingIntent(body)) {
+    if (this._isReschedulingIntent(body)) {
       logger.info(`Rescheduling intent detected from ${rawPhone}: "${body}"`);
-      await this._initiateReschedulingWorkflow(session, msg.from, patient);
+      await this._initiateReschedulingWorkflow(session, msg.from, patient, body);
       return;
+    }
+
+    // 10b. Check if patient is replying to a Ready Lab Case notification (Option 1, 2, 3 or custom slot)
+    if (patient?.id) {
+      const readyCase = await this._getPendingReadyDentalLabCase(patient.id);
+      if (readyCase) {
+        const handled = await this._handleDentalLabCaseReply(session, body, msg.from, patient, readyCase);
+        if (handled) return;
+      }
     }
 
     // 11. Universal Restart / Menu command check
@@ -206,7 +215,7 @@ class BotEngine {
   /**
    * Initiates the automated rescheduling workflow.
    */
-  static async _initiateReschedulingWorkflow(session, fromJid, patient) {
+  static async _initiateReschedulingWorkflow(session, fromJid, patient, initialText = '') {
     const todayIso = SlotService.getTodayIST();
 
     if (!patient || !patient.id) {
@@ -250,12 +259,110 @@ class BotEngine {
       const formattedTime = SlotService.formatTime12Hour(appt.appointment_time);
       const doctor = appt.doctor_name || 'Attending Specialist';
 
+      // Record in whatsapp_appointment_requests so Staff Portal -> My Schedule -> WhatsApp Requests displays it immediately!
+      let requestId = null;
+      try {
+        const { data: reqRow } = await supabase
+          .from('whatsapp_appointment_requests')
+          .insert({
+            patient_id: patient.id,
+            patient_name: patient.name || 'Valued Patient',
+            patient_phone: session.phone_number,
+            department: dept,
+            doctor_id: appt.doctor_id || null,
+            doctor_name: doctor,
+            requested_date: appt.appointment_date,
+            requested_time: appt.appointment_time,
+            status: 'pending_review',
+            notes: `Reschedule requested for appointment #${appt.id}. Patient input: "${initialText || 'Reschedule request'}"`,
+          })
+          .select('id')
+          .maybeSingle();
+        if (reqRow) requestId = reqRow.id;
+      } catch (err) {
+        logger.warn(`Could not insert into whatsapp_appointment_requests: ${err.message}`);
+      }
+
       // Notify staff of incoming reschedule request
       await this._notifyStaffOfRescheduleRequest(patient, appt, dept);
 
+      // Check if patient specified requested new date and/or time in their message
+      const parsedDate = SlotService.parseRequestedDate(initialText);
+      const parsedTime = SlotService.parseRequestedTime(initialText);
+
+      if (parsedDate) {
+        const availableSlots = await SlotService.getAvailableSlots(dept, parsedDate, appt.doctor_id);
+
+        if (parsedTime) {
+          const matchingSlot = availableSlots.find(
+            (s) => s.raw === parsedTime || s.formatted.toLowerCase() === parsedTime.toLowerCase() || s.raw.startsWith(parsedTime.slice(0, 5))
+          );
+
+          if (matchingSlot) {
+            // Requested slot is genuinely available!
+            await this._updateSession(session.phone_number, {
+              current_step: BOT_STEPS.AWAITING_RESCHEDULE_CONFIRMATION,
+              reschedule_appointment_id: appt.id,
+              reschedule_request_id: requestId,
+              selected_date: parsedDate,
+              selected_slot: matchingSlot.raw,
+              reschedule_target_slot: matchingSlot,
+              selected_department: dept,
+            });
+
+            const confirmMsg =
+              `🔄 *Confirm Reschedule*\n\n` +
+              `Dear ${patient.name},\n` +
+              `We found your requested slot with Doctor ${doctor}:\n\n` +
+              `📅 *Date:* ${parsedDate}\n` +
+              `⏰ *Time:* ${matchingSlot.formatted}\n\n` +
+              `Reply *1* to CONFIRM this new appointment time.\n` +
+              `Reply *0* to cancel and keep your current appointment.`;
+
+            await whatsappClient.sendMessageWithHumanizedDelay(fromJid, confirmMsg);
+            return;
+          } else {
+            // Requested time is unavailable; offer genuinely available alternatives
+            const topSlots = availableSlots.slice(0, 5);
+            if (topSlots.length > 0) {
+              await this._updateSession(session.phone_number, {
+                current_step: BOT_STEPS.AWAITING_RESCHEDULE_SLOT_CHOICE,
+                reschedule_appointment_id: appt.id,
+                reschedule_request_id: requestId,
+                selected_date: parsedDate,
+                presented_options: topSlots,
+                selected_department: dept,
+              });
+
+              let optMsg =
+                `⚠️ The requested time (${parsedTime}) on *${parsedDate}* is unavailable with Doctor ${doctor}.\n\n` +
+                `Here are genuinely available alternative slots on *${parsedDate}*:\n\n`;
+              topSlots.forEach((s, idx) => {
+                optMsg += `*${idx + 1}* — ${s.formatted}\n`;
+              });
+              optMsg += `\nReply with a number (*1* to *${topSlots.length}*), or reply *0* to pick another date.`;
+
+              await whatsappClient.sendMessageWithHumanizedDelay(fromJid, optMsg);
+              return;
+            }
+          }
+        } else {
+          // Date given, but no time; present available slots for that date
+          await this._updateSession(session.phone_number, {
+            reschedule_appointment_id: appt.id,
+            reschedule_request_id: requestId,
+            selected_department: dept,
+          });
+          await this._presentRescheduleSlots(session, parsedDate, fromJid, dept);
+          return;
+        }
+      }
+
+      // Ambiguous or generic request - prompt patient clearly
       await this._updateSession(session.phone_number, {
         current_step: BOT_STEPS.AWAITING_RESCHEDULE_DATE_CHOICE,
         reschedule_appointment_id: appt.id,
+        reschedule_request_id: requestId,
         reschedule_original_date: appt.appointment_date,
         reschedule_original_time: appt.appointment_time,
         selected_department: dept,
@@ -268,6 +375,7 @@ class BotEngine {
         `*1* — Today\n` +
         `*2* — Tomorrow\n` +
         `*3* — Choose from upcoming dates\n\n` +
+        `Or reply with your requested date and time (e.g. 'Tomorrow at 4pm').\n\n` +
         `_Reply 0 to cancel and keep your current appointment._`;
 
       await whatsappClient.sendMessageWithHumanizedDelay(fromJid, promptText);
@@ -333,6 +441,10 @@ class BotEngine {
 
       case BOT_STEPS.AWAITING_RESCHEDULE_SLOT_CHOICE:
         await this._handleRescheduleSlotChoice(session, input, fromJid, patientName, dept, patient);
+        break;
+
+      case BOT_STEPS.AWAITING_RESCHEDULE_CONFIRMATION:
+        await this._handleRescheduleConfirmation(session, input, fromJid, patientName, dept, patient);
         break;
 
       default:
@@ -533,7 +645,6 @@ class BotEngine {
         `Dear ${patientName},\n` +
         `Your request for a *${dept.toUpperCase()}* appointment on *${selectedDate}* at *${chosenSlot.formatted}* has been received.\n\n` +
         `Our clinic staff is verifying doctor availability and will send your formal confirmation shortly.\n\n` +
-        `📍 *MKES CARE+ Hospital, Malad West*\n` +
         `_Reply STOP to unsubscribe._`;
 
       await whatsappClient.sendMessageWithHumanizedDelay(fromJid, ackText);
@@ -720,103 +831,321 @@ class BotEngine {
     if (choice >= 1 && choice <= options.length) {
       const chosenSlot = options[choice - 1];
       const newDate = session.selected_date;
-      const apptId = session.reschedule_appointment_id;
-
-      if (!apptId) {
-        logger.error('Missing reschedule_appointment_id in session.');
-        await whatsappClient.sendMessageWithHumanizedDelay(fromJid, 'An error occurred during rescheduling. Please contact reception.');
-        await this._resetSession(session.phone_number);
-        return;
-      }
-
-      logger.info(`Executing reschedule for appt ${apptId} -> ${newDate} at ${chosenSlot.raw}`);
-
-      // Attempt atomic stored procedure
-      let rpcSuccess = false;
-      let rpcError = null;
-
-      try {
-        const { data: res, error } = await supabase.rpc('reschedule_appointment_via_whatsapp', {
-          p_appointment_id: apptId,
-          p_new_date: newDate,
-          p_new_time: chosenSlot.raw,
-          p_duration_minutes: CLINIC.CHAT_SLOT_DURATION_MINUTES,
-        });
-
-        if (error) {
-          rpcError = error.message;
-        } else if (res && res.success) {
-          rpcSuccess = true;
-        } else if (res && !res.success) {
-          rpcError = res.message;
-        }
-      } catch (callErr) {
-        rpcError = callErr.message;
-      }
-
-      // Safe Fallback if RPC pending deployment on Supabase
-      if (!rpcSuccess && (rpcError?.includes('does not exist') || rpcError?.includes('42883'))) {
-        try {
-          // Update appointment directly
-          const { error: updErr } = await supabase
-            .from('appointments')
-            .update({
-              appointment_date: newDate,
-              appointment_time: chosenSlot.raw,
-              status: 'confirmed',
-              notes: `[Rescheduled via WhatsApp on ${new Date().toISOString()}]`,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', apptId);
-
-          if (!updErr) {
-            rpcSuccess = true;
-            // Insert outbox confirmation
-            await supabase.from('whatsapp_messages_outbox').insert({
-              recipient_phone: session.phone_number,
-              patient_id: patient?.id,
-              appointment_id: apptId,
-              department: dept,
-              message_type: 'rescheduled',
-              message_text: `🔄 *MKES CARE+ Appointment Rescheduled!*\n\nDear ${patientName}, your ${dept.toUpperCase()} appointment is now confirmed for *${newDate}* at *${chosenSlot.formatted}*.\n\n📍 Location: MKES Hospital, Malad West.\nReply STOP to unsubscribe.`,
-            });
-            // Generate staff notification
-            await this._notifyStaffOfReschedule(patientName, dept, newDate, chosenSlot.formatted, apptId);
-          }
-        } catch (fbErr) {
-          rpcError = fbErr.message;
-        }
-      }
-
-      if (rpcSuccess) {
-        // Notify staff of committed reschedule via database and push notifications
-        await this._notifyStaffOfReschedule(patientName, dept, newDate, chosenSlot.formatted, apptId);
-
-        const successMsg =
-          `✅ *Appointment Successfully Rescheduled!*\n\n` +
-          `Dear ${patientName},\n` +
-          `Your *${dept.toUpperCase()}* appointment at MKES CARE+ has been successfully updated:\n\n` +
-          `📅 *New Date:* ${newDate}\n` +
-          `⏰ *New Time:* ${chosenSlot.formatted}\n\n` +
-          `📍 *MKES Hospital, Malad West*\n` +
-          `_Please arrive 10 minutes prior to your time._\n` +
-          `_Reply STOP to unsubscribe._`;
-
-        await whatsappClient.sendMessageWithHumanizedDelay(fromJid, successMsg);
-        await this._resetSession(session.phone_number);
-      } else {
-        logger.error(`Rescheduling failed for ${apptId}: ${rpcError}`);
-        await whatsappClient.sendMessageWithHumanizedDelay(
-          fromJid,
-          `⚠️ The requested slot (${chosenSlot.formatted}) could not be reserved (${rpcError || 'Slot unavailable'}).\n\n` +
-          `Your original appointment remains active. Please reply with another slot number or *0* to pick another date.`
-        );
-      }
+      await this._executeRescheduleCommit(session, newDate, chosenSlot, fromJid, patientName, dept, patient);
     } else {
       await whatsappClient.sendMessageWithHumanizedDelay(
         fromJid,
         `Invalid choice. Reply with a valid slot number (1 to ${options.length}) or *0* to pick another date.`
       );
+    }
+  }
+
+  static async _handleRescheduleConfirmation(session, input, fromJid, patientName, dept, patient) {
+    const trimmed = input.trim().toLowerCase();
+    if (trimmed === '0' || trimmed === 'cancel') {
+      await this._resetSession(session.phone_number);
+      await whatsappClient.sendMessageWithHumanizedDelay(
+        fromJid,
+        'Rescheduling cancelled. Your original appointment remains active and unchanged.'
+      );
+      return;
+    }
+
+    if (trimmed === '1' || trimmed === 'yes' || trimmed === 'confirm') {
+      const chosenSlot = session.reschedule_target_slot;
+      const targetDate = session.selected_date;
+      if (!chosenSlot || !targetDate) {
+        await whatsappClient.sendMessageWithHumanizedDelay(
+          fromJid,
+          'Rescheduling session expired. Please reply *RESCHEDULE* to start again.'
+        );
+        await this._resetSession(session.phone_number);
+        return;
+      }
+      await this._executeRescheduleCommit(session, targetDate, chosenSlot, fromJid, patientName, dept, patient);
+    } else {
+      await whatsappClient.sendMessageWithHumanizedDelay(
+        fromJid,
+        'Please reply *1* to confirm your rescheduled appointment time, or *0* to cancel and keep your current appointment.'
+      );
+    }
+  }
+
+  static async _executeRescheduleCommit(session, newDate, chosenSlot, fromJid, patientName, dept, patient) {
+    const apptId = session.reschedule_appointment_id;
+
+    if (!apptId) {
+      logger.error('Missing reschedule_appointment_id in session.');
+      await whatsappClient.sendMessageWithHumanizedDelay(fromJid, 'An error occurred during rescheduling. Please contact reception.');
+      await this._resetSession(session.phone_number);
+      return;
+    }
+
+    logger.info(`Executing reschedule for appt ${apptId} -> ${newDate} at ${chosenSlot.raw}`);
+
+    // Prevent double booking before committing
+    const { data: conflicts } = await supabase
+      .from('appointments')
+      .select('id')
+      .eq('appointment_date', newDate)
+      .eq('appointment_time', chosenSlot.raw)
+      .eq('department', dept)
+      .neq('id', apptId)
+      .in('status', ['scheduled', 'confirmed']);
+
+    if (conflicts && conflicts.length > 0) {
+      logger.warn(`Reschedule collision detected: slot ${newDate} ${chosenSlot.raw} already booked.`);
+      await whatsappClient.sendMessageWithHumanizedDelay(
+        fromJid,
+        `⚠️ The slot on *${newDate}* at *${chosenSlot.formatted}* was just booked by another patient.\n\n` +
+        `Please reply *RESCHEDULE* to view remaining available times.`
+      );
+      await this._resetSession(session.phone_number);
+      return;
+    }
+
+    // Attempt atomic stored procedure
+    let rpcSuccess = false;
+    let rpcError = null;
+
+    try {
+      const { data: res, error } = await supabase.rpc('reschedule_appointment_via_whatsapp', {
+        p_appointment_id: apptId,
+        p_new_date: newDate,
+        p_new_time: chosenSlot.raw,
+        p_duration_minutes: CLINIC.CHAT_SLOT_DURATION_MINUTES,
+      });
+
+      if (error) {
+        rpcError = error.message;
+      } else if (res && res.success) {
+        rpcSuccess = true;
+      } else if (res && !res.success) {
+        rpcError = res.message;
+      }
+    } catch (callErr) {
+      rpcError = callErr.message;
+    }
+
+    // Safe fallback if RPC not deployed or needs direct atomic update
+    if (!rpcSuccess && (rpcError?.includes('does not exist') || rpcError?.includes('42883'))) {
+      try {
+        const { error: updErr } = await supabase
+          .from('appointments')
+          .update({
+            appointment_date: newDate,
+            appointment_time: chosenSlot.raw,
+            status: 'confirmed',
+            notes: `[Rescheduled via WhatsApp on ${new Date().toISOString()}]`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', apptId);
+
+        if (!updErr) {
+          rpcSuccess = true;
+        } else {
+          rpcError = updErr.message;
+        }
+      } catch (fbErr) {
+        rpcError = fbErr.message;
+      }
+    }
+
+    if (rpcSuccess) {
+      // Mark request in whatsapp_appointment_requests as approved so My Schedule shows it resolved
+      if (session.reschedule_request_id) {
+        try {
+          await supabase
+            .from('whatsapp_appointment_requests')
+            .update({
+              status: 'approved',
+              requested_date: newDate,
+              requested_time: chosenSlot.raw,
+              promoted_appointment_id: apptId,
+              reviewed_at: new Date().toISOString(),
+              staff_remarks: 'Rescheduled directly via WhatsApp conversational interaction',
+            })
+            .eq('id', session.reschedule_request_id);
+        } catch (_) {}
+      }
+
+      // Insert outbox confirmation - STRICTLY NO CLINIC LOCATION TEXT OR LINKS
+      await supabase.from('whatsapp_messages_outbox').insert({
+        recipient_phone: session.phone_number,
+        patient_id: patient?.id,
+        appointment_id: apptId,
+        department: dept,
+        message_type: 'rescheduled',
+        template_key: `reschedule_conf_${apptId}_${newDate}`,
+        message_text: `🔄 *MKES CARE+ Appointment Rescheduled!*\n\nDear ${patientName}, your ${dept.toUpperCase()} appointment is now confirmed for *${newDate}* at *${chosenSlot.formatted}*.\n\nReply STOP to unsubscribe.`,
+      });
+
+      // Generate staff notification for department staff & admins
+      await this._notifyStaffOfReschedule(patientName, dept, newDate, chosenSlot.formatted, apptId);
+
+      // User confirmation message - STRICTLY NO LOCATION TEXT OR LINKS
+      const successMsg =
+        `✅ *Appointment Successfully Rescheduled!*\n\n` +
+        `Dear ${patientName},\n` +
+        `Your *${dept.toUpperCase()}* appointment at MKES CARE+ has been successfully updated:\n\n` +
+        `📅 *New Date:* ${newDate}\n` +
+        `⏰ *New Time:* ${chosenSlot.formatted}\n\n` +
+        `_Please arrive 10 minutes prior to your time._\n` +
+        `_Reply STOP to unsubscribe._`;
+
+      await whatsappClient.sendMessageWithHumanizedDelay(fromJid, successMsg);
+      await this._resetSession(session.phone_number);
+    } else {
+      logger.error(`Rescheduling failed for ${apptId}: ${rpcError}`);
+      await whatsappClient.sendMessageWithHumanizedDelay(
+        fromJid,
+        `⚠️ The requested slot (${chosenSlot.formatted}) could not be reserved (${rpcError || 'Slot unavailable'}).\n\n` +
+        `Your original appointment remains active. Please reply with another slot number or *0* to pick another date.`
+      );
+    }
+  }
+
+  static async _getPendingReadyDentalLabCase(patientId) {
+    if (!patientId) return null;
+    try {
+      const { data, error } = await supabase
+        .from('dental_lab')
+        .select('*')
+        .eq('patient_id', patientId)
+        .eq('status', 'ready')
+        .is('appointment_id', null)
+        .order('ready_date', { ascending: false })
+        .limit(1);
+
+      if (error || !data || data.length === 0) return null;
+      return data[0];
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static async _handleDentalLabCaseReply(session, body, fromJid, patient, labCase) {
+    const trimmed = body.trim();
+    const choiceNum = parseInt(trimmed, 10);
+    const parsedDate = SlotService.parseRequestedDate(trimmed);
+    const parsedTime = SlotService.parseRequestedTime(trimmed);
+
+    if ((isNaN(choiceNum) || choiceNum < 1 || choiceNum > 3) && !parsedDate && !parsedTime) {
+      return false;
+    }
+
+    let targetDate = null;
+    let targetTime = null;
+    let timeFormatted = '';
+
+    const today = new Date();
+    if (choiceNum === 1) {
+      let d = new Date(today);
+      d.setDate(d.getDate() + 2);
+      if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+      targetDate = d.toISOString().split('T')[0];
+      targetTime = '10:30:00';
+      timeFormatted = '10:30 AM';
+    } else if (choiceNum === 2) {
+      let d = new Date(today);
+      d.setDate(d.getDate() + 3);
+      if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+      targetDate = d.toISOString().split('T')[0];
+      targetTime = '14:00:00';
+      timeFormatted = '02:00 PM';
+    } else if (choiceNum === 3) {
+      let d = new Date(today);
+      d.setDate(d.getDate() + 4);
+      if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+      targetDate = d.toISOString().split('T')[0];
+      targetTime = '11:30:00';
+      timeFormatted = '11:30 AM';
+    } else if (parsedDate || parsedTime) {
+      targetDate = parsedDate || SlotService.getTomorrowIST();
+      targetTime = parsedTime || '11:00:00';
+      timeFormatted = SlotService.formatTime12Hour(targetTime);
+    } else {
+      return false;
+    }
+
+    // Recheck availability before booking
+    const isAvail = await SlotService.isSlotAvailable('dental', targetDate, targetTime);
+    if (!isAvail) {
+      const altSlots = await SlotService.getAvailableSlots('dental', targetDate);
+      let altMsg = `⚠️ The requested slot on *${targetDate}* at *${timeFormatted}* is no longer available.\n\n` +
+        `Here are available alternative slots:\n`;
+      (altSlots.slice(0, 3)).forEach((s, idx) => {
+        altMsg += `*${idx + 1}* — ${s.formatted}\n`;
+      });
+      altMsg += `\nPlease reply with your preferred slot number or contact dental reception.`;
+      await whatsappClient.sendMessageWithHumanizedDelay(fromJid, altMsg);
+      return true;
+    }
+
+    try {
+      const { data: newAppt, error: apptErr } = await supabase
+        .from('appointments')
+        .insert({
+          patient_id: patient.id,
+          department: 'dental',
+          appointment_date: targetDate,
+          appointment_time: targetTime,
+          appointment_type: 'follow_up',
+          status: 'scheduled',
+          notes: `Follow-up fitting for Dental Lab Case #${labCase.case_number} (${labCase.case_type}) confirmed via WhatsApp`,
+        })
+        .select('id')
+        .single();
+
+      if (apptErr || !newAppt) {
+        logger.error(`Failed to book lab fitting appointment: ${apptErr?.message}`);
+        await whatsappClient.sendMessageWithHumanizedDelay(
+          fromJid,
+          'An error occurred while booking your fitting appointment. Our dental reception has been notified to assist you.'
+        );
+        return true;
+      }
+
+      await supabase
+        .from('dental_lab')
+        .update({ appointment_id: newAppt.id })
+        .eq('id', labCase.id);
+
+      const confText =
+        `✅ *Dental Fitting Appointment Confirmed!*\n\n` +
+        `Dear ${patient.name || 'Valued Patient'},\n` +
+        `Your fitting appointment for *${labCase.case_type}* (Ref: #${labCase.case_number}) has been scheduled:\n\n` +
+        `📅 *Date:* ${targetDate}\n` +
+        `⏰ *Time:* ${timeFormatted}\n\n` +
+        `_Please arrive 10 minutes prior to your time._\n` +
+        `_Reply STOP to unsubscribe._`;
+
+      await whatsappClient.sendMessageWithHumanizedDelay(fromJid, confText);
+
+      const { data: staffList } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_active', true)
+        .or(`role.eq.admin,and(role.eq.staff,department.ilike.%dental%)`);
+
+      if (staffList && staffList.length > 0) {
+        for (const s of staffList) {
+          await supabase.from('notifications').insert({
+            user_id: s.id,
+            title: 'Dental Lab Fitting Booked (WhatsApp)',
+            message: `${patient.name || 'Patient'} confirmed fitting for Case #${labCase.case_number} on ${targetDate} at ${timeFormatted}.`,
+            type: 'dental_lab_ready',
+            related_id: labCase.id,
+            is_read: false,
+          });
+        }
+      }
+
+      logger.info(`Fitting appointment ${newAppt.id} successfully booked for Dental Lab Case ${labCase.id}`);
+      return true;
+    } catch (err) {
+      logger.error(`Exception in _handleDentalLabCaseReply: ${err.message}`, err);
+      return false;
     }
   }
 

@@ -10,6 +10,8 @@ import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patients_provider.dart';
 import '../../patients/screens/patient_details_screen.dart';
 import '../../patients/widgets/patient_form_dialog.dart';
+import '../../whatsapp/providers/whatsapp_inbox_provider.dart';
+import '../../whatsapp/screens/whatsapp_inbox_screen.dart';
 
 /// Staff-facing patient directory & search.
 ///
@@ -105,28 +107,59 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                     ],
                   ),
                 ),
-                FilledButton.icon(
-                  onPressed: () async {
-                    final defaultDept = isRestrictedToDept
-                        ? staffDept
-                        : (_selectedDepartment == 'all' ? 'eye' : _selectedDepartment);
-                    final created = await showDialog<PatientModel>(
-                      context: context,
-                      builder: (_) => PatientFormDialog(initialDepartment: defaultDept),
-                    );
-                    if (created != null) {
-                      if (!context.mounted) return;
-                      ref.invalidate(patientSearchProvider);
-                      ref.invalidate(patientsProvider);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => PatientDetailsScreen(patientId: created.id),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Tooltip(
+                      message: 'Open Shared WhatsApp Inbox',
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ref.read(whatsappConversationsProvider.notifier).refresh();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const WhatsAppInboxScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.chat_bubble_outline,
+                            size: 18, color: Color(0xFF25D366)),
+                        label: const Text('WhatsApp Inbox'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF128C7E),
+                          side: const BorderSide(color: Color(0xFF25D366)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.xs,
+                          ),
                         ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.person_add_outlined, size: 18),
-                  label: const Text('New Patient'),
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        final defaultDept = isRestrictedToDept
+                            ? staffDept
+                            : (_selectedDepartment == 'all' ? 'eye' : _selectedDepartment);
+                        final created = await showDialog<PatientModel>(
+                          context: context,
+                          builder: (_) => PatientFormDialog(initialDepartment: defaultDept),
+                        );
+                        if (created != null) {
+                          if (!context.mounted) return;
+                          ref.invalidate(patientSearchProvider);
+                          ref.invalidate(patientsProvider);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PatientDetailsScreen(patientId: created.id),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.person_add_outlined, size: 18),
+                      label: const Text('New Patient'),
+                    ),
+                  ],
                 ),
               ],
             ),

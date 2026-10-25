@@ -42,10 +42,18 @@ class WhatsAppAppointmentRequest {
   bool get isRejected => status == 'rejected';
 
   factory WhatsAppAppointmentRequest.fromJson(Map<String, dynamic> json) {
+    final patientJoin = json['patients'] as Map<String, dynamic>?;
+    final pName = (json['patient_name'] as String?)?.trim();
+    final pPhone = (json['patient_phone'] as String?)?.trim();
+
     return WhatsAppAppointmentRequest(
       id: json['id'] as String,
-      patientPhone: json['patient_phone'] as String? ?? '',
-      patientName: json['patient_name'] as String? ?? 'Patient',
+      patientPhone: (pPhone != null && pPhone.isNotEmpty)
+          ? pPhone
+          : (patientJoin?['mobile'] as String? ?? ''),
+      patientName: (pName != null && pName.isNotEmpty)
+          ? pName
+          : (patientJoin?['name'] as String? ?? 'Valued Patient'),
       patientId: json['patient_id'] as String?,
       department: (json['department'] as String? ?? 'dental').toLowerCase().trim(),
       doctorId: json['doctor_id'] as String?,

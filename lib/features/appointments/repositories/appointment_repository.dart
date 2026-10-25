@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/providers/supabase_provider.dart';
@@ -112,7 +113,7 @@ class AppointmentRepository {
     return AppointmentModel.fromJson(response);
   }
 
-  /// Create a new appointment.
+  /// Create a new appointment and automatically enqueue WhatsApp confirmation.
   Future<AppointmentModel> createAppointment(
       AppointmentModel appointment) async {
     final response = await _supabase
@@ -123,7 +124,75 @@ class AppointmentRepository {
         )
         .single();
 
-    return AppointmentModel.fromJson(response);
+    final created = AppointmentModel.fromJson(response);
+
+    // Auto-send WhatsApp confirmation on successful booking (Requirement 3)
+    _enqueueWhatsAppConfirmation(created, response['patients'] as Map<String, dynamic>?);
+
+    return created;
+  }
+
+  void _enqueueWhatsAppConfirmation(
+    AppointmentModel appt,
+    Map<String, dynamic>? patientMap,
+  ) async {
+    try {
+      if (appt.status.toLowerCase() == 'cancelled') return;
+      if (appt.patientId == null || appt.patientId!.trim().isEmpty) return;
+
+      Map<String, dynamic>? pData = patientMap;
+      if (pData == null || pData['mobile'] == null) {
+        final pRes = await _supabase
+            .from('patients')
+            .select('name, mobile, whatsapp_opt_out')
+            .eq('id', appt.patientId!)
+            .maybeSingle();
+        if (pRes != null) pData = Map<String, dynamic>.from(pRes);
+      }
+
+      if (pData == null) return;
+      if (pData['whatsapp_opt_out'] == true) return;
+
+      final rawMobile = pData['mobile']?.toString() ?? '';
+      final digits = rawMobile.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length < 10) return;
+      final clean10 = digits.substring(digits.length - 10);
+
+      // Duplicate prevention: check if confirmation already exists for this appointment
+      final existing = await _supabase
+          .from('whatsapp_messages_outbox')
+          .select('id')
+          .eq('appointment_id', appt.id)
+          .eq('message_type', 'confirmation')
+          .maybeSingle();
+
+      if (existing != null) return;
+
+      final patientName = pData['name']?.toString() ?? appt.patientName ?? 'Valued Patient';
+      final formattedDate = DateFormat('d MMMM yyyy').format(appt.appointmentDate);
+      final docStr = (appt.doctorName != null && appt.doctorName!.trim().isNotEmpty)
+          ? ' with ${appt.doctorName}'
+          : '';
+
+      final messageText = '✅ *MKES CARE+ Appointment Confirmed!*\n\n'
+          'Dear $patientName,\n'
+          'Your ${appt.department.toUpperCase()} appointment is confirmed for *$formattedDate* at *${appt.formattedTime}*$docStr.\n\n'
+          'Please arrive 10 minutes prior to your scheduled time.\n'
+          'Reply STOP to unsubscribe.';
+
+      await _supabase.from('whatsapp_messages_outbox').insert({
+        'recipient_phone': clean10,
+        'patient_id': appt.patientId,
+        'appointment_id': appt.id,
+        'department': appt.department.toLowerCase(),
+        'message_type': 'confirmation',
+        'template_key': 'appointment_confirmation',
+        'message_text': messageText,
+        'status': 'pending',
+      });
+    } catch (_) {
+      // Non-blocking: background messaging failure should not fail appointment creation
+    }
   }
 
   /// Update appointment fields.

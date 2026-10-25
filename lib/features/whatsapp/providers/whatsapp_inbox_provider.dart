@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/providers/supabase_provider.dart';
 import '../models/whatsapp_message.dart';
 import '../repositories/whatsapp_repository.dart';
 
@@ -10,9 +13,38 @@ final whatsappConversationsProvider =
 
 class WhatsAppConversationsNotifier
     extends AsyncNotifier<List<WhatsAppConversation>> {
+  Timer? _pollingTimer;
+  RealtimeChannel? _subscriptionChannel;
+
   @override
   Future<List<WhatsAppConversation>> build() async {
+    _setupAutoRefresh();
+    ref.onDispose(() {
+      _pollingTimer?.cancel();
+      _subscriptionChannel?.unsubscribe();
+    });
     return _fetch();
+  }
+
+  void _setupAutoRefresh() {
+    _pollingTimer?.cancel();
+    // Periodic silent refresh every 8 seconds while provider is active
+    _pollingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      silentRefresh();
+    });
+
+    try {
+      final supabase = ref.read(supabaseProvider);
+      _subscriptionChannel?.unsubscribe();
+      _subscriptionChannel = supabase.channel('wa_inbox_live').onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'whatsapp_message_logs',
+        callback: (_) {
+          silentRefresh();
+        },
+      )..subscribe();
+    } catch (_) {}
   }
 
   Future<List<WhatsAppConversation>> _fetch() async {
@@ -23,6 +55,14 @@ class WhatsAppConversationsNotifier
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(_fetch);
+  }
+
+  /// Silently updates conversations without showing a disruptive loading spinner
+  Future<void> silentRefresh() async {
+    try {
+      final updated = await _fetch();
+      state = AsyncValue.data(updated);
+    } catch (_) {}
   }
 
   Future<bool> sendMessage({
@@ -41,7 +81,7 @@ class WhatsAppConversationsNotifier
 
     if (res['success'] == true) {
       // Refresh conversations list to show outgoing message
-      await refresh();
+      await silentRefresh();
       return true;
     }
     return false;
