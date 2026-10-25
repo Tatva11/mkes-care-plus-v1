@@ -180,6 +180,18 @@ class LeaveRepository {
     final end = DateTime.parse(req['end_date'] as String);
     final staffId = req['staff_id'] as String;
 
+    final dutyPeriod =
+        (req['duty_period'] as String?)?.toLowerCase() ?? 'full_day';
+
+    final shiftsToMark = <String>[];
+    if (dutyPeriod == 'morning') {
+      shiftsToMark.add('morning');
+    } else if (dutyPeriod == 'afternoon' || dutyPeriod == 'evening') {
+      shiftsToMark.add('afternoon');
+    } else {
+      shiftsToMark.addAll(['morning', 'afternoon']);
+    }
+
     for (var d = start;
         !d.isAfter(end);
         d = d.add(const Duration(days: 1))) {
@@ -187,12 +199,15 @@ class LeaveRepository {
       if (d.weekday == DateTime.sunday) continue;
 
       final dateStr = d.toIso8601String().split('T').first;
-      await _supabase.from('staff_attendance').upsert({
-        'staff_id': staffId,
-        'record_date': dateStr,
-        'status': 'leave',
-        'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'staff_id, record_date');
+      for (final shift in shiftsToMark) {
+        await _supabase.from('staff_attendance').upsert({
+          'staff_id': staffId,
+          'record_date': dateStr,
+          'shift': shift,
+          'status': 'leave',
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'staff_id, record_date, shift');
+      }
     }
 
     // 3. Notify the staff member.

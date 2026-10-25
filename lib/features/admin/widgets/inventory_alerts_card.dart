@@ -44,27 +44,28 @@ class InventoryAlertsCard extends ConsumerWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.xs,
+                  runSpacing: 4,
                   children: [
-                    Flexible(
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.inventory_2_outlined,
-                            color: AppColors.secondary,
-                            size: 22,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.inventory_2_outlined,
+                          color: AppColors.secondary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: Text(
+                            'Critical Inventory',
+                            style: AppTypography.headlineMd,
                           ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Flexible(
-                            child: Text(
-                              'Critical Inventory',
-                              style: AppTypography.headlineMd,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                     TextButton(
                       onPressed: () {

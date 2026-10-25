@@ -149,6 +149,24 @@ class StaffMemberTile extends StatelessWidget {
     }
   }
 
+  String _checkInSubtitle(BuildContext context) {
+    final att = todayAttendance;
+    if (att != null && att.checkInTime != null) {
+      final tod = TimeOfDay.fromDateTime(att.checkInTime!.toLocal());
+      return 'In: ${tod.format(context)}';
+    }
+    if (!user.isActive) {
+      return 'Off Duty';
+    }
+    if (att != null && att.status.toLowerCase() == 'leave') {
+      return 'On Leave';
+    }
+    if (att != null && att.status.toLowerCase() == 'absent') {
+      return 'Absent';
+    }
+    return 'Not checked in';
+  }
+
   @override
   Widget build(BuildContext context) {
     final initials = user.fullName
@@ -209,19 +227,22 @@ class StaffMemberTile extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                         overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+                        maxLines: 2,
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         '${user.designation ?? user.role.toUpperCase()} • ${user.departmentName ?? user.department ?? '-'}',
-                        style: AppTypography.bodySm,
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                        ),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: AppSpacing.xs),
-                // Shift & Contact & Salary
+                const SizedBox(width: AppSpacing.sm),
+                // Status badge & Check-in time
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -256,16 +277,13 @@ class StaffMemberTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.base),
+                    const SizedBox(height: 4),
                     Text(
-                      '${user.email} • ${user.phoneNumber ?? 'No phone'}',
+                      _checkInSubtitle(context),
                       style: AppTypography.bodySm.copyWith(
                         fontSize: 12,
+                        color: AppColors.onSurfaceVariant,
                       ),
-                    ),
-                    Text(
-                      'Joined: ${user.joiningDate?.toIso8601String().split('T').first ?? '—'} • Salary: ${user.salary != null ? '₹${user.salary!.toStringAsFixed(0)}' : '—'}',
-                      style: AppTypography.bodySm.copyWith(fontSize: 11),
                     ),
                   ],
                 ),

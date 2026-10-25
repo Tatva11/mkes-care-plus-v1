@@ -507,7 +507,10 @@ class _StaffPatientCard extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: AppSpacing.base),
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: AppSpacing.xs,
+                              runSpacing: 2,
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -528,7 +531,6 @@ class _StaffPatientCard extends StatelessWidget {
                                   ),
                                 ),
                                 if (patient.dob != null) ...[
-                                  const SizedBox(width: AppSpacing.xs),
                                   Text(
                                     '${DateTime.now().year - patient.dob!.year}y',
                                     style: AppTypography.bodySm.copyWith(
@@ -538,18 +540,19 @@ class _StaffPatientCard extends StatelessWidget {
                                 ],
                                 if (patient.mobile != null &&
                                     patient.mobile!.isNotEmpty) ...[
-                                  const SizedBox(width: AppSpacing.xs),
-                                  const Icon(Icons.phone_outlined,
-                                      size: 13, color: AppColors.outline),
-                                  const SizedBox(width: 3),
-                                  Flexible(
-                                    child: Text(
-                                      patient.mobile!,
-                                      style: AppTypography.bodySm.copyWith(
-                                        color: AppColors.onSurfaceVariant,
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.phone_outlined,
+                                          size: 13, color: AppColors.outline),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        patient.mobile!,
+                                        style: AppTypography.bodySm.copyWith(
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
                                       ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                    ],
                                   ),
                                 ],
                               ],
@@ -562,20 +565,22 @@ class _StaffPatientCard extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.xs),
 
               // ── Call button ─────────────────────────────────────────
               _PatientCallButton(patient: patient),
 
-              const SizedBox(width: AppSpacing.xs),
+              const SizedBox(width: 2),
 
               // ── Chevron ─────────────────────────────────────────────
               IconButton(
                 icon: const Icon(
                   Icons.arrow_forward_ios_rounded,
-                  size: 16,
+                  size: 14,
                   color: AppColors.outline,
                 ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 36),
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -623,10 +628,9 @@ class _PatientCallButton extends StatelessWidget {
         backgroundColor:
             hasValidPhone ? AppColors.primary : AppColors.outlineVariant,
         foregroundColor: hasValidPhone ? Colors.white : AppColors.outline,
-        textStyle: AppTypography.labelCaps.copyWith(fontSize: 11),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: AppTypography.labelCaps.copyWith(fontSize: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        minimumSize: const Size(60, 36),
       ),
     );
   }

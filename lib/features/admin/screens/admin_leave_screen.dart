@@ -377,14 +377,16 @@ class _LeaveCard extends ConsumerWidget {
                       style: AppTypography.bodyMd
                           .copyWith(fontWeight: FontWeight.w700),
                     ),
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: AppSpacing.xs,
+                      runSpacing: 2,
                       children: [
                         Text(
                           '${request.leaveDays.toStringAsFixed(request.leaveDays.truncateToDouble() == request.leaveDays ? 0 : 1)} working day(s)',
                           style: AppTypography.bodySm
                               .copyWith(color: AppColors.onSurfaceVariant),
                         ),
-                        const SizedBox(width: AppSpacing.xs),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
@@ -515,8 +517,10 @@ class _LeaveCard extends ConsumerWidget {
           // Action buttons (pending only)
           if (showActions && request.status == 'pending') ...[
             const SizedBox(height: AppSpacing.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
               children: [
                 OutlinedButton.icon(
                   icon:
@@ -534,7 +538,6 @@ class _LeaveCard extends ConsumerWidget {
                   onPressed:
                       isProcessing ? null : () => _showRejectDialog(context),
                 ),
-                const SizedBox(width: AppSpacing.sm),
                 FilledButton.icon(
                   icon: isProcessing
                       ? const SizedBox(

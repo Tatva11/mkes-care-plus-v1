@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
+import '../../../shared/widgets/responsive_form_row.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patients_provider.dart';
 import '../models/dental_lab_model.dart';
@@ -242,54 +245,73 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
         .where((p) => p.department?.toLowerCase() == 'dental')
         .toList();
 
-    return AlertDialog(
+    final dialogConstraints = AdaptiveDialogShell.constraintsFor(
+      context,
+      maxMobileWidth: AppBreakpoints.maxDialogWidthMobile,
+      maxTabletWidth: 540.0,
+      maxDesktopWidth: 560.0,
+    );
+
+    return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
       ),
-      titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-      contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
-      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-      title: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.biotech,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                isEditing ? 'Edit Dental Lab Case' : 'New Dental Lab Case',
-                style: AppTypography.headlineMd.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.lg,
       ),
-      content: SizedBox(
-        width: 540,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogConstraints.maxWidth,
+          maxHeight: dialogConstraints.maxHeight,
+        ),
         child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
+                // ── Header ───────────────────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.biotech,
+                              color: AppColors.primary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              isEditing ? 'Edit Dental Lab Case' : 'New Dental Lab Case',
+                              style: AppTypography.headlineMd.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
                 if (_errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(AppSpacing.sm),
@@ -358,7 +380,7 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
                       ],
                     ),
                   )
-                else
+                else ...[
                   Autocomplete<PatientModel>(
                     displayStringForOption: (patient) => '${patient.name} (${patient.patientNumber})',
                     optionsBuilder: (TextEditingValue textEditingValue) {
@@ -376,6 +398,36 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
                       setState(() {
                         _selectedPatient = patient;
                       });
+                    },
+                    optionsViewBuilder: (context, onSelected, options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 4,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 200, maxWidth: 360),
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (context, i) {
+                                final option = options.elementAt(i);
+                                return ListTile(
+                                  dense: true,
+                                  leading: const Icon(Icons.person, size: 18),
+                                  title: Text(option.name, style: AppTypography.bodyMd),
+                                  subtitle: Text(
+                                    'ID: ${option.patientNumber} • ${option.mobile ?? "No phone"}',
+                                    style: AppTypography.bodySm,
+                                  ),
+                                  onTap: () => onSelected(option),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
                     },
                     fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
                       return TextFormField(
@@ -407,73 +459,101 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
                       );
                     },
                   ),
-
-                const SizedBox(height: AppSpacing.md),
-
-                // ── Case Number & Case Type Row ────────────────────────────
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Case Number
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  if (dentalPatientsAsync.isLoading && dentalPatients.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Loading dental patients...',
+                        style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                      ),
+                    ),
+                  if (dentalPatientsAsync.hasError && dentalPatients.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
                         children: [
-                          Text('CASE NUMBER *', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _caseNumberController,
-                            readOnly: isEditing,
-                            decoration: InputDecoration(
-                              hintText: 'e.g. DEN-20261002-0001',
-                              prefixIcon: const Icon(Icons.tag, size: 18),
-                              filled: isEditing,
-                              fillColor: isEditing ? AppColors.surfaceContainerLow : null,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            ),
-                            validator: (val) {
-                              if (val == null || val.trim().isEmpty) {
-                                return 'Required';
-                              }
-                              return null;
+                          Text(
+                            'Failed to load patients. ',
+                            style: AppTypography.bodySm.copyWith(color: AppColors.error),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              ref.invalidate(patientsByDepartmentProvider('dental'));
+                              ref.invalidate(patientsProvider);
                             },
+                            child: Text(
+                              'Retry',
+                              style: AppTypography.bodySm.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
+                ],
+
+                const SizedBox(height: AppSpacing.md),
+
+                // ── Case Number & Case Type Row ────────────────────────────
+                ResponsiveFormRow(
+                  breakpoint: 480,
+                  flexes: const [4, 5],
+                  children: [
+                    // Case Number
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('CASE NUMBER *', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: _caseNumberController,
+                          readOnly: isEditing,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. DEN-20261002-0001',
+                            prefixIcon: const Icon(Icons.tag, size: 18),
+                            filled: isEditing,
+                            fillColor: isEditing ? AppColors.surfaceContainerLow : null,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Required';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
 
                     // Case Type
-                    Expanded(
-                      flex: 5,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('CASE TYPE *', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            controller: _caseTypeController,
-                            decoration: InputDecoration(
-                              hintText: 'e.g. Zirconia Crown',
-                              prefixIcon: const Icon(Icons.medical_services_outlined, size: 18),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('CASE TYPE *', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: _caseTypeController,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. Zirconia Crown',
+                            prefixIcon: const Icon(Icons.medical_services_outlined, size: 18),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                             ),
-                            validator: (val) {
-                              if (val == null || val.trim().isEmpty) {
-                                return 'Required';
-                              }
-                              return null;
-                            },
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                           ),
-                        ],
-                      ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Required';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -502,17 +582,48 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
                 const SizedBox(height: AppSpacing.md),
 
                 // ── Date Pickers ──────────────────────────────────────────
-                Row(
+                ResponsiveFormRow(
+                  breakpoint: 480,
                   children: [
                     // Sent Date
-                    Expanded(
-                      child: Column(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('SENT DATE *', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
+                        const SizedBox(height: 6),
+                        InkWell(
+                          onTap: _pickSentDate,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.outlineVariant),
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  DateFormat('dd MMM yyyy').format(_sentDate),
+                                  style: AppTypography.bodyMd,
+                                ),
+                                const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (isEditing)
+                      // Ready Date (if applicable)
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('SENT DATE *', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
+                          Text('READY DATE', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
                           const SizedBox(height: 6),
                           InkWell(
-                            onTap: _pickSentDate,
+                            onTap: _pickReadyDate,
                             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -524,89 +635,51 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    DateFormat('dd MMM yyyy').format(_sentDate),
-                                    style: AppTypography.bodyMd,
+                                    _readyDate != null ? DateFormat('dd MMM yyyy').format(_readyDate!) : 'Not set',
+                                    style: AppTypography.bodyMd.copyWith(
+                                      color: _readyDate != null ? AppColors.onSurface : AppColors.onSurfaceVariant,
+                                    ),
                                   ),
-                                  const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
+                                  const Icon(Icons.event_available, size: 16, color: AppColors.secondary),
                                 ],
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ),
 
-                    if (isEditing) ...[
-                      const SizedBox(width: AppSpacing.sm),
-                      // Ready Date (if applicable)
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('READY DATE', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
-                            const SizedBox(height: 6),
-                            InkWell(
-                              onTap: _pickReadyDate,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: AppColors.outlineVariant),
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      _readyDate != null ? DateFormat('dd MMM yyyy').format(_readyDate!) : 'Not set',
-                                      style: AppTypography.bodyMd.copyWith(
-                                        color: _readyDate != null ? AppColors.onSurface : AppColors.onSurfaceVariant,
-                                      ),
-                                    ),
-                                    const Icon(Icons.event_available, size: 16, color: AppColors.secondary),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(width: AppSpacing.sm),
+                    if (isEditing)
                       // Delivered Date (if applicable)
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('DELIVERED DATE', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
-                            const SizedBox(height: 6),
-                            InkWell(
-                              onTap: _pickDeliveredDate,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: AppColors.outlineVariant),
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      _deliveredDate != null ? DateFormat('dd MMM yyyy').format(_deliveredDate!) : 'Not set',
-                                      style: AppTypography.bodyMd.copyWith(
-                                        color: _deliveredDate != null ? AppColors.onSurface : AppColors.onSurfaceVariant,
-                                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('DELIVERED DATE', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
+                          const SizedBox(height: 6),
+                          InkWell(
+                            onTap: _pickDeliveredDate,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: AppColors.outlineVariant),
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _deliveredDate != null ? DateFormat('dd MMM yyyy').format(_deliveredDate!) : 'Not set',
+                                    style: AppTypography.bodyMd.copyWith(
+                                      color: _deliveredDate != null ? AppColors.onSurface : AppColors.onSurfaceVariant,
                                     ),
-                                    const Icon(Icons.done_all, size: 16, color: Colors.green),
-                                  ],
-                                ),
+                                  ),
+                                  const Icon(Icons.done_all, size: 16, color: Colors.green),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
                   ],
                 ),
 
@@ -626,24 +699,31 @@ class _DentalLabFormDialogState extends ConsumerState<DentalLabFormDialog> {
                     contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                // ── Actions ────────────────────────────────────────────────
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    TextButton(
+                      onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _isSaving ? null : _save,
+                      icon: _isSaving
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.check, size: 18),
+                      label: Text(isEditing ? 'Save Changes' : 'Create Lab Case'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton.icon(
-          onPressed: _isSaving ? null : _save,
-          icon: _isSaving
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.check, size: 18),
-          label: Text(isEditing ? 'Save Changes' : 'Create Lab Case'),
-        ),
-      ],
     );
   }
 }

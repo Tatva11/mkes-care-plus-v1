@@ -154,30 +154,61 @@ class _DepartmentManagementContentState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _buildHeaderTexts()),
-              const SizedBox(width: AppSpacing.md),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const InventoryManagementScreen(),
+          if (isDesktop)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildHeaderTexts(isDesktop)),
+                const SizedBox(width: AppSpacing.md),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const InventoryManagementScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                  label: const Text('Inventory'),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                FilledButton.icon(
+                  onPressed: () => _openDepartmentDialog(),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Department'),
+                ),
+              ],
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeaderTexts(isDesktop),
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const InventoryManagementScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                      label: const Text('Inventory'),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.inventory_2_outlined, size: 18),
-                label: const Text('Inventory'),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              FilledButton.icon(
-                onPressed: () => _openDepartmentDialog(),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Department'),
-              ),
-            ],
-          ),
+                    FilledButton.icon(
+                      onPressed: () => _openDepartmentDialog(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Department'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           const SizedBox(height: AppSpacing.lg),
           departmentsState.when(
             loading: () => const Center(
@@ -207,53 +238,134 @@ class _DepartmentManagementContentState
   }
 
   Widget _buildDepartmentTile(Department department) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.business_outlined, color: AppColors.primary),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        final statusChip = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: department.isActive
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : AppColors.onSurfaceVariant.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          ),
+          child: Text(
+            department.isActive ? 'Active' : 'Inactive',
+            style: AppTypography.labelCaps.copyWith(
+              color: department.isActive
+                  ? AppColors.primary
+                  : AppColors.onSurfaceVariant,
+            ),
+          ),
+        );
+
+        if (isMobile) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(color: AppColors.outlineVariant),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(department.name, style: AppTypography.headlineMd),
-                if (department.description?.isNotEmpty == true)
-                  Text(department.description!, style: AppTypography.bodyMd),
+                Row(
+                  children: [
+                    const Icon(Icons.business_outlined, color: AppColors.primary),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        department.name,
+                        style: AppTypography.headlineMd.copyWith(fontSize: 18),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    statusChip,
+                  ],
+                ),
+                if (department.description?.isNotEmpty == true) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(department.description!, style: AppTypography.bodySm),
+                ],
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () =>
+                          _openDepartmentDialog(department: department),
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Edit'),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    TextButton.icon(
+                      onPressed: () => _deleteDepartment(department),
+                      icon: const Icon(Icons.delete_outline,
+                          size: 16, color: AppColors.error),
+                      label: const Text('Delete',
+                          style: TextStyle(color: AppColors.error)),
+                    ),
+                  ],
+                ),
               ],
             ),
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: AppColors.outlineVariant),
           ),
-          Text(department.isActive ? 'Active' : 'Inactive',
-              style: AppTypography.labelCaps),
-          IconButton(
-            tooltip: 'Edit department',
-            onPressed: () => _openDepartmentDialog(department: department),
-            icon: const Icon(Icons.edit_outlined),
+          child: Row(
+            children: [
+              const Icon(Icons.business_outlined, color: AppColors.primary),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(department.name, style: AppTypography.headlineMd),
+                    if (department.description?.isNotEmpty == true)
+                      Text(department.description!, style: AppTypography.bodyMd),
+                  ],
+                ),
+              ),
+              statusChip,
+              const SizedBox(width: AppSpacing.sm),
+              IconButton(
+                tooltip: 'Edit department',
+                onPressed: () => _openDepartmentDialog(department: department),
+                icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                tooltip: 'Delete department',
+                onPressed: () => _deleteDepartment(department),
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Delete department',
-            onPressed: () => _deleteDepartment(department),
-            icon: const Icon(Icons.delete_outline),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildHeaderTexts() {
+  Widget _buildHeaderTexts(bool isDesktop) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Department Management',
-          style: AppTypography.displayLg.copyWith(
+          style: (isDesktop ? AppTypography.displayLg : AppTypography.headlineMd)
+              .copyWith(
             color: AppColors.onBackground,
+            fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -331,24 +443,26 @@ class _DepartmentDialogState extends State<_DepartmentDialog> {
     return AlertDialog(
       title: Text(
           widget.department == null ? 'Add Department' : 'Edit Department'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-              controller: _nameController,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Name')),
-          TextField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Description')),
-          if (widget.department != null)
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Active'),
-              value: _isActive,
-              onChanged: (value) => setState(() => _isActive = value),
-            ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+                controller: _nameController,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Name')),
+            TextField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(labelText: 'Description')),
+            if (widget.department != null)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Active'),
+                value: _isActive,
+                onChanged: (value) => setState(() => _isActive = value),
+              ),
+          ],
+        ),
       ),
       actions: [
         TextButton(

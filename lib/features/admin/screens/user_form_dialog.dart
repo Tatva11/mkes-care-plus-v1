@@ -9,6 +9,7 @@ import '../../../shared/widgets/mkes_text_field.dart';
 import '../../../shared/widgets/mkes_primary_button.dart';
 import '../models/user_profile.dart';
 import '../providers/users_provider.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
 import '../../department/models/department.dart';
 import '../../department/providers/departments_provider.dart';
 import '../../notifications/repositories/notification_repository.dart';
@@ -179,15 +180,13 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
   @override
   Widget build(BuildContext context) {
     final departmentsState = ref.watch(departmentsProvider);
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final screenHeight = MediaQuery.sizeOf(context).height;
     final viewInsets = MediaQuery.viewInsetsOf(context);
-
-    // Responsive max width: up to 500px, but always fits the screen with 32px margins.
-    final dialogMaxWidth = (screenWidth - 32).clamp(280.0, 500.0);
-    // Responsive max height: leave room for keyboard and status bar.
-    final dialogMaxHeight =
-        (screenHeight - viewInsets.bottom - 80).clamp(300.0, 640.0);
+    final dialogConstraints = AdaptiveDialogConstraints.getConstraints(
+      context: context,
+      maxPhoneWidth: 460,
+      maxTabletWidth: 500,
+      maxDesktopWidth: 520,
+    );
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -195,10 +194,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
       // insetPadding keeps the dialog from touching screen edges on small phones.
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogMaxWidth,
-          maxHeight: dialogMaxHeight,
-        ),
+        constraints: dialogConstraints,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -291,85 +287,54 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
-                // On very small screens, stack Phone + Role vertically
+                // On narrow screens (< 440 px), stack Phone + Role vertically
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final narrow = constraints.maxWidth < 320;
+                    final narrow = constraints.maxWidth < 440;
+                    final phoneField = MkesTextField(
+                      controller: _phoneController,
+                      label: 'Phone Number',
+                      keyboardType: TextInputType.phone,
+                      validator: (v) {
+                        if (v != null && v.isNotEmpty && v.length < 10) {
+                          return 'Enter a valid phone number (min 10 digits)';
+                        }
+                        return null;
+                      },
+                    );
+                    final roleField = DropdownButtonFormField<String>(
+                      initialValue: _selectedRole,
+                      decoration: InputDecoration(
+                        labelText: 'Role',
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusMd),
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                        DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                      ],
+                      onChanged: (val) {
+                        setState(() => _selectedRole = val!);
+                      },
+                    );
+
                     if (narrow) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          MkesTextField(
-                            controller: _phoneController,
-                            label: 'Phone Number',
-                            keyboardType: TextInputType.phone,
-                            validator: (v) {
-                              if (v != null && v.isNotEmpty && v.length < 10) {
-                                return 'Enter a valid phone number (min 10 digits)';
-                              }
-                              return null;
-                            },
-                          ),
+                          phoneField,
                           const SizedBox(height: AppSpacing.md),
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedRole,
-                            decoration: InputDecoration(
-                              labelText: 'Role',
-                              border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppSpacing.radiusMd),
-                              ),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                  value: 'staff', child: Text('Staff')),
-                              DropdownMenuItem(
-                                  value: 'admin', child: Text('Admin')),
-                            ],
-                            onChanged: (val) {
-                              setState(() => _selectedRole = val!);
-                            },
-                          ),
+                          roleField,
                         ],
                       );
                     }
                     return Row(
                       children: [
-                        Expanded(
-                          child: MkesTextField(
-                            controller: _phoneController,
-                            label: 'Phone Number',
-                            keyboardType: TextInputType.phone,
-                            validator: (v) {
-                              if (v != null && v.isNotEmpty && v.length < 10) {
-                                return 'Enter a valid phone number (min 10 digits)';
-                              }
-                              return null;
-                            },
-                          ),
-                        ),
+                        Expanded(child: phoneField),
                         const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _selectedRole,
-                            decoration: InputDecoration(
-                              labelText: 'Role',
-                              border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppSpacing.radiusMd),
-                              ),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                  value: 'staff', child: Text('Staff')),
-                              DropdownMenuItem(
-                                  value: 'admin', child: Text('Admin')),
-                            ],
-                            onChanged: (val) {
-                              setState(() => _selectedRole = val!);
-                            },
-                          ),
-                        ),
+                        Expanded(child: roleField),
                       ],
                     );
                   },
@@ -400,73 +365,101 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    Expanded(
-                      child: departmentsState.when(
-                        loading: () => const LinearProgressIndicator(),
-                        error: (error, stackTrace) =>
-                            Text('Unable to load departments: $error'),
-                        data: (departments) => DropdownButtonFormField<String?>(
-                          initialValue: _selectedDepartmentId,
-                          decoration: InputDecoration(
-                            labelText: 'Department',
-                            border: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusMd),
-                            ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final narrow = constraints.maxWidth < 440;
+                    final deptField = departmentsState.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (error, stackTrace) =>
+                          Text('Unable to load departments: $error'),
+                      data: (departments) => DropdownButtonFormField<String?>(
+                        initialValue: _selectedDepartmentId,
+                        decoration: InputDecoration(
+                          labelText: 'Department',
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusMd),
                           ),
-                          items: [
-                            const DropdownMenuItem<String?>(
-                              value: null,
-                              child: Text('Unassigned'),
-                            ),
-                            ...departments
-                                .where((department) =>
-                                    department.isActive ||
-                                    department.id == _selectedDepartmentId)
-                                .map(
-                                  (Department department) =>
-                                      DropdownMenuItem<String?>(
-                                    value: department.id,
-                                    child: Text(department.name),
-                                  ),
-                                ),
-                          ],
-                          onChanged: (value) =>
-                              setState(() => _selectedDepartmentId = value),
                         ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Unassigned'),
+                          ),
+                          ...departments
+                              .where((department) =>
+                                  department.isActive ||
+                                  department.id == _selectedDepartmentId)
+                              .map(
+                                (Department department) =>
+                                    DropdownMenuItem<String?>(
+                                  value: department.id,
+                                  child: Text(department.name),
+                                ),
+                              ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _selectedDepartmentId = value),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: MkesTextField(
-                        controller: _designationController,
-                        label: 'Designation',
-                      ),
-                    ),
-                  ],
+                    );
+                    final desigField = MkesTextField(
+                      controller: _designationController,
+                      label: 'Designation',
+                    );
+
+                    if (narrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          deptField,
+                          const SizedBox(height: AppSpacing.md),
+                          desigField,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: deptField),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(child: desigField),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    Expanded(
-                      child: MkesTextField(
-                        controller: _salaryController,
-                        label: 'Salary',
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: MkesTextField(
-                        controller: _joiningDateController,
-                        label: 'Joining Date (YYYY-MM-DD)',
-                        keyboardType: TextInputType.datetime,
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final narrow = constraints.maxWidth < 440;
+                    final salaryField = MkesTextField(
+                      controller: _salaryController,
+                      label: 'Salary',
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                    );
+                    final joiningField = MkesTextField(
+                      controller: _joiningDateController,
+                      label: 'Joining Date (YYYY-MM-DD)',
+                      keyboardType: TextInputType.datetime,
+                    );
+
+                    if (narrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          salaryField,
+                          const SizedBox(height: AppSpacing.md),
+                          joiningField,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: salaryField),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(child: joiningField),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Row(

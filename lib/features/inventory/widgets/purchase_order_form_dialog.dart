@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
+import '../../../shared/widgets/responsive_form_row.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../vendors/models/vendor.dart';
 import '../../vendors/providers/vendor_provider.dart';
@@ -281,7 +283,6 @@ class _PurchaseOrderFormDialogState
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width > 768;
     final rawVendors = ref.watch(vendorsProvider).value ?? [];
     final allVendors = rawVendors.where((v) => v.isActive).toList();
     final allInventory = ref.watch(inventoryProvider).value ?? [];
@@ -290,6 +291,13 @@ class _PurchaseOrderFormDialogState
     final availableProducts = selectedVendor != null
         ? allInventory.where((i) => isProductSuppliedByVendor(i, selectedVendor)).toList()
         : allInventory;
+
+    final dialogConstraints = AdaptiveDialogShell.constraintsFor(
+      context,
+      maxMobileWidth: double.infinity,
+      maxTabletWidth: 640.0,
+      maxDesktopWidth: 800.0,
+    );
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -302,8 +310,8 @@ class _PurchaseOrderFormDialogState
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: isDesktop ? 800 : 540,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+          maxWidth: dialogConstraints.maxWidth,
+          maxHeight: dialogConstraints.maxHeight,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -325,230 +333,220 @@ class _PurchaseOrderFormDialogState
                       ],
 
                       // Row 1: PO Number & Vendor
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      ResponsiveFormRow(
+                        breakpoint: 500,
+                        flexes: const [2, 3],
                         children: [
-                          Expanded(
-                            flex: 2,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _isEditing ? 'PO NUMBER (READ-ONLY)' : 'PO NUMBER (AUTO-GENERATED)',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _isEditing ? 'PO NUMBER (READ-ONLY)' : 'PO NUMBER (AUTO-GENERATED)',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.md,
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                    border: Border.all(color: AppColors.outlineVariant),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.tag,
-                                        size: 18,
-                                        color: AppColors.primary,
-                                      ),
-                                      const SizedBox(width: AppSpacing.xs),
-                                      Expanded(
-                                        child: Text(
-                                          _isEditing
-                                              ? widget.order!.purchaseOrderNumber
-                                              : 'Auto: PO-${DateFormat('ddMMyyyy').format(DateTime.now())}-XXXX',
-                                          style: AppTypography.bodyMd.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.onSurface,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: 14,
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            flex: 3,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'VENDOR / SUPPLIER *',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                  border: Border.all(color: AppColors.outlineVariant),
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                DropdownButtonFormField<String>(
-                                  key: const Key('po_vendor_dropdown'),
-                                  isExpanded: true,
-                                  initialValue: _selectedVendorId,
-                                  hint: const Text('Select Supplier *'),
-                                  decoration: InputDecoration(
-                                    prefixIcon: const Icon(
-                                      Icons.local_shipping_outlined,
-                                      size: 20,
-                                      color: AppColors.onSurfaceVariant,
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.tag,
+                                      size: 18,
+                                      color: AppColors.primary,
                                     ),
-                                    fillColor: AppColors.surfaceContainerLow,
-                                    hintText: 'Select Supplier *',
-                                  ),
-                                  items: allVendors.map((v) {
-                                    return DropdownMenuItem<String>(
-                                      value: v.id,
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Expanded(
                                       child: Text(
-                                        '${v.name} (${v.productsDisplay})',
+                                        _isEditing
+                                            ? widget.order!.purchaseOrderNumber
+                                            : 'Auto: PO-${DateFormat('ddMMyyyy').format(DateTime.now())}-XXXX',
+                                        style: AppTypography.bodyMd.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.onSurface,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (val) {
-                                    if (val == _selectedVendorId) return;
-                                    setState(() {
-                                      _selectedVendorId = val;
-                                      // CHANGE 1: Immediately clear/reset all previously selected PO products/items
-                                      for (final item in _items) {
-                                        item.dispose();
-                                      }
-                                      _items.clear();
-                                      _items.add(_EditablePOLineItem());
-                                    });
-                                  },
-                                  validator: (v) => (v == null || v.isEmpty)
-                                      ? 'Vendor is required'
-                                      : null,
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'VENDOR / SUPPLIER *',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              DropdownButtonFormField<String>(
+                                key: const Key('po_vendor_dropdown'),
+                                isExpanded: true,
+                                initialValue: _selectedVendorId,
+                                hint: const Text('Select Supplier *'),
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(
+                                    Icons.local_shipping_outlined,
+                                    size: 20,
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                  fillColor: AppColors.surfaceContainerLow,
+                                  hintText: 'Select Supplier *',
+                                ),
+                                items: allVendors.map((v) {
+                                  return DropdownMenuItem<String>(
+                                    value: v.id,
+                                    child: Text(
+                                      '${v.name} (${v.productsDisplay})',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val == _selectedVendorId) return;
+                                  setState(() {
+                                    _selectedVendorId = val;
+                                    // CHANGE 1: Immediately clear/reset all previously selected PO products/items
+                                    for (final item in _items) {
+                                      item.dispose();
+                                    }
+                                    _items.clear();
+                                    _items.add(_EditablePOLineItem());
+                                  });
+                                },
+                                validator: (v) => (v == null || v.isEmpty)
+                                    ? 'Vendor is required'
+                                    : null,
+                              ),
+                            ],
                           ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),
 
                       // Row 2: Dates (Order Date & Expected Delivery)
-                      Row(
+                      ResponsiveFormRow(
+                        breakpoint: 500,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'ORDER DATE *',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ORDER DATE *',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                InkWell(
-                                  onTap: () async {
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: _orderDate,
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime(2040),
-                                    );
-                                    if (picked != null) {
-                                      setState(() {
-                                        _orderDate = picked;
-                                        if (_expectedDeliveryDate != null) {
-                                          final oDate = DateTime(picked.year, picked.month, picked.day);
-                                          final dDate = DateTime(
-                                            _expectedDeliveryDate!.year,
-                                            _expectedDeliveryDate!.month,
-                                            _expectedDeliveryDate!.day,
-                                          );
-                                          if (dDate.isBefore(oDate)) {
-                                            _expectedDeliveryDate = null;
-                                          }
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              InkWell(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: _orderDate,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2040),
+                                  );
+                                  if (picked != null) {
+                                    setState(() {
+                                      _orderDate = picked;
+                                      if (_expectedDeliveryDate != null) {
+                                        final oDate = DateTime(picked.year, picked.month, picked.day);
+                                        final dDate = DateTime(
+                                          _expectedDeliveryDate!.year,
+                                          _expectedDeliveryDate!.month,
+                                          _expectedDeliveryDate!.day,
+                                        );
+                                        if (dDate.isBefore(oDate)) {
+                                          _expectedDeliveryDate = null;
                                         }
-                                      });
-                                    }
-                                  },
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                  child: InputDecorator(
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
-                                      fillColor: AppColors.surfaceContainerLow,
-                                    ),
-                                    child: Text(
-                                      DateFormat('yyyy-MM-dd').format(_orderDate),
-                                      style: AppTypography.bodyMd,
-                                    ),
+                                      }
+                                    });
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                child: InputDecorator(
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+                                    fillColor: AppColors.surfaceContainerLow,
+                                  ),
+                                  child: Text(
+                                    DateFormat('yyyy-MM-dd').format(_orderDate),
+                                    style: AppTypography.bodyMd,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'EXPECTED DELIVERY',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'EXPECTED DELIVERY',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                InkWell(
-                                  onTap: () async {
-                                    final orderDateOnly = DateTime(_orderDate.year, _orderDate.month, _orderDate.day);
-                                    DateTime initialTarget;
-                                    if (_expectedDeliveryDate != null &&
-                                        !_expectedDeliveryDate!.isBefore(orderDateOnly)) {
-                                      initialTarget = _expectedDeliveryDate!;
-                                    } else {
-                                      initialTarget = orderDateOnly;
-                                    }
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              InkWell(
+                                onTap: () async {
+                                  final orderDateOnly = DateTime(_orderDate.year, _orderDate.month, _orderDate.day);
+                                  DateTime initialTarget;
+                                  if (_expectedDeliveryDate != null &&
+                                      !_expectedDeliveryDate!.isBefore(orderDateOnly)) {
+                                    initialTarget = _expectedDeliveryDate!;
+                                  } else {
+                                    initialTarget = orderDateOnly;
+                                  }
 
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: initialTarget,
-                                      firstDate: orderDateOnly,
-                                      lastDate: DateTime(2040),
-                                    );
-                                    if (picked != null) {
-                                      setState(() => _expectedDeliveryDate = picked);
-                                    }
-                                  },
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                  child: InputDecorator(
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(Icons.event_available_outlined, size: 20),
-                                      suffixIcon: _expectedDeliveryDate != null
-                                          ? IconButton(
-                                              icon: const Icon(Icons.clear, size: 18),
-                                              onPressed: () => setState(() => _expectedDeliveryDate = null),
-                                            )
-                                          : null,
-                                      fillColor: AppColors.surfaceContainerLow,
-                                    ),
-                                    child: Text(
-                                      _expectedDeliveryDate != null
-                                          ? DateFormat('yyyy-MM-dd').format(_expectedDeliveryDate!)
-                                          : 'Not specified',
-                                      style: AppTypography.bodyMd.copyWith(
-                                        color: _expectedDeliveryDate != null
-                                            ? AppColors.onSurface
-                                            : AppColors.onSurfaceVariant,
-                                      ),
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: initialTarget,
+                                    firstDate: orderDateOnly,
+                                    lastDate: DateTime(2040),
+                                  );
+                                  if (picked != null) {
+                                    setState(() => _expectedDeliveryDate = picked);
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                child: InputDecorator(
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.event_available_outlined, size: 20),
+                                    suffixIcon: _expectedDeliveryDate != null
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear, size: 18),
+                                            onPressed: () => setState(() => _expectedDeliveryDate = null),
+                                          )
+                                        : null,
+                                    fillColor: AppColors.surfaceContainerLow,
+                                  ),
+                                  child: Text(
+                                    _expectedDeliveryDate != null
+                                        ? DateFormat('yyyy-MM-dd').format(_expectedDeliveryDate!)
+                                        : 'Not specified',
+                                    style: AppTypography.bodyMd.copyWith(
+                                      color: _expectedDeliveryDate != null
+                                          ? AppColors.onSurface
+                                          : AppColors.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -734,127 +732,147 @@ class _PurchaseOrderFormDialogState
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(color: AppColors.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 560;
+
+          final productField = DropdownButtonFormField<String>(
+            key: ValueKey('po_item_product_${index}_${_selectedVendorId}_${line.inventoryId}'),
+            isExpanded: true,
+            initialValue: dropdownProducts.any((i) => i.id == line.inventoryId) ? line.inventoryId : null,
+            hint: Text(
+              _selectedVendorId == null
+                  ? 'Select vendor first'
+                  : availableProducts.isEmpty
+                      ? 'No products supplied'
+                      : 'Select Product *',
+              overflow: TextOverflow.ellipsis,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Product ${index + 1}',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            items: dropdownProducts.map((item) {
+              final skuSuffix = item.sku != null ? ' (${item.sku})' : '';
+              return DropdownMenuItem<String>(
+                value: item.id,
+                child: Text(
+                  '${item.name}$skuSuffix',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: availableProducts.isEmpty
+                ? null
+                : (val) {
+                    if (val == null) return;
+                    final selected = dropdownProducts.firstWhere((i) => i.id == val);
+                    setState(() {
+                      line.inventoryId = selected.id;
+                      line.inventoryName = selected.name;
+                      line.inventoryUnit = selected.unit;
+                      line.inventorySku = selected.sku;
+                      if (selected.price != null && selected.price! > 0) {
+                        line.priceController.text = selected.price!.toStringAsFixed(2);
+                      }
+                    });
+                  },
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Product is required';
+              return null;
+            },
+          );
+
+          final qtyField = TextFormField(
+            controller: line.qtyController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+            ],
+            decoration: InputDecoration(
+              labelText: 'Qty (${line.inventoryUnit})',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            onChanged: (_) => setState(() {}),
+          );
+
+          final priceField = TextFormField(
+            controller: line.priceController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+            ],
+            decoration: const InputDecoration(
+              labelText: 'Unit Price (₹)',
+              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            onChanged: (_) => setState(() {}),
+          );
+
+          final subtotalWidget = SizedBox(
+            width: 75,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Text(
+                '₹${line.totalAmount.toStringAsFixed(2)}',
+                style: AppTypography.bodyMd.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.onSurface,
+                ),
+                textAlign: TextAlign.end,
+              ),
+            ),
+          );
+
+          final deleteButton = IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+            tooltip: 'Remove product',
+            onPressed: () => _removeItem(index),
+          );
+
+          if (isCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(child: productField),
+                    const SizedBox(width: AppSpacing.sm),
+                    deleteButton,
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(flex: 3, child: qtyField),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(flex: 3, child: priceField),
+                    const SizedBox(width: AppSpacing.sm),
+                    subtotalWidget,
+                  ],
+                ),
+              ],
+            );
+          }
+
+          return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product dropdown
-              Expanded(
-                flex: 4,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('po_item_product_${index}_${_selectedVendorId}_${line.inventoryId}'),
-                  isExpanded: true,
-                  initialValue: dropdownProducts.any((i) => i.id == line.inventoryId) ? line.inventoryId : null,
-                  hint: Text(
-                    _selectedVendorId == null
-                        ? 'Select vendor first'
-                        : availableProducts.isEmpty
-                            ? 'No products supplied'
-                            : 'Select Product *',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Product ${index + 1}',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
-                  items: dropdownProducts.map((item) {
-                    final skuSuffix = item.sku != null ? ' (${item.sku})' : '';
-                    return DropdownMenuItem<String>(
-                      value: item.id,
-                      child: Text(
-                        '${item.name}$skuSuffix',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: availableProducts.isEmpty
-                      ? null
-                      : (val) {
-                          if (val == null) return;
-                          final selected = dropdownProducts.firstWhere((i) => i.id == val);
-                          setState(() {
-                            line.inventoryId = selected.id;
-                            line.inventoryName = selected.name;
-                            line.inventoryUnit = selected.unit;
-                            line.inventorySku = selected.sku;
-                            if (selected.price != null && selected.price! > 0) {
-                              line.priceController.text = selected.price!.toStringAsFixed(2);
-                            }
-                          });
-                        },
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Product is required';
-                    return null;
-                  },
-                ),
-              ),
+              Expanded(flex: 4, child: productField),
               const SizedBox(width: AppSpacing.sm),
-
-              // Quantity
-              Expanded(
-                flex: 2,
-                child: TextFormField(
-                  controller: line.qtyController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                  ],
-                  decoration: InputDecoration(
-                    labelText: 'Qty (${line.inventoryUnit})',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
+              Expanded(flex: 2, child: qtyField),
               const SizedBox(width: AppSpacing.sm),
-
-              // Unit price
-              Expanded(
-                flex: 2,
-                child: TextFormField(
-                  controller: line.priceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Unit Price (₹)',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
+              Expanded(flex: 2, child: priceField),
               const SizedBox(width: AppSpacing.sm),
-
-              // Subtotal
-              SizedBox(
-                width: 75,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 14),
-                  child: Text(
-                    '₹${line.totalAmount.toStringAsFixed(2)}',
-                    style: AppTypography.bodyMd.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
-                    ),
-                    textAlign: TextAlign.end,
-                  ),
-                ),
-              ),
-
-              // Delete row
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
-                tooltip: 'Remove product',
-                onPressed: () => _removeItem(index),
-              ),
+              subtotalWidget,
+              deleteButton,
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -895,29 +913,34 @@ class _PurchaseOrderFormDialogState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                  child: const Icon(
+                    Icons.receipt_long_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.receipt_long_outlined,
-                  color: AppColors.primary,
-                  size: 20,
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    _isEditing ? 'Edit Purchase Order' : 'New Purchase Order',
+                    style: AppTypography.headlineMd.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                _isEditing ? 'Edit Purchase Order' : 'New Purchase Order',
-                style: AppTypography.headlineMd.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.close),
@@ -931,19 +954,20 @@ class _PurchaseOrderFormDialogState
   Widget _buildDialogActions() {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xs,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           TextButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          const SizedBox(width: AppSpacing.sm),
           OutlinedButton(
             onPressed: _isLoading ? null : () => _submit(PurchaseOrderStatus.draft),
             child: const Text('Save as Draft'),
           ),
-          const SizedBox(width: AppSpacing.sm),
           FilledButton.icon(
             onPressed: _isLoading ? null : () => _submit(PurchaseOrderStatus.ordered),
             icon: _isLoading

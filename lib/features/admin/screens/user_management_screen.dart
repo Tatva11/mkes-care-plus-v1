@@ -20,40 +20,49 @@ class UserManagementScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AdminShell(
-      selectedItem: AdminNavItem.administration,
-      onNavItemSelected: (item) {
-        if (item == AdminNavItem.dashboard) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-          return;
-        }
-        if (item == AdminNavItem.staff) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const StaffManagementScreen()),
-          );
-          return;
-        }
-        if (item == AdminNavItem.patients) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const PatientListScreen()),
-          );
-          return;
-        }
-        if (item == AdminNavItem.operations) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-                builder: (_) => const DepartmentManagementScreen()),
-          );
-          return;
-        }
-        if (item == AdminNavItem.administration) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const AdministrationScreen()),
-          );
-          return;
-        }
+    return PopScope(
+      canPop: Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AdministrationScreen()),
+        );
       },
-      body: const UserManagementContent(),
+      child: AdminShell(
+        selectedItem: AdminNavItem.administration,
+        onNavItemSelected: (item) {
+          if (item == AdminNavItem.dashboard) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            return;
+          }
+          if (item == AdminNavItem.staff) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const StaffManagementScreen()),
+            );
+            return;
+          }
+          if (item == AdminNavItem.patients) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const PatientListScreen()),
+            );
+            return;
+          }
+          if (item == AdminNavItem.operations) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                  builder: (_) => const DepartmentManagementScreen()),
+            );
+            return;
+          }
+          if (item == AdminNavItem.administration) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const AdministrationScreen()),
+            );
+            return;
+          }
+        },
+        body: const UserManagementContent(),
+      ),
     );
   }
 }
@@ -195,7 +204,8 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
               _buildSearchBar(),
               const SizedBox(height: AppSpacing.md),
               usersState.when(
-                data: (users) => _buildUserTable(users),
+                data: (users) =>
+                    isDesktop ? _buildUserTable(users) : _buildUserCards(users),
                 loading: () => const Padding(
                   padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
                   child: Center(child: CircularProgressIndicator()),
@@ -218,7 +228,15 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
       children: [
         IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const AdministrationScreen()),
+              );
+            }
+          },
         ),
         const SizedBox(width: AppSpacing.xs),
         Expanded(
@@ -351,6 +369,188 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildUserCards(List<UserProfile> users) {
+    if (users.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          border: Border.all(color: AppColors.outlineVariant),
+        ),
+        child: const Center(child: Text('No users found.')),
+      );
+    }
+
+    return Column(
+      children: users.map((user) {
+        final isAdmin = user.role == 'admin';
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: AppColors.outlineVariant),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 8,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header: Name, Role badge, & Actions ─────────────────────
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.fullName,
+                          style: AppTypography.bodyMd.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isAdmin
+                                    ? AppColors.secondaryContainer
+                                        .withValues(alpha: 0.2)
+                                    : AppColors.primaryContainer
+                                        .withValues(alpha: 0.1),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusSm),
+                              ),
+                              child: Text(
+                                isAdmin ? 'Admin' : 'Staff',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: isAdmin
+                                      ? AppColors.secondary
+                                      : AppColors.primaryContainer,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Flexible(
+                              child: Text(
+                                user.departmentName ?? user.department ?? '—',
+                                style: AppTypography.bodySm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    color: AppColors.onSurfaceVariant,
+                    tooltip: 'Edit user',
+                    onPressed: () => _openEditUserDialog(user),
+                  ),
+                  if (_deletingUserIds.contains(user.id))
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 10),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      color: AppColors.error,
+                      tooltip: 'Remove user',
+                      onPressed: () => _confirmDelete(user),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // ── Email ───────────────────────────────────────────────────
+              Row(
+                children: [
+                  const Icon(Icons.email_outlined,
+                      size: 14, color: AppColors.outline),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      user.email,
+                      style: AppTypography.bodySm
+                          .copyWith(color: AppColors.onSurfaceVariant),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // ── Active / Inactive Status Toggle ─────────────────────────
+              Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: () => _toggleActive(user),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: user.isActive
+                          ? AppColors.primaryContainer.withValues(alpha: 0.1)
+                          : AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          user.isActive
+                              ? Icons.check_circle_outline
+                              : Icons.pause_circle_outline,
+                          size: 14,
+                          color: user.isActive
+                              ? AppColors.primaryContainer
+                              : AppColors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          user.isActive ? 'Active' : 'Inactive',
+                          style: AppTypography.labelCaps.copyWith(
+                            color: user.isActive
+                                ? AppColors.primaryContainer
+                                : AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 

@@ -12,6 +12,7 @@ import '../../staff/providers/attendance_provider.dart';
 import '../../staff/repositories/attendance_repository.dart';
 import '../models/user_profile.dart';
 import '../providers/users_provider.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../widgets/admin_shell.dart';
 import 'administration_screen.dart';
 import '../../staff/screens/staff_management_screen.dart';
@@ -220,8 +221,9 @@ class _ShiftManagementContentState
                           ref.read(usersProvider).valueOrNull ?? [];
                       final affectedStaff = allUsers.where((u) =>
                           u.role == 'staff' &&
-                          (u.assignedShift == config.name ||
-                              u.assignedShift == 'both'));
+                          (u.activeShift == config.name ||
+                              (config.name == 'afternoon' && u.isEveningShift) ||
+                              u.isBothShifts));
                       for (final s in affectedStaff) {
                         await ref
                             .read(notificationRepositoryProvider)
@@ -284,6 +286,9 @@ class _ShiftManagementContentState
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final targetShiftLabel = _formatShiftName(newShift);
+          final isToday = effectiveDate.year == today.year &&
+              effectiveDate.month == today.month &&
+              effectiveDate.day == today.day;
           final isTomorrow = effectiveDate.year == today.year &&
               effectiveDate.month == today.month &&
               effectiveDate.day == today.day + 1;
@@ -351,7 +356,32 @@ class _ShiftManagementContentState
                     style: AppTypography.labelCaps
                         .copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Today (Immediate)'),
+                        selected: isToday,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setDialogState(() => effectiveDate = today);
+                          }
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('Tomorrow'),
+                        selected: isTomorrow,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setDialogState(() => effectiveDate =
+                                today.add(const Duration(days: 1)));
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   ListTile(
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -361,16 +391,20 @@ class _ShiftManagementContentState
                     ),
                     leading: const Icon(Icons.event, color: AppColors.primary),
                     title: Text(
-                      isTomorrow
-                          ? 'Tomorrow (${DateFormat('d MMMM yyyy').format(effectiveDate)})'
-                          : DateFormat('d MMMM yyyy').format(effectiveDate),
+                      isToday
+                          ? 'Today (${DateFormat('d MMMM yyyy').format(effectiveDate)})'
+                          : (isTomorrow
+                              ? 'Tomorrow (${DateFormat('d MMMM yyyy').format(effectiveDate)})'
+                              : DateFormat('d MMMM yyyy').format(effectiveDate)),
                       style: AppTypography.bodyMd
                           .copyWith(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
-                      isTomorrow
-                          ? 'Effective from next calendar day by default'
-                          : 'Custom effective date selected',
+                      isToday
+                          ? 'Takes effect immediately today'
+                          : (isTomorrow
+                              ? 'Effective from next calendar day'
+                              : 'Custom effective date selected'),
                       style: AppTypography.bodySm.copyWith(
                           color: AppColors.onSurfaceVariant, fontSize: 11),
                     ),
@@ -392,7 +426,9 @@ class _ShiftManagementContentState
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Note: Today\'s working shift (${user.shiftDisplayName}) and any existing attendance records will not be overwritten.',
+                    isToday
+                        ? 'Note: Shift updates immediately for today. Existing past attendance logs remain preserved.'
+                        : 'Note: Today\'s working shift (${user.shiftDisplayName}) and any existing attendance records will not be overwritten until ${DateFormat('d MMM yyyy').format(effectiveDate)}.',
                     style: AppTypography.bodySm.copyWith(
                       color: AppColors.onSurfaceVariant,
                       fontSize: 11,
@@ -443,6 +479,7 @@ class _ShiftManagementContentState
 
       ref.invalidate(usersProvider);
       ref.invalidate(staffAssignedShiftProvider(user.id));
+      ref.invalidate(currentProfileProvider);
 
       // 2. Send in-app notification only after change is successfully saved
       bool notificationDelivered = false;
@@ -746,7 +783,7 @@ class _ShiftManagementContentState
               final staffUsers = allUsers.where((u) {
                 if (u.role != 'staff') return false;
                 if (_filterShift != 'all') {
-                  final s = u.assignedShift.toLowerCase();
+                  final s = u.activeShift.toLowerCase();
                   if (_filterShift == 'both' && s != 'both') {
                     return false;
                   }
@@ -803,9 +840,8 @@ class _ShiftManagementContentState
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final staff = staffUsers[index];
-                    final shift = staff.assignedShift.toLowerCase();
-                    final isBoth = shift == 'both';
-                    final isAft = shift == 'afternoon' || shift == 'night';
+                    final isBoth = staff.isBothShifts;
+                    final isAft = staff.isEveningShift;
                     final chipColor = isBoth
                         ? AppColors.tertiary
                         : (isAft ? AppColors.secondary : AppColors.primary);
@@ -840,7 +876,7 @@ class _ShiftManagementContentState
                             style: AppTypography.bodySm
                                 .copyWith(color: AppColors.onSurfaceVariant),
                           ),
-                          if (staff.hasScheduledShift)
+                          if (staff.isUpcomingShiftChange())
                             Padding(
                               padding: const EdgeInsets.only(top: 3),
                               child: Row(
@@ -848,12 +884,15 @@ class _ShiftManagementContentState
                                   const Icon(Icons.schedule_send_outlined,
                                       size: 14, color: AppColors.secondary),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    'Effective ${DateFormat('d MMM yyyy').format(staff.shiftEffectiveDate!)}: ${staff.scheduledShiftDisplayName}',
-                                    style: AppTypography.bodySm.copyWith(
-                                      color: AppColors.secondary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 11,
+                                  Expanded(
+                                    child: Text(
+                                      'Effective ${DateFormat('d MMM yyyy').format(staff.shiftEffectiveDate!)}: ${staff.scheduledShiftDisplayName}',
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: AppColors.secondary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 11,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
@@ -899,7 +938,7 @@ class _ShiftManagementContentState
                               itemBuilder: (ctx) => [
                                 PopupMenuItem(
                                   value: 'morning',
-                                  enabled: staff.assignedShift != 'morning',
+                                  enabled: staff.activeShift != 'morning',
                                   child: const Row(
                                     children: [
                                       Icon(Icons.wb_sunny_outlined, size: 18),
@@ -910,9 +949,7 @@ class _ShiftManagementContentState
                                 ),
                                 PopupMenuItem(
                                   value: 'afternoon',
-                                  enabled: staff.assignedShift != 'afternoon' &&
-                                      staff.assignedShift != 'evening' &&
-                                      staff.assignedShift != 'night',
+                                  enabled: !staff.isEveningShift,
                                   child: const Row(
                                     children: [
                                       Icon(Icons.wb_twilight_outlined,
@@ -924,7 +961,7 @@ class _ShiftManagementContentState
                                 ),
                                 PopupMenuItem(
                                   value: 'both',
-                                  enabled: staff.assignedShift != 'both',
+                                  enabled: !staff.isBothShifts,
                                   child: const Row(
                                     children: [
                                       Icon(Icons.all_inclusive, size: 18),
@@ -953,88 +990,178 @@ class _ShiftManagementContentState
   Widget _buildConfigCard(ShiftConfiguration config, bool isMorning) {
     final themeColor = isMorning ? AppColors.primary : AppColors.secondary;
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: themeColor.withValues(alpha: 0.3)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    isMorning
-                        ? Icons.wb_sunny_outlined
-                        : Icons.wb_twilight_outlined,
-                    color: themeColor,
-                    size: 24,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    config.displayName,
-                    style: AppTypography.headlineMd.copyWith(color: themeColor),
-                  ),
-                ],
-              ),
-              OutlinedButton.icon(
-                onPressed: () => _editShiftTimings(config),
-                icon: const Icon(Icons.edit, size: 16),
-                label: const Text('Edit Timings'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: themeColor,
-                  side: BorderSide(color: themeColor),
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 520;
+
+        return Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: themeColor.withValues(alpha: 0.3)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x08000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
+              if (isCompact) ...[
+                Row(
+                  children: [
+                    Icon(
+                      isMorning
+                          ? Icons.wb_sunny_outlined
+                          : Icons.wb_twilight_outlined,
+                      color: themeColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        config.displayName,
+                        style: AppTypography.headlineMd
+                            .copyWith(color: themeColor),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _editShiftTimings(config),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('Edit Timings'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: themeColor,
+                      side: BorderSide(color: themeColor),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+              ] else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            isMorning
+                                ? Icons.wb_sunny_outlined
+                                : Icons.wb_twilight_outlined,
+                            color: themeColor,
+                            size: 24,
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: Text(
+                              config.displayName,
+                              style: AppTypography.headlineMd
+                                  .copyWith(color: themeColor),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    OutlinedButton.icon(
+                      onPressed: () => _editShiftTimings(config),
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Edit Timings'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: themeColor,
+                        side: BorderSide(color: themeColor),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: AppSpacing.md),
+              if (isCompact) ...[
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('SCHEDULED HOURS', style: AppTypography.labelCaps),
                     const SizedBox(height: 2),
-                    Text(
-                      config.formattedTiming,
-                      style: AppTypography.headlineMd
-                          .copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        config.formattedTiming,
+                        style: AppTypography.headlineMd
+                            .copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                    const SizedBox(height: AppSpacing.sm),
                     Text('LATE GRACE PERIOD', style: AppTypography.labelCaps),
                     const SizedBox(height: 2),
-                    Text(
-                      '${config.gracePeriodMinutes} Minutes',
-                      style: AppTypography.headlineMd
-                          .copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${config.gracePeriodMinutes} Minutes',
+                        style: AppTypography.headlineMd
+                            .copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
-              ),
+              ] else
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('SCHEDULED HOURS',
+                              style: AppTypography.labelCaps),
+                          const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              config.formattedTiming,
+                              style: AppTypography.headlineMd.copyWith(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('LATE GRACE PERIOD',
+                              style: AppTypography.labelCaps),
+                          const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${config.gracePeriodMinutes} Minutes',
+                              style: AppTypography.headlineMd.copyWith(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

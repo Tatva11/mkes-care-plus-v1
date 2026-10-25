@@ -101,14 +101,30 @@ class ProfileModel {
     }
   }
 
-  bool get isMorningShift => (assignedShift ?? 'morning').toLowerCase() == 'morning';
-  bool get isAfternoonShift =>
-      (assignedShift ?? '').toLowerCase() == 'afternoon' ||
-      (assignedShift ?? '').toLowerCase() == 'evening' ||
-      (assignedShift ?? '').toLowerCase() == 'night';
-  bool get isEveningShift => isAfternoonShift;
-  bool get isBothShifts => (assignedShift ?? '').toLowerCase() == 'both';
+  String get activeShift => getShiftForDate(DateTime.now());
 
+  bool get isMorningShift => activeShift.toLowerCase() == 'morning';
+  bool get isAfternoonShift =>
+      activeShift.toLowerCase() == 'afternoon' ||
+      activeShift.toLowerCase() == 'evening' ||
+      activeShift.toLowerCase() == 'night';
+  bool get isEveningShift => isAfternoonShift;
+  bool get isBothShifts => activeShift.toLowerCase() == 'both';
+
+  /// Returns true only if a scheduled shift change genuinely exists in the future (after today).
+  bool isUpcomingShiftChange([DateTime? referenceDate]) {
+    if (nextShift == null || shiftEffectiveDate == null) return false;
+    final now = referenceDate ?? DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final effOnly = DateTime(
+      shiftEffectiveDate!.year,
+      shiftEffectiveDate!.month,
+      shiftEffectiveDate!.day,
+    );
+    return effOnly.isAfter(today);
+  }
+
+  /// Whether the profile has a scheduled shift change record attached.
   bool get hasScheduledShift => nextShift != null && shiftEffectiveDate != null;
 
   String getShiftForDate(DateTime date) {
@@ -142,7 +158,7 @@ class ProfileModel {
   }
 
   String get shiftDisplayName =>
-    formatShiftLabel(assignedShift ?? 'morning', includeSuffix: true);
+      formatShiftLabel(activeShift, includeSuffix: true);
 
   String? get scheduledShiftDisplayName =>
       nextShift != null ? formatShiftLabel(nextShift!) : null;

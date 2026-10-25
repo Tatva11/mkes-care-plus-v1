@@ -173,9 +173,9 @@ class PatientDetailsScreen extends ConsumerWidget {
                 ],
                 if (patient.department == 'eye' ||
                     ref
-                        .watch(eyeSurgeriesForPatientProvider(patient.id))
-                        .valueOrNull
-                        ?.isNotEmpty ==
+                            .watch(eyeSurgeriesForPatientProvider(patient.id))
+                            .valueOrNull
+                            ?.isNotEmpty ==
                         true) ...[
                   if (patient.department == 'eye') ...[
                     EyeExaminationPatientSection(patient: patient),
@@ -219,113 +219,245 @@ class PatientDetailsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: AppColors.primaryContainer.withValues(alpha: 0.2),
-            child: Text(
-              _initials(patient.name),
-              style: AppTypography.headlineMd.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 360;
+          if (isNarrow) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  patient.name,
-                  style: AppTypography.headlineMd.copyWith(fontSize: 20),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: AppColors.outlineVariant),
-                      ),
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor:
+                          AppColors.primaryContainer.withValues(alpha: 0.2),
                       child: Text(
-                        patient.patientNumber,
-                        style: AppTypography.dataMono.copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
+                        _initials(patient.name),
+                        style: AppTypography.headlineMd.copyWith(
                           color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color:
-                            AppColors.secondaryContainer.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            patient.name,
+                            style:
+                                AppTypography.headlineMd.copyWith(fontSize: 18),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                      color: AppColors.outlineVariant),
+                                ),
+                                child: Text(
+                                  patient.patientNumber,
+                                  style: AppTypography.dataMono.copyWith(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondaryContainer
+                                      .withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  deptLabel,
+                                  style: AppTypography.labelCaps.copyWith(
+                                    color: AppColors.secondary,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        deptLabel,
-                        style: AppTypography.labelCaps.copyWith(
-                          color: AppColors.secondary,
-                          fontSize: 11,
+                    ),
+                  ],
+                ),
+                if (patient.mobile != null &&
+                    patient.mobile!.trim().isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: () => _makePhoneCall(context, patient.mobile!),
+                          icon: const Icon(Icons.phone, size: 16),
+                          label: const Text('Call'),
+                          style: FilledButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                          ),
                         ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => WhatsAppInboxScreen(
+                                  initialPhoneNumber: patient.mobile,
+                                  initialPatient: patient,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                          label: const Text('WhatsApp'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF25D366),
+                            foregroundColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor:
+                    AppColors.primaryContainer.withValues(alpha: 0.2),
+                child: Text(
+                  _initials(patient.name),
+                  style: AppTypography.headlineMd.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      patient.name,
+                      style: AppTypography.headlineMd.copyWith(fontSize: 20),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.outlineVariant),
+                          ),
+                          child: Text(
+                            patient.patientNumber,
+                            style: AppTypography.dataMono.copyWith(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryContainer
+                                .withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            deptLabel,
+                            style: AppTypography.labelCaps.copyWith(
+                              color: AppColors.secondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (patient.mobile != null &&
+                  patient.mobile!.trim().isNotEmpty) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    FilledButton.tonalIcon(
+                      onPressed: () => _makePhoneCall(context, patient.mobile!),
+                      icon: const Icon(Icons.phone, size: 16),
+                      label: const Text('Call'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => WhatsAppInboxScreen(
+                              initialPhoneNumber: patient.mobile,
+                              initialPatient: patient,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                      label: const Text('WhatsApp'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF25D366),
+                        foregroundColor: Colors.white,
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                       ),
                     ),
                   ],
                 ),
               ],
-            ),
-          ),
-          if (patient.mobile != null && patient.mobile!.trim().isNotEmpty) ...[
-            const SizedBox(width: AppSpacing.sm),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              alignment: WrapAlignment.end,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                FilledButton.tonalIcon(
-                  onPressed: () => _makePhoneCall(context, patient.mobile!),
-                  icon: const Icon(Icons.phone, size: 16),
-                  label: const Text('Call'),
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => WhatsAppInboxScreen(
-                          initialPhoneNumber: patient.mobile,
-                          initialPatient: patient,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                  label: const Text('WhatsApp'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF25D366),
-                    foregroundColor: Colors.white,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -379,22 +511,27 @@ class PatientDetailsScreen extends ConsumerWidget {
             icon: Icons.phone_outlined,
             label: 'Mobile',
             value: patient.mobile ?? 'Not provided',
-            trailing: (patient.mobile != null && patient.mobile!.trim().isNotEmpty)
+            trailing: (patient.mobile != null &&
+                    patient.mobile!.trim().isNotEmpty)
                 ? InkWell(
                     onTap: () => _makePhoneCall(context, patient.mobile!),
                     borderRadius: BorderRadius.circular(4),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withValues(alpha: 0.12),
+                        color:
+                            AppColors.primaryContainer.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                            color: AppColors.primaryContainer.withValues(alpha: 0.3)),
+                            color: AppColors.primaryContainer
+                                .withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.phone, size: 13, color: AppColors.primary),
+                          const Icon(Icons.phone,
+                              size: 13, color: AppColors.primary),
                           const SizedBox(width: 4),
                           Text(
                             'Call',
@@ -491,34 +628,74 @@ class PatientDetailsScreen extends ConsumerWidget {
   }) {
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: AppColors.outline),
-          const SizedBox(width: AppSpacing.sm),
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: AppTypography.bodySm.copyWith(
-                color: AppColors.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 360;
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, size: 16, color: AppColors.outline),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (trailing != null) trailing,
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Text(
+                    value,
+                    style: AppTypography.bodyMd.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: AppColors.outline),
+              const SizedBox(width: AppSpacing.sm),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 100, maxWidth: 130),
+                child: Text(
+                  label,
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTypography.bodyMd.copyWith(
-                fontWeight: FontWeight.w500,
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  value,
+                  style: AppTypography.bodyMd.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
-            ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: AppSpacing.xs),
-            trailing,
-          ],
-        ],
+              if (trailing != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                trailing,
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -800,7 +977,10 @@ class PatientDetailsScreen extends ConsumerWidget {
                       size: 20,
                     ),
                   ),
-                  title: Row(
+                  title: Wrap(
+                    spacing: 8,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         item.caseNumber,
@@ -809,7 +989,6 @@ class PatientDetailsScreen extends ConsumerWidget {
                           color: AppColors.primary,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Text(
                         item.caseType,
                         style: AppTypography.bodyMd

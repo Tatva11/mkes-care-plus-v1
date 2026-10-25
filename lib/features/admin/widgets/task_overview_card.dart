@@ -54,36 +54,37 @@ class TaskOverviewCard extends ConsumerWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.xs,
+                  runSpacing: 4,
                   children: [
-                    Flexible(
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.xs),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryContainer
-                                  .withValues(alpha: 0.15),
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusSm),
-                            ),
-                            child: const Icon(
-                              Icons.assignment_outlined,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.xs),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryContainer
+                                .withValues(alpha: 0.15),
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusSm),
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Flexible(
-                            child: Text(
-                              'Task Overview',
-                              style: AppTypography.headlineMd,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          child: const Icon(
+                            Icons.assignment_outlined,
+                            color: AppColors.primary,
+                            size: 20,
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Flexible(
+                          child: Text(
+                            'Task Overview',
+                            style: AppTypography.headlineMd,
+                          ),
+                        ),
+                      ],
                     ),
                     TextButton(
                       onPressed: () {

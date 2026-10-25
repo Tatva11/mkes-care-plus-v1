@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
+import '../../../shared/widgets/responsive_form_row.dart';
 import '../../../shared/widgets/mkes_text_field.dart';
 import '../models/inventory_item.dart';
 import '../providers/inventory_provider.dart';
@@ -212,7 +214,12 @@ class _InventoryFormDialogState extends ConsumerState<InventoryFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width > 700;
+    final dialogConstraints = AdaptiveDialogShell.constraintsFor(
+      context,
+      maxMobileWidth: double.infinity,
+      maxTabletWidth: 540.0,
+      maxDesktopWidth: 640.0,
+    );
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -225,8 +232,8 @@ class _InventoryFormDialogState extends ConsumerState<InventoryFormDialog> {
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: isDesktop ? 620 : 480,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+          maxWidth: dialogConstraints.maxWidth,
+          maxHeight: dialogConstraints.maxHeight,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -349,68 +356,62 @@ class _InventoryFormDialogState extends ConsumerState<InventoryFormDialog> {
                       const SizedBox(height: AppSpacing.md),
 
                       // 3. Stock & Unit row (Both Required)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      ResponsiveFormRow(
+                        breakpoint: 480,
+                        flexes: const [3, 2],
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: MkesTextField(
-                              controller: _stockController,
-                              label: 'CURRENT STOCK *',
-                              hintText: '0',
-                              prefixIcon: Icons.inventory_2_outlined,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
+                          MkesTextField(
+                            controller: _stockController,
+                            label: 'CURRENT STOCK *',
+                            hintText: '0',
+                            prefixIcon: Icons.inventory_2_outlined,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*'),
                               ),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                  RegExp(r'^\d*\.?\d*'),
-                                ),
-                              ],
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Stock quantity is required';
-                                }
-                                final numVal = double.tryParse(value.trim());
-                                if (numVal == null) {
-                                  return 'Must be numeric';
-                                }
-                                if (numVal < 0) {
-                                  return 'Cannot be negative';
-                                }
-                                return null;
-                              },
-                            ),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Stock quantity is required';
+                              }
+                              final numVal = double.tryParse(value.trim());
+                              if (numVal == null) {
+                                return 'Must be numeric';
+                              }
+                              if (numVal < 0) {
+                                return 'Cannot be negative';
+                              }
+                              return null;
+                            },
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            flex: 2,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'UNIT *',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'UNIT *',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                TextFormField(
-                                  controller: _unitController,
-                                  decoration: const InputDecoration(
-                                    hintText: 'e.g. pcs',
-                                    fillColor: AppColors.surfaceContainerLow,
-                                  ),
-                                  style: AppTypography.bodyMd,
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Unit required';
-                                    }
-                                    return null;
-                                  },
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              TextFormField(
+                                controller: _unitController,
+                                decoration: const InputDecoration(
+                                  hintText: 'e.g. pcs',
+                                  fillColor: AppColors.surfaceContainerLow,
                                 ),
-                              ],
-                            ),
+                                style: AppTypography.bodyMd,
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Unit required';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -433,190 +434,177 @@ class _InventoryFormDialogState extends ConsumerState<InventoryFormDialog> {
                       const SizedBox(height: AppSpacing.md),
 
                       // 4. Department & SKU Row (Optional)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      ResponsiveFormRow(
+                        breakpoint: 480,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'DEPARTMENT',
-                                  style: AppTypography.labelCaps.copyWith(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'DEPARTMENT',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              DropdownButtonFormField<String?>(
+                                isExpanded: true,
+                                initialValue: _selectedDepartment,
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(
+                                    Icons.business_outlined,
+                                    size: 20,
                                     color: AppColors.onSurfaceVariant,
                                   ),
+                                  fillColor: AppColors.surfaceContainerLow,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                DropdownButtonFormField<String?>(
-                                  isExpanded: true,
-                                  initialValue: _selectedDepartment,
-                                  decoration: InputDecoration(
-                                    prefixIcon: const Icon(
-                                      Icons.business_outlined,
-                                      size: 20,
-                                      color: AppColors.onSurfaceVariant,
-                                    ),
-                                    fillColor: AppColors.surfaceContainerLow,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: null,
+                                    child: Text('All / General'),
                                   ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: null,
-                                      child: Text('All / General'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'eye',
-                                      child: Text('Eye Care'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'dental',
-                                      child: Text('Dental Clinic'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'optical',
-                                      child: Text('Optical Store'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'general',
-                                      child: Text('General'),
-                                    ),
-                                  ],
-                                  onChanged: (val) {
-                                    setState(() => _selectedDepartment = val);
-                                  },
-                                ),
-                              ],
-                            ),
+                                  DropdownMenuItem(
+                                    value: 'eye',
+                                    child: Text('Eye Care'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'dental',
+                                    child: Text('Dental Clinic'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'optical',
+                                    child: Text('Optical Store'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'general',
+                                    child: Text('General'),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  setState(() => _selectedDepartment = val);
+                                },
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: MkesTextField(
-                              controller: _skuController,
-                              label: 'SKU / CODE',
-                              hintText: 'e.g. MED-AMX-500',
-                              prefixIcon: Icons.qr_code_outlined,
-                            ),
+                          MkesTextField(
+                            controller: _skuController,
+                            label: 'SKU / CODE',
+                            hintText: 'e.g. MED-AMX-500',
+                            prefixIcon: Icons.qr_code_outlined,
                           ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),
 
                       // 5. Minimum Stock Threshold & Unit Price Row (Optional)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      ResponsiveFormRow(
+                        breakpoint: 480,
                         children: [
-                          Expanded(
-                            child: MkesTextField(
-                              controller: _minStockController,
-                              label: 'MIN. STOCK THRESHOLD',
-                              hintText: 'e.g. 10',
-                              prefixIcon: Icons.warning_amber_outlined,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                  RegExp(r'^\d*\.?\d*'),
-                                ),
-                              ],
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return null;
-                                }
-                                final val = double.tryParse(value.trim());
-                                if (val == null || val < 0) {
-                                  return 'Must be >= 0';
-                                }
-                                return null;
-                              },
+                          MkesTextField(
+                            controller: _minStockController,
+                            label: 'MIN. STOCK THRESHOLD',
+                            hintText: 'e.g. 10',
+                            prefixIcon: Icons.warning_amber_outlined,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*'),
+                              ),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return null;
+                              }
+                              final val = double.tryParse(value.trim());
+                              if (val == null || val < 0) {
+                                return 'Must be >= 0';
+                              }
+                              return null;
+                            },
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: MkesTextField(
-                              controller: _priceController,
-                              label: 'UNIT PRICE (₹)',
-                              hintText: 'e.g. 150.00',
-                              prefixIcon: Icons.currency_rupee_outlined,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                  RegExp(r'^\d*\.?\d*'),
-                                ),
-                              ],
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return null;
-                                }
-                                final val = double.tryParse(value.trim());
-                                if (val == null || val < 0) {
-                                  return 'Must be >= 0';
-                                }
-                                return null;
-                              },
+                          MkesTextField(
+                            controller: _priceController,
+                            label: 'UNIT PRICE (₹)',
+                            hintText: 'e.g. 150.00',
+                            prefixIcon: Icons.currency_rupee_outlined,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*'),
+                              ),
+                            ],
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return null;
+                              }
+                              final val = double.tryParse(value.trim());
+                              if (val == null || val < 0) {
+                                return 'Must be >= 0';
+                              }
+                              return null;
+                            },
                           ),
                         ],
                       ),
+                      const SizedBox(height: AppSpacing.md),
+
                       // Brand & Expiry Date Row (Optional)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      ResponsiveFormRow(
+                        breakpoint: 480,
                         children: [
-                          Expanded(
-                            child: MkesTextField(
-                              controller: _brandController,
-                              label: 'BRAND / MANUFACTURER',
-                              hintText: 'e.g. Cipla, Ray-Ban, 3M',
-                              prefixIcon: Icons.branding_watermark_outlined,
-                            ),
+                          MkesTextField(
+                            controller: _brandController,
+                            label: 'BRAND / MANUFACTURER',
+                            hintText: 'e.g. Cipla, Ray-Ban, 3M',
+                            prefixIcon: Icons.branding_watermark_outlined,
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'EXPIRY DATE',
-                                  style: AppTypography.labelCaps.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'EXPIRY DATE',
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                                  onTap: _pickExpiryDate,
-                                  child: InputDecorator(
-                                    decoration: InputDecoration(
-                                      hintText: 'Select date...',
-                                      prefixIcon: const Icon(
-                                        Icons.calendar_today_outlined,
-                                        size: 20,
-                                        color: AppColors.onSurfaceVariant,
-                                      ),
-                                      suffixIcon: _expiryDate != null
-                                          ? IconButton(
-                                              icon: const Icon(Icons.clear, size: 18),
-                                              tooltip: 'Clear expiry date',
-                                              onPressed: () => setState(() => _expiryDate = null),
-                                            )
-                                          : null,
-                                      fillColor: AppColors.surfaceContainerLow,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                onTap: _pickExpiryDate,
+                                child: InputDecorator(
+                                  decoration: InputDecoration(
+                                    hintText: 'Select date...',
+                                    prefixIcon: const Icon(
+                                      Icons.calendar_today_outlined,
+                                      size: 20,
+                                      color: AppColors.onSurfaceVariant,
                                     ),
-                                    child: Text(
-                                      _expiryDate != null
-                                          ? '${_expiryDate!.year}-${_expiryDate!.month.toString().padLeft(2, '0')}-${_expiryDate!.day.toString().padLeft(2, '0')}'
-                                          : 'No expiry date set',
-                                      style: AppTypography.bodyMd.copyWith(
-                                        color: _expiryDate != null
-                                            ? AppColors.onSurface
-                                            : AppColors.onSurfaceVariant,
-                                      ),
+                                    suffixIcon: _expiryDate != null
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear, size: 18),
+                                            tooltip: 'Clear expiry date',
+                                            onPressed: () => setState(() => _expiryDate = null),
+                                          )
+                                        : null,
+                                    fillColor: AppColors.surfaceContainerLow,
+                                  ),
+                                  child: Text(
+                                    _expiryDate != null
+                                        ? '${_expiryDate!.year}-${_expiryDate!.month.toString().padLeft(2, '0')}-${_expiryDate!.day.toString().padLeft(2, '0')}'
+                                        : 'No expiry date set',
+                                    style: AppTypography.bodyMd.copyWith(
+                                      color: _expiryDate != null
+                                          ? AppColors.onSurface
+                                          : AppColors.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -771,14 +759,16 @@ class _InventoryFormDialogState extends ConsumerState<InventoryFormDialog> {
   Widget _buildDialogActions() {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xs,
         children: [
           TextButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          const SizedBox(width: AppSpacing.sm),
           FilledButton.icon(
             onPressed: _isLoading ? null : _submit,
             icon: _isLoading

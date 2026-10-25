@@ -8,10 +8,6 @@ import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/notification_center_modal.dart';
 import '../../../shared/widgets/user_profile_menu.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../auth/repositories/auth_repository.dart';
-import '../../staff/models/shift_configuration.dart';
-import '../../staff/providers/attendance_provider.dart';
-import '../../staff/repositories/attendance_repository.dart';
 import '../../whatsapp/widgets/whatsapp_inbox_button.dart';
 
 enum StaffNavItem { schedule, patients, tasks, attendance, billing }
@@ -69,53 +65,7 @@ class StaffShell extends ConsumerWidget {
               body: Center(child: CircularProgressIndicator()));
         }
 
-        // Automatic shift-end sign-out safeguard
-        final profile = ref.watch(currentProfileProvider).valueOrNull;
-        final configs = ref.watch(shiftConfigurationsProvider).valueOrNull;
-        if (profile != null && configs != null && configs.isNotEmpty) {
-          final now = DateTime.now();
-          final assignedShift = profile.getShiftForDate(now);
-          ShiftConfiguration? targetConfig;
-          if (assignedShift.toLowerCase() == 'both') {
-            targetConfig = configs.firstWhere(
-              (c) =>
-                  c.name.toLowerCase() == 'afternoon' ||
-                  c.name.toLowerCase() == 'evening',
-              orElse: () => configs.last,
-            );
-          } else {
-            final norm = (assignedShift.toLowerCase() == 'evening' ||
-                    assignedShift.toLowerCase() == 'night')
-                ? 'afternoon'
-                : assignedShift.toLowerCase();
-            targetConfig =
-                configs.where((c) => c.name.toLowerCase() == norm).firstOrNull;
-          }
 
-          if (targetConfig != null && targetConfig.isTimePastShiftEnd(now)) {
-            WidgetsBinding.instance.addPostFrameCallback((_) async {
-              if (!context.mounted) return;
-              try {
-                final repo = ref.read(attendanceRepositoryProvider);
-                await repo.autoTerminateOverdueAttendance();
-              } catch (_) {}
-
-              if (context.mounted &&
-                  Supabase.instance.client.auth.currentSession != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Your assigned ${targetConfig!.name.toUpperCase()} Shift reached its scheduled end time. You have been signed out.',
-                    ),
-                    backgroundColor: AppColors.primary,
-                    duration: const Duration(seconds: 4),
-                  ),
-                );
-                await ref.read(authRepositoryProvider).signOut();
-              }
-            });
-          }
-        }
 
         final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
 
@@ -399,37 +349,46 @@ class _StaffBottomNavBar extends StatelessWidget {
         child: SizedBox(
           height: 64,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _BottomNavItem(
-                label: 'Schedule',
-                icon: Icons.calendar_today,
-                selected: selectedItem == StaffNavItem.schedule,
-                onTap: () => onNavItemSelected?.call(StaffNavItem.schedule),
+              Expanded(
+                child: _BottomNavItem(
+                  label: 'Schedule',
+                  icon: Icons.calendar_today,
+                  selected: selectedItem == StaffNavItem.schedule,
+                  onTap: () => onNavItemSelected?.call(StaffNavItem.schedule),
+                ),
               ),
-              _BottomNavItem(
-                label: 'Patients',
-                icon: Icons.people_outline,
-                selected: selectedItem == StaffNavItem.patients,
-                onTap: () => onNavItemSelected?.call(StaffNavItem.patients),
+              Expanded(
+                child: _BottomNavItem(
+                  label: 'Patients',
+                  icon: Icons.people_outline,
+                  selected: selectedItem == StaffNavItem.patients,
+                  onTap: () => onNavItemSelected?.call(StaffNavItem.patients),
+                ),
               ),
-              _BottomNavItem(
-                label: 'Tasks',
-                icon: Icons.task_alt_outlined,
-                selected: selectedItem == StaffNavItem.tasks,
-                onTap: () => onNavItemSelected?.call(StaffNavItem.tasks),
+              Expanded(
+                child: _BottomNavItem(
+                  label: 'Tasks',
+                  icon: Icons.task_alt_outlined,
+                  selected: selectedItem == StaffNavItem.tasks,
+                  onTap: () => onNavItemSelected?.call(StaffNavItem.tasks),
+                ),
               ),
-              _BottomNavItem(
-                label: 'Attendance',
-                icon: Icons.access_time_outlined,
-                selected: selectedItem == StaffNavItem.attendance,
-                onTap: () => onNavItemSelected?.call(StaffNavItem.attendance),
+              Expanded(
+                child: _BottomNavItem(
+                  label: 'Attendance',
+                  icon: Icons.access_time_outlined,
+                  selected: selectedItem == StaffNavItem.attendance,
+                  onTap: () => onNavItemSelected?.call(StaffNavItem.attendance),
+                ),
               ),
-              _BottomNavItem(
-                label: 'Billing',
-                icon: Icons.receipt_long_outlined,
-                selected: selectedItem == StaffNavItem.billing,
-                onTap: () => onNavItemSelected?.call(StaffNavItem.billing),
+              Expanded(
+                child: _BottomNavItem(
+                  label: 'Billing',
+                  icon: Icons.receipt_long_outlined,
+                  selected: selectedItem == StaffNavItem.billing,
+                  onTap: () => onNavItemSelected?.call(StaffNavItem.billing),
+                ),
               ),
             ],
           ),
@@ -461,31 +420,38 @@ class _BottomNavItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.base,
-        ),
-        decoration: isActive
-            ? BoxDecoration(
-                color: AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(999),
-              )
-            : null,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 22, color: foreground),
-            const SizedBox(height: AppSpacing.base),
-            Text(
-              label,
-              style: AppTypography.labelCaps.copyWith(
-                color: foreground,
-                fontSize: 11,
+      child: Center(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 6,
+            vertical: 4,
+          ),
+          decoration: isActive
+              ? BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(999),
+                )
+              : null,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: foreground),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: AppTypography.labelCaps.copyWith(
+                    color: foreground,
+                    fontSize: 10.5,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

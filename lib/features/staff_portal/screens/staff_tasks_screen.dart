@@ -14,7 +14,6 @@ import '../../staff/models/task_item.dart';
 import '../../staff/providers/task_provider.dart';
 import '../../staff/utils/task_operational_filter.dart';
 import '../../vendors/screens/vendor_management_screen.dart';
-import 'staff_task_history_screen.dart';
 
 enum StaffTaskTab {
   tasks,
@@ -49,6 +48,60 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
     _selectedTab = widget.initialTab;
   }
 
+  Widget _buildMobileTabItem({
+    required StaffTaskTab tab,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = _selectedTab == tab;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedTab = tab),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        child: Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.primaryContainer.withValues(alpha: 0.15)
+                : AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color:
+                    isSelected ? AppColors.primary : AppColors.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 768.0;
@@ -60,12 +113,12 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Sub-navigation bar under the Task section: Tasks | Inventory
+        // Sub-navigation bar under the Task section: Tasks | Inventory | Vendors | PO | Dental Lab | Eye Surgery
         Container(
           padding: EdgeInsets.symmetric(
             horizontal:
                 isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
-            vertical: AppSpacing.sm,
+            vertical: AppSpacing.xs,
           ),
           decoration: const BoxDecoration(
             color: AppColors.surface,
@@ -73,60 +126,116 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
               bottom: BorderSide(color: AppColors.outlineVariant),
             ),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                SegmentedButton<StaffTaskTab>(
-                  segments: const [
-                    ButtonSegment<StaffTaskTab>(
-                      value: StaffTaskTab.tasks,
-                      label: Text('Shift Tasks'),
-                      icon: Icon(Icons.task_alt_outlined, size: 16),
-                    ),
-                    ButtonSegment<StaffTaskTab>(
-                      value: StaffTaskTab.inventory,
-                      label: Text('Inventory'),
-                      icon: Icon(Icons.inventory_2_outlined, size: 16),
-                    ),
-                    ButtonSegment<StaffTaskTab>(
-                      value: StaffTaskTab.vendors,
-                      label: Text('Vendors'),
-                      icon: Icon(Icons.local_shipping_outlined, size: 16),
-                    ),
-                    ButtonSegment<StaffTaskTab>(
-                      value: StaffTaskTab.purchaseOrders,
-                      label: Text('Purchase Orders'),
-                      icon: Icon(Icons.receipt_long_outlined, size: 16),
-                    ),
-                    ButtonSegment<StaffTaskTab>(
-                      value: StaffTaskTab.dentalLab,
-                      label: Text('Dental Lab'),
-                      icon: Icon(Icons.biotech_outlined, size: 16),
-                    ),
-                    ButtonSegment<StaffTaskTab>(
-                      value: StaffTaskTab.eyeSurgery,
-                      label: Text('Eye Surgery'),
-                      icon: Icon(Icons.visibility_outlined, size: 16),
-                    ),
-                  ],
-                  selected: {_selectedTab},
-                  onSelectionChanged: (newSelection) {
-                    setState(() => _selectedTab = newSelection.first);
-                  },
-                  style: SegmentedButton.styleFrom(
-                    selectedBackgroundColor:
-                        AppColors.primaryContainer.withValues(alpha: 0.2),
-                    selectedForegroundColor: AppColors.primary,
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    visualDensity: VisualDensity.compact,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth >= 768.0) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      SegmentedButton<StaffTaskTab>(
+                        segments: const [
+                          ButtonSegment<StaffTaskTab>(
+                            value: StaffTaskTab.tasks,
+                            label: Text('Shift Tasks'),
+                            icon: Icon(Icons.task_alt_outlined, size: 16),
+                          ),
+                          ButtonSegment<StaffTaskTab>(
+                            value: StaffTaskTab.inventory,
+                            label: Text('Inventory'),
+                            icon: Icon(Icons.inventory_2_outlined, size: 16),
+                          ),
+                          ButtonSegment<StaffTaskTab>(
+                            value: StaffTaskTab.vendors,
+                            label: Text('Vendors'),
+                            icon: Icon(Icons.local_shipping_outlined, size: 16),
+                          ),
+                          ButtonSegment<StaffTaskTab>(
+                            value: StaffTaskTab.purchaseOrders,
+                            label: Text('Purchase Orders'),
+                            icon: Icon(Icons.receipt_long_outlined, size: 16),
+                          ),
+                          ButtonSegment<StaffTaskTab>(
+                            value: StaffTaskTab.dentalLab,
+                            label: Text('Dental Lab'),
+                            icon: Icon(Icons.biotech_outlined, size: 16),
+                          ),
+                          ButtonSegment<StaffTaskTab>(
+                            value: StaffTaskTab.eyeSurgery,
+                            label: Text('Eye Surgery'),
+                            icon: Icon(Icons.visibility_outlined, size: 16),
+                          ),
+                        ],
+                        selected: {_selectedTab},
+                        onSelectionChanged: (newSelection) {
+                          setState(() => _selectedTab = newSelection.first);
+                        },
+                        style: SegmentedButton.styleFrom(
+                          selectedBackgroundColor:
+                              AppColors.primaryContainer.withValues(alpha: 0.2),
+                          selectedForegroundColor: AppColors.primary,
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
+                );
+              }
+
+              // Mobile compact 2-row grid: all 6 destinations visible without scrolling/clipping
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      _buildMobileTabItem(
+                        tab: StaffTaskTab.tasks,
+                        label: 'Shift Tasks',
+                        icon: Icons.task_alt_outlined,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildMobileTabItem(
+                        tab: StaffTaskTab.inventory,
+                        label: 'Inventory',
+                        icon: Icons.inventory_2_outlined,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildMobileTabItem(
+                        tab: StaffTaskTab.vendors,
+                        label: 'Vendors',
+                        icon: Icons.local_shipping_outlined,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _buildMobileTabItem(
+                        tab: StaffTaskTab.purchaseOrders,
+                        label: 'Purchase Orders',
+                        icon: Icons.receipt_long_outlined,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildMobileTabItem(
+                        tab: StaffTaskTab.dentalLab,
+                        label: 'Dental Lab',
+                        icon: Icons.biotech_outlined,
+                      ),
+                      const SizedBox(width: 6),
+                      _buildMobileTabItem(
+                        tab: StaffTaskTab.eyeSurgery,
+                        label: 'Eye Surgery',
+                        icon: Icons.visibility_outlined,
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
         ),
 
@@ -180,78 +289,17 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                       ],
                     ),
                   ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      reverse: true,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.refresh),
-                            tooltip: 'Refresh tasks',
-                            onPressed: () => ref
-                                .read(
-                                    staffTasksProvider(currentUser.id).notifier)
-                                .fetchTasks(),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          OutlinedButton.icon(
-                            onPressed: () => setState(
-                                () => _selectedTab = StaffTaskTab.inventory),
-                            icon: const Icon(Icons.inventory_2_outlined,
-                                size: 18),
-                            label: const Text('Inventory'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          OutlinedButton.icon(
-                            onPressed: () => setState(
-                                () => _selectedTab = StaffTaskTab.vendors),
-                            icon: const Icon(Icons.local_shipping_outlined,
-                                size: 18),
-                            label: const Text('Vendors'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          OutlinedButton.icon(
-                            onPressed: () => setState(() =>
-                                _selectedTab = StaffTaskTab.purchaseOrders),
-                            icon: const Icon(Icons.receipt_long_outlined,
-                                size: 18),
-                            label: const Text('Purchase Orders'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          OutlinedButton.icon(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const StaffTaskHistoryScreen(),
-                              ),
-                            ),
-                            icon: const Icon(Icons.history, size: 18),
-                            label: const Text('History'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Refresh tasks',
+                    onPressed: () => ref
+                        .read(
+                            staffTasksProvider(currentUser.id).notifier)
+                        .fetchTasks(),
                   ),
                 ],
               )
-            else ...[
+            else
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,77 +310,25 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                       children: [
                         Text('My Shift Tasks',
                             style: AppTypography.displayLg.copyWith(
-                                color: AppColors.onBackground, fontSize: 26)),
+                                color: AppColors.onBackground,
+                                fontSize: 24)),
                         const SizedBox(height: AppSpacing.xs),
                         Text('Clinical checklist and patient care duties',
-                            style: AppTypography.bodyLg
-                                .copyWith(color: AppColors.onSurfaceVariant)),
+                            style: AppTypography.bodySm.copyWith(
+                                color: AppColors.onSurfaceVariant)),
                       ],
                     ),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: 'Refresh tasks',
-                        onPressed: () => ref
-                            .read(staffTasksProvider(currentUser.id).notifier)
-                            .fetchTasks(),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => setState(
-                            () => _selectedTab = StaffTaskTab.inventory),
-                        icon: const Icon(Icons.inventory_2_outlined, size: 16),
-                        label: const Text('Inventory'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      OutlinedButton.icon(
-                        onPressed: () =>
-                            setState(() => _selectedTab = StaffTaskTab.vendors),
-                        icon:
-                            const Icon(Icons.local_shipping_outlined, size: 16),
-                        label: const Text('Vendors'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      OutlinedButton.icon(
-                        onPressed: () => setState(
-                            () => _selectedTab = StaffTaskTab.purchaseOrders),
-                        icon: const Icon(Icons.receipt_long_outlined, size: 16),
-                        label: const Text('PO'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const StaffTaskHistoryScreen(),
-                          ),
-                        ),
-                        icon: const Icon(Icons.history, size: 16),
-                        label: const Text('History'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                        ),
-                      ),
-                    ],
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Refresh tasks',
+                    onPressed: () => ref
+                        .read(staffTasksProvider(currentUser.id).notifier)
+                        .fetchTasks(),
                   ),
                 ],
               ),
-            ],
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
 
             // Date Selector Control on Staff Tasks Screen (Part 4)
             _buildDateSelector(isDesktop),
@@ -404,38 +400,102 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                             BorderRadius.circular(AppSpacing.radiusMd),
                         border: Border.all(color: AppColors.outlineVariant),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.today,
-                              size: 18, color: AppColors.primary),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            isViewingToday
-                                ? 'Operational Tasks — Today (${DateFormat('d MMM yyyy').format(_selectedDate)})'
-                                : 'Scheduled Tasks — ${DateFormat('EEEE, d MMM yyyy').format(_selectedDate)}',
-                            style: AppTypography.bodyMd
-                                .copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryContainer
-                                  .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              isViewingToday
-                                  ? '${operationalTasks.length} pending'
-                                  : '${primaryTasks.length} pending',
-                              style: AppTypography.labelCaps.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 440;
+                          final dateTitle = isViewingToday
+                              ? 'Operational Tasks — Today (${DateFormat('d MMM yyyy').format(_selectedDate)})'
+                              : 'Scheduled Tasks — ${DateFormat('EEEE, d MMM yyyy').format(_selectedDate)}';
+
+                          final badges = Wrap(
+                            spacing: AppSpacing.xs,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (isViewingToday && overdueTasks.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        AppColors.error.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                        color: AppColors.error
+                                            .withValues(alpha: 0.4)),
+                                  ),
+                                  child: Text(
+                                    '${overdueTasks.length} overdue',
+                                    style: AppTypography.labelCaps.copyWith(
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryContainer
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  isViewingToday
+                                      ? '${operationalTasks.length} pending'
+                                      : '${primaryTasks.length} pending',
+                                  style: AppTypography.labelCaps.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ],
+                            ],
+                          );
+
+                          if (isNarrow) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.today,
+                                        size: 18, color: AppColors.primary),
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Expanded(
+                                      child: Text(
+                                        dateTitle,
+                                        style: AppTypography.bodyMd.copyWith(
+                                            fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                badges,
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              const Icon(Icons.today,
+                                  size: 18, color: AppColors.primary),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: Text(
+                                  dateTitle,
+                                  style: AppTypography.bodyMd
+                                      .copyWith(fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              badges,
+                            ],
+                          );
+                        },
                       ),
                     ),
                     SingleChildScrollView(
@@ -564,49 +624,60 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Row(
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          if (item.dueDate != null) ...[
-                                            Icon(
-                                              Icons.access_time,
-                                              size: 12,
-                                              color: isOverdue
-                                                  ? AppColors.error
-                                                  : AppColors.outline,
+                                          if (item.dueDate != null)
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time,
+                                                  size: 12,
+                                                  color: isOverdue
+                                                      ? AppColors.error
+                                                      : AppColors.outline,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Flexible(
+                                                  child: Text(
+                                                    isOverdue
+                                                        ? TaskOperationalFilter
+                                                            .formatDueDateMessage(
+                                                                item.dueDate!)
+                                                        : DateFormat(
+                                                                'MMM d, h:mm a')
+                                                            .format(
+                                                                item.dueDate!),
+                                                    style: AppTypography
+                                                        .dataMono
+                                                        .copyWith(
+                                                      fontSize: 11,
+                                                      fontWeight: isOverdue
+                                                          ? FontWeight.bold
+                                                          : FontWeight.normal,
+                                                      color: isOverdue
+                                                          ? AppColors.error
+                                                          : AppColors.outline,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              isOverdue
-                                                  ? TaskOperationalFilter
-                                                      .formatDueDateMessage(
-                                                          item.dueDate!)
-                                                  : DateFormat('MMM d, h:mm a')
-                                                      .format(item.dueDate!),
-                                              style: AppTypography.dataMono
-                                                  .copyWith(
-                                                fontSize: 11,
-                                                fontWeight: isOverdue
-                                                    ? FontWeight.bold
-                                                    : FontWeight.normal,
-                                                color: isOverdue
-                                                    ? AppColors.error
-                                                    : AppColors.outline,
-                                              ),
-                                            ),
-                                          ],
                                           if (item.description != null &&
                                               item.description!.isNotEmpty) ...[
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                item.description!,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: AppTypography.bodySm
-                                                    .copyWith(
-                                                  color: AppColors
-                                                      .onSurfaceVariant,
-                                                ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              item.description!,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style:
+                                                  AppTypography.bodySm.copyWith(
+                                                color:
+                                                    AppColors.onSurfaceVariant,
                                               ),
                                             ),
                                           ],
@@ -746,47 +817,53 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                               ),
                               subtitle: Padding(
                                 padding: const EdgeInsets.only(top: 4),
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (item.dueDate != null) ...[
-                                      Icon(
-                                        Icons.access_time,
-                                        size: 12,
-                                        color: isOverdue
-                                            ? AppColors.error
-                                            : AppColors.outline,
+                                    if (item.dueDate != null)
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.access_time,
+                                            size: 12,
+                                            color: isOverdue
+                                                ? AppColors.error
+                                                : AppColors.outline,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              isOverdue
+                                                  ? TaskOperationalFilter
+                                                      .formatDueDateMessage(
+                                                          item.dueDate!)
+                                                  : DateFormat('MMM d, h:mm a')
+                                                      .format(item.dueDate!),
+                                              style: AppTypography.dataMono
+                                                  .copyWith(
+                                                fontSize: 11,
+                                                fontWeight: isOverdue
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                                color: isOverdue
+                                                    ? AppColors.error
+                                                    : AppColors.outline,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        isOverdue
-                                            ? TaskOperationalFilter
-                                                .formatDueDateMessage(
-                                                    item.dueDate!)
-                                            : DateFormat('MMM d, h:mm a')
-                                                .format(item.dueDate!),
-                                        style: AppTypography.dataMono.copyWith(
-                                          fontSize: 11,
-                                          fontWeight: isOverdue
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                          color: isOverdue
-                                              ? AppColors.error
-                                              : AppColors.outline,
-                                        ),
-                                      ),
-                                    ],
                                     if (item.description != null &&
                                         item.description!.isNotEmpty) ...[
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          item.description!,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: AppTypography.bodySm.copyWith(
-                                              color:
-                                                  AppColors.onSurfaceVariant),
-                                        ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        item.description!,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: AppTypography.bodySm.copyWith(
+                                            color: AppColors.onSurfaceVariant),
                                       ),
                                     ],
                                   ],
@@ -899,92 +976,176 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
         ? 'Today, ${DateFormat('d MMM yyyy').format(_selectedDate)}'
         : DateFormat('EEE, d MMM yyyy').format(_selectedDate);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      padding:
-          const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            key: const Key('staff_tasks_prev_date_button'),
-            icon: const Icon(Icons.chevron_left),
-            tooltip: 'Previous Day',
-            visualDensity: VisualDensity.compact,
-            onPressed: () {
-              setState(() {
-                _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-              });
-            },
-          ),
-          InkWell(
-            key: const Key('staff_tasks_date_picker_button'),
-            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2035),
-              );
-              if (picked != null && mounted) {
-                setState(() => _selectedDate = picked);
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.calendar_month_outlined,
-                      size: 18, color: AppColors.primary),
-                  const SizedBox(width: 6),
-                  Text(
-                    dateLabel,
-                    style: AppTypography.bodyMd.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.onSurface,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_drop_down,
-                      size: 20, color: AppColors.outline),
-                ],
-              ),
-            ),
-          ),
-          IconButton(
-            key: const Key('staff_tasks_next_date_button'),
-            icon: const Icon(Icons.chevron_right),
-            tooltip: 'Next Day',
-            visualDensity: VisualDensity.compact,
-            onPressed: () {
-              setState(() {
-                _selectedDate = _selectedDate.add(const Duration(days: 1));
-              });
-            },
-          ),
-          const Spacer(),
-          TextButton.icon(
-            key: const Key('staff_tasks_today_button'),
-            icon: const Icon(Icons.today, size: 16),
-            label: const Text('Today'),
-            style: TextButton.styleFrom(
-              foregroundColor: isToday ? AppColors.outline : AppColors.primary,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final isVeryNarrow = availableWidth < 320;
+        final isCompact = !isDesktop && availableWidth < 520;
+
+        Widget prevButton() => IconButton(
+              key: const Key('staff_tasks_prev_date_button'),
+              icon: const Icon(Icons.chevron_left, size: 20),
+              tooltip: 'Previous Day',
               visualDensity: VisualDensity.compact,
-            ),
-            onPressed: isToday
-                ? null
-                : () {
-                    setState(() => _selectedDate = DateTime.now());
-                  },
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: isCompact ? 28 : 32,
+                minHeight: 32,
+              ),
+              onPressed: () {
+                setState(() {
+                  _selectedDate =
+                      _selectedDate.subtract(const Duration(days: 1));
+                });
+              },
+            );
+
+        Widget nextButton() => IconButton(
+              key: const Key('staff_tasks_next_date_button'),
+              icon: const Icon(Icons.chevron_right, size: 20),
+              tooltip: 'Next Day',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: isCompact ? 28 : 32,
+                minHeight: 32,
+              ),
+              onPressed: () {
+                setState(() {
+                  _selectedDate = _selectedDate.add(const Duration(days: 1));
+                });
+              },
+            );
+
+        Widget datePickerButton() => InkWell(
+              key: const Key('staff_tasks_date_picker_button'),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2035),
+                );
+                if (picked != null && mounted) {
+                  setState(() => _selectedDate = picked);
+                }
+              },
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCompact ? 4 : 8,
+                  vertical: 6,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.calendar_month_outlined,
+                      size: isCompact ? 16 : 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        dateLabel,
+                        maxLines: 1,
+                        style: (isDesktop
+                                ? AppTypography.bodyMd
+                                : AppTypography.bodySm)
+                            .copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      size: isCompact ? 18 : 20,
+                      color: AppColors.outline,
+                    ),
+                  ],
+                ),
+              ),
+            );
+
+        Widget todayButton() => TextButton.icon(
+              key: const Key('staff_tasks_today_button'),
+              icon: const Icon(Icons.today, size: 14),
+              label: Text(
+                'Today',
+                style: TextStyle(
+                  fontSize: isCompact ? 12 : 13,
+                  fontWeight: isToday ? FontWeight.w500 : FontWeight.bold,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor:
+                    isToday ? AppColors.outline : AppColors.primary,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCompact ? 6 : 8,
+                  vertical: 4,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: isToday
+                  ? null
+                  : () {
+                      setState(() => _selectedDate = DateTime.now());
+                    },
+            );
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? AppSpacing.md : 6,
+            vertical: isDesktop ? 6 : 4,
           ),
-        ],
-      ),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            border: Border.all(color: AppColors.outlineVariant),
+          ),
+          child: isVeryNarrow
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        prevButton(),
+                        Expanded(child: Center(child: datePickerButton())),
+                        nextButton(),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    todayButton(),
+                  ],
+                )
+              : Row(
+                  children: [
+                    prevButton(),
+                    if (!isCompact) const SizedBox(width: 2),
+                    Expanded(
+                      child: Center(
+                        child: datePickerButton(),
+                      ),
+                    ),
+                    if (!isCompact) const SizedBox(width: 2),
+                    nextButton(),
+                    if (isDesktop || availableWidth >= 520) ...[
+                      const Spacer(),
+                      todayButton(),
+                    ] else ...[
+                      const SizedBox(width: 4),
+                      todayButton(),
+                    ],
+                  ],
+                ),
+        );
+      },
     );
   }
 }

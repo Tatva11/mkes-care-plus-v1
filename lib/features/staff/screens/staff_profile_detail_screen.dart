@@ -237,28 +237,48 @@ class _StaffProfileDetailScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(user.fullName),
-        actions: [
-          OutlinedButton.icon(
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            label: const Text('Edit Profile'),
-            onPressed: () => _openEditDialog(user),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          FilledButton.tonalIcon(
-            icon: Icon(
-              user.isActive ? Icons.person_off_outlined : Icons.person_outline,
-              size: 18,
-            ),
-            label: Text(user.isActive ? 'Deactivate' : 'Activate'),
-            style: FilledButton.styleFrom(
-              foregroundColor:
-                  user.isActive ? AppColors.error : AppColors.primary,
-            ),
-            onPressed: () => _toggleStatus(user),
-          ),
-          const SizedBox(width: AppSpacing.md),
-        ],
+        title: Text(user.fullName, overflow: TextOverflow.ellipsis),
+        actions: isDesktop
+            ? [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit Profile'),
+                  onPressed: () => _openEditDialog(user),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                FilledButton.tonalIcon(
+                  icon: Icon(
+                    user.isActive
+                        ? Icons.person_off_outlined
+                        : Icons.person_outline,
+                    size: 18,
+                  ),
+                  label: Text(user.isActive ? 'Deactivate' : 'Activate'),
+                  style: FilledButton.styleFrom(
+                    foregroundColor:
+                        user.isActive ? AppColors.error : AppColors.primary,
+                  ),
+                  onPressed: () => _toggleStatus(user),
+                ),
+                const SizedBox(width: AppSpacing.md),
+              ]
+            : [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit Profile',
+                  onPressed: () => _openEditDialog(user),
+                ),
+                IconButton(
+                  icon: Icon(
+                    user.isActive
+                        ? Icons.person_off_outlined
+                        : Icons.person_outline,
+                  ),
+                  tooltip: user.isActive ? 'Deactivate' : 'Activate',
+                  color: user.isActive ? AppColors.error : AppColors.primary,
+                  onPressed: () => _toggleStatus(user),
+                ),
+              ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(
@@ -906,7 +926,7 @@ class _StaffAttendanceTab extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'In: $checkInStr  •  Out: $checkOutStr',
+                              'In: $checkInStr  •  Out: $checkOutStr  •  Hours: ${rec.workingHours != null ? "${rec.workingHours!.toStringAsFixed(1)} hrs" : "—"}',
                               style: AppTypography.bodySm.copyWith(
                                 color: AppColors.onSurfaceVariant,
                               ),

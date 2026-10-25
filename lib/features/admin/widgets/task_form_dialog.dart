@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../staff/models/task_item.dart';
 import '../../staff/providers/task_provider.dart';
@@ -82,7 +84,15 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
             .toList() ??
         <UserProfile>[];
 
+    final dialogConstraints = AdaptiveDialogConstraints.getConstraints(
+      context: context,
+      maxPhoneWidth: AppBreakpoints.maxDialogWidthMobile,
+      maxTabletWidth: 500.0,
+      maxDesktopWidth: 500.0,
+    );
+
     return AlertDialog(
+      actionsOverflowButtonSpacing: AppSpacing.xs,
       title: Row(
         children: [
           Icon(
@@ -90,14 +100,20 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
             color: AppColors.primary,
           ),
           const SizedBox(width: AppSpacing.sm),
-          Text(
-            widget.isEditing ? 'Edit Task' : 'Create & Assign Task',
-            style: AppTypography.headlineMd.copyWith(fontSize: 20),
+          Expanded(
+            child: Text(
+              widget.isEditing ? 'Edit Task' : 'Create & Assign Task',
+              style: AppTypography.headlineMd.copyWith(fontSize: 20),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
-      content: SizedBox(
-        width: 500,
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogConstraints.maxWidth,
+          maxHeight: dialogConstraints.maxHeight,
+        ),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -162,63 +178,29 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                // Priority and Status Row
-                Row(
-                  children: [
-                    // Priority
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _selectedPriority,
-                        decoration: const InputDecoration(
-                          labelText: 'Priority',
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'low', child: Text('Low')),
-                          DropdownMenuItem(
-                              value: 'medium', child: Text('Medium')),
-                          DropdownMenuItem(value: 'high', child: Text('High')),
-                          DropdownMenuItem(
-                              value: 'critical', child: Text('Critical')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() => _selectedPriority = val);
-                          }
-                        },
-                      ),
-                    ),
-                    if (widget.isEditing) ...[
-                      const SizedBox(width: AppSpacing.md),
-                      // Status
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _selectedStatus,
-                          decoration: const InputDecoration(
-                            labelText: 'Status',
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                                value: 'pending', child: Text('Pending')),
-                            DropdownMenuItem(
-                                value: 'in_progress',
-                                child: Text('In Progress')),
-                            DropdownMenuItem(
-                                value: 'completed', child: Text('Completed')),
-                            DropdownMenuItem(
-                                value: 'overdue', child: Text('Overdue')),
-                            DropdownMenuItem(
-                                value: 'cancelled', child: Text('Cancelled')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedStatus = val);
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                // Priority and Status (Adaptive: Column on narrow screens, Row on wide screens)
+                if (widget.isEditing)
+                  if (dialogConstraints.maxWidth < 420)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildPriorityDropdown(),
+                        const SizedBox(height: AppSpacing.sm),
+                        _buildStatusDropdown(),
+                      ],
+                    )
+                  else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildPriorityDropdown()),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(child: _buildStatusDropdown()),
+                      ],
+                    )
+                else
+                  _buildPriorityDropdown(),
                 const SizedBox(height: AppSpacing.md),
 
                 // Due Date Picker
@@ -243,6 +225,7 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
                           _dueDate != null
                               ? 'Due: ${DateFormat('MMM d, yyyy').format(_dueDate!)}'
                               : 'Set Due Date (optional)',
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
@@ -374,5 +357,48 @@ class _TaskFormDialogState extends ConsumerState<TaskFormDialog> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Widget _buildPriorityDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedPriority,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Priority',
+      ),
+      items: const [
+        DropdownMenuItem(value: 'low', child: Text('Low')),
+        DropdownMenuItem(value: 'medium', child: Text('Medium')),
+        DropdownMenuItem(value: 'high', child: Text('High')),
+        DropdownMenuItem(value: 'critical', child: Text('Critical')),
+      ],
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _selectedPriority = val);
+        }
+      },
+    );
+  }
+
+  Widget _buildStatusDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedStatus,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Status',
+      ),
+      items: const [
+        DropdownMenuItem(value: 'pending', child: Text('Pending')),
+        DropdownMenuItem(value: 'in_progress', child: Text('In Progress')),
+        DropdownMenuItem(value: 'completed', child: Text('Completed')),
+        DropdownMenuItem(value: 'overdue', child: Text('Overdue')),
+        DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+      ],
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _selectedStatus = val);
+        }
+      },
+    );
   }
 }

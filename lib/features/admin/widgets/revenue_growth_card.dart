@@ -31,27 +31,28 @@ class RevenueGrowthCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.xs,
+            runSpacing: 4,
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.trending_up,
-                      color: AppColors.primaryContainer,
-                      size: 22,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.trending_up,
+                    color: AppColors.primaryContainer,
+                    size: 22,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Flexible(
+                    child: Text(
+                      'Revenue Growth',
+                      style: AppTypography.headlineMd,
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Flexible(
-                      child: Text(
-                        'Revenue Growth',
-                        style: AppTypography.headlineMd,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               TextButton(
                 onPressed: () {
@@ -188,21 +189,19 @@ class RevenueGrowthCard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.xs,
+          runSpacing: 4,
           children: [
-            Flexible(
-              child: Text(
-                currency.format(metrics.todayRevenue),
-                style: AppTypography.displayLg.copyWith(
-                  color: AppColors.onSurface,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Text(
+              currency.format(metrics.todayRevenue),
+              style: AppTypography.displayLg.copyWith(
+                color: AppColors.onSurface,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: AppSpacing.xs),
             _buildGrowthBadge(metrics.growthPercentage),
           ],
         ),

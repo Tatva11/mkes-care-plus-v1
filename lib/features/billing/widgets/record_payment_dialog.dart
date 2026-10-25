@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../shared/widgets/adaptive_dialog_shell.dart';
 import '../models/billing_invoice_model.dart';
 import '../providers/billing_provider.dart';
 
@@ -18,7 +20,8 @@ class RecordPaymentDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<RecordPaymentDialog> createState() => _RecordPaymentDialogState();
+  ConsumerState<RecordPaymentDialog> createState() =>
+      _RecordPaymentDialogState();
 }
 
 class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
@@ -87,20 +90,19 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
     setState(() => _errorMessage = null);
 
     try {
-      final payment = await ref
-          .read(recordPaymentNotifierProvider.notifier)
-          .recordPayment(
-            billingId: widget.invoice.id,
-            amount: amount,
-            paymentMode: _paymentMode,
-            paymentReference: _referenceController.text.trim().isNotEmpty
-                ? _referenceController.text.trim()
-                : null,
-            paidAt: _paidAt,
-            notes: _notesController.text.trim().isNotEmpty
-                ? _notesController.text.trim()
-                : null,
-          );
+      final payment =
+          await ref.read(recordPaymentNotifierProvider.notifier).recordPayment(
+                billingId: widget.invoice.id,
+                amount: amount,
+                paymentMode: _paymentMode,
+                paymentReference: _referenceController.text.trim().isNotEmpty
+                    ? _referenceController.text.trim()
+                    : null,
+                paidAt: _paidAt,
+                notes: _notesController.text.trim().isNotEmpty
+                    ? _notesController.text.trim()
+                    : null,
+              );
 
       if (mounted) {
         Navigator.of(context).pop(payment);
@@ -119,13 +121,24 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
     final recordState = ref.watch(recordPaymentNotifierProvider);
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
 
+    final dialogConstraints = AdaptiveDialogConstraints.getConstraints(
+      context: context,
+      maxPhoneWidth: AppBreakpoints.maxDialogWidthMobile,
+      maxTabletWidth: 520.0,
+      maxDesktopWidth: 520.0,
+    );
+
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.lg,
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
       ),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 520),
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        constraints: dialogConstraints,
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: SingleChildScrollView(
           child: Form(
             key: _formKey,
@@ -137,23 +150,29 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'RECORD PAYMENT',
-                          style: AppTypography.labelCaps.copyWith(
-                            color: AppColors.primary,
-                            letterSpacing: 1.2,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'RECORD PAYMENT',
+                            style: AppTypography.labelCaps.copyWith(
+                              color: AppColors.primary,
+                              letterSpacing: 1.2,
+                            ),
                           ),
-                        ),
-                        Text(
-                          widget.invoice.invoiceNumber,
-                          style: AppTypography.headlineMd.copyWith(
-                            fontWeight: FontWeight.bold,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              widget.invoice.invoiceNumber,
+                              style: AppTypography.headlineMd.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -177,12 +196,16 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Patient: ${widget.invoice.patientName ?? "—"}',
-                            style: AppTypography.bodySm.copyWith(
-                              fontWeight: FontWeight.w600,
+                          Expanded(
+                            child: Text(
+                              'Patient: ${widget.invoice.patientName ?? "—"}',
+                              style: AppTypography.bodySm.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: AppSpacing.sm),
                           Text(
                             'Dept: ${widget.invoice.department.toUpperCase()}',
                             style: AppTypography.labelCaps.copyWith(
@@ -195,13 +218,21 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _summaryCol('Total Amount', '₹${widget.invoice.totalAmount.toStringAsFixed(2)}'),
-                          _summaryCol('Already Paid', '₹${widget.invoice.amountPaid.toStringAsFixed(2)}'),
-                          _summaryCol(
-                            'Balance Due',
-                            '₹${widget.invoice.remainingAmount.toStringAsFixed(2)}',
-                            valueColor: AppColors.error,
-                            isBold: true,
+                          Expanded(
+                            child: _summaryCol('Total Amount',
+                                '₹${widget.invoice.totalAmount.toStringAsFixed(2)}'),
+                          ),
+                          Expanded(
+                            child: _summaryCol('Already Paid',
+                                '₹${widget.invoice.amountPaid.toStringAsFixed(2)}'),
+                          ),
+                          Expanded(
+                            child: _summaryCol(
+                              'Balance Due',
+                              '₹${widget.invoice.remainingAmount.toStringAsFixed(2)}',
+                              valueColor: AppColors.error,
+                              isBold: true,
+                            ),
                           ),
                         ],
                       ),
@@ -220,7 +251,8 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: AppColors.error, size: 20),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Text(
@@ -247,9 +279,11 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                 const SizedBox(height: 4),
                 TextFormField(
                   controller: _amountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                    FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d+\.?\d{0,2}')),
                   ],
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.currency_rupee, size: 20),
@@ -297,33 +331,36 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(
-                      value: 'cash',
-                      label: Text('Cash'),
-                      icon: Icon(Icons.payments_outlined, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: 'upi',
-                      label: Text('UPI'),
-                      icon: Icon(Icons.qr_code_2_outlined, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: 'bank_transfer',
-                      label: Text('Bank'),
-                      icon: Icon(Icons.account_balance_outlined, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: 'other',
-                      label: Text('Other'),
-                      icon: Icon(Icons.more_horiz, size: 16),
-                    ),
-                  ],
-                  selected: {_paymentMode},
-                  onSelectionChanged: (selected) {
-                    setState(() => _paymentMode = selected.first);
-                  },
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'cash',
+                        label: Text('Cash'),
+                        icon: Icon(Icons.payments_outlined, size: 16),
+                      ),
+                      ButtonSegment(
+                        value: 'upi',
+                        label: Text('UPI'),
+                        icon: Icon(Icons.qr_code_2_outlined, size: 16),
+                      ),
+                      ButtonSegment(
+                        value: 'bank_transfer',
+                        label: Text('Bank'),
+                        icon: Icon(Icons.account_balance_outlined, size: 16),
+                      ),
+                      ButtonSegment(
+                        value: 'other',
+                        label: Text('Other'),
+                        icon: Icon(Icons.more_horiz, size: 16),
+                      ),
+                    ],
+                    selected: {_paymentMode},
+                    onSelectionChanged: (selected) {
+                      setState(() => _paymentMode = selected.first);
+                    },
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
 
@@ -374,17 +411,49 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                 const SizedBox(height: AppSpacing.lg),
 
                 // Action Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: recordState.isLoading
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    FilledButton.icon(
+                if (isDesktop)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: recordState.isLoading
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      FilledButton.icon(
+                        onPressed:
+                            recordState.isLoading ? null : _submitPayment,
+                        icon: recordState.isLoading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.check, size: 18),
+                        label: Text(
+                          recordState.isLoading
+                              ? 'Recording...'
+                              : 'Record Payment',
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
                       onPressed: recordState.isLoading ? null : _submitPayment,
                       icon: recordState.isLoading
                           ? const SizedBox(
@@ -397,18 +466,30 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                             )
                           : const Icon(Icons.check, size: 18),
                       label: Text(
-                        recordState.isLoading ? 'Recording...' : 'Record Payment',
+                        recordState.isLoading
+                            ? 'Recording...'
+                            : 'Record Payment',
                       ),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
+                          horizontal: 16,
                           vertical: 12,
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: recordState.isLoading
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -417,7 +498,8 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
     );
   }
 
-  Widget _summaryCol(String label, String value, {Color? valueColor, bool isBold = false}) {
+  Widget _summaryCol(String label, String value,
+      {Color? valueColor, bool isBold = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -427,13 +509,18 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
             color: AppColors.onSurfaceVariant,
             fontSize: 10,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: AppTypography.bodySm.copyWith(
-            color: valueColor ?? AppColors.onSurface,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: AppTypography.bodySm.copyWith(
+              color: valueColor ?? AppColors.onSurface,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -501,7 +588,8 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                   DateFormat('dd MMM yyyy').format(_paidAt),
                   style: AppTypography.bodySm,
                 ),
-                const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.primary),
+                const Icon(Icons.calendar_today_outlined,
+                    size: 16, color: AppColors.primary),
               ],
             ),
           ),
