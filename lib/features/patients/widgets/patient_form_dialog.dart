@@ -190,8 +190,8 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isEditing
-                ? 'Failed to update patient: $e'
-                : 'Failed to register patient: $e'),
+                ? 'Failed to update patient: ${e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '')}'
+                : 'Failed to register patient: ${e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '')}'),
             backgroundColor: AppColors.error,
           ),
         );

@@ -1,0 +1,227 @@
+<USER_REQUEST>
+# MKES CARE+ — Demo Data Population, Full Functionality Screenshots & Presentation Preparation
+
+## Objective
+
+Prepare the existing MKES CARE+ Flutter Android application for a college/project presentation. Populate the app with realistic demonstration data, verify that its major functionalities work, and capture clear screenshots of every important screen and workflow so I can directly use them in my PowerPoint presentation.
+
+**Do not just create a report or a list of screenshots to take. Actually prepare the app, launch it, navigate through the screens, and capture the screenshots wherever the environment allows.**
+
+## 1. Mandatory Safety Rules
+
+- Inspect the current Git branch and working tree before making changes.
+- Preserve all existing uncommitted work. Do not reset, stash, discard, overwrite, or revert existing changes.
+- Do not commit, merge, or push anything.
+- Do not alter business logic just to make a screenshot look successful.
+- Do not use fabricated data as evidence that a real workflow or backend integration works.
+- Never insert demo records into the production database or modify real patient records.
+- Use the existing development/demo environment and existing test-data mechanisms. If a separate demo environment is not configured, stop before inserting records and explain what configuration is needed.
+- Use clearly fictional patient names and contact details. Do not use real patient information in screenshots.
+- Do not create fake authentication accounts for static doctors.
+- Optical production features remain on hold. Do not implement or modify them.
+- Do not modify Sprint 10 WhatsApp/notification functionality.
+- Do not bypass authentication, permissions, validation, or security checks.
+- If any functionality fails, document the failure honestly rather than hiding it.
+
+## 2. Populate Realistic Demo Data
+
+Inspect the existing database schema, models, providers, and workflows before creating demo records.
+
+Use the application's existing data models and valid relationships. Populate only the isolated development/demo environment.
+
+Include a sensible amount of demo data so the screens look complete without becoming overcrowded.
+
+### Patients and appointments
+- Add several fictional patients with realistic profile details.
+- Include appointments across the Eye and Dental departments.
+- Include appointments for today and selected historical dates.
+- Include different appointment statuses supported by the application.
+- Ensure the schedule shows only appointments appropriate to the selected date and filters.
+- Do not reintroduce hardcoded mock appointments or fake fallback data into production code.
+
+### Staff and departments
+- Populate the existing staff-management screens with suitable demo records only where the development environment permits it.
+- Use existing department records and valid staff-to-department relationships.
+- Preserve the static doctor roster and existing authentication rules.
+- Include shift assignments that demonstrate the existing morning, afternoon/evening, and other supported shift configurations.
+
+### Billing and payments
+- Create demo invoices associated with fictional patients.
+- Include multiple invoice line items, different payment statuses, partial payments, and outstanding balances where supported.
+- Ensure totals and balances are calculated by the actual application logic.
+- Include records suitable for demonstrating invoice details, payment history, and PDF generation if available.
+
+### Inventory, vendors and purchase orders
+- Add a small but useful variety of demo inventory items, stock quantities, and expiry dates.
+- Add fictional vendor records.
+- Include purchase orders in the statuses supported by the app.
+- Keep quantities, prices, vendors, and purchase-order relationships consistent.
+
+### Dental lab, tasks and attendance
+- Add demo dental lab cases with valid patient references and statuses.
+- Add a few staff tasks with different statuses and due dates.
+- Include attendance records suitable for demonstrating clock-in, clock-out, shift timing, and worked-hours display.
+- Do not fabricate a successful attendance result if the real workflow or backend is failing.
+
+### Leave and reports
+- Add a few fictional leave requests with pending, approved, or rejected statuses where supported.
+- Ensure the admin approval workflow can be demonstrated.
+- Populate enough historical demo data for the existing reports and dashboard charts to show meaningful results.
+
+**Important:** Use only fields and statuses supported by the existing schema. Do not invent unsupported database columns, IDs, or status values.
+
+## 3. Verify Every Major Functionality
+
+Navigate through the application as an administrator and as staff, using authorized demo accounts already configured for the development environment.
+
+Capture screenshots of the actual rendered app. Verify the underlying workflow where practical.
+
+At minimum, cover:
+
+1. Login and role-based landing screens.
+2. Admin dashboard and its summary cards/charts.
+3. Staff management and doctor management.
+4. Patient list, patient details, and patient creation if supported.
+5. Appointment scheduling, date navigation, department filters, and appointment creation.
+6. Staff schedule and staff task management.
+7. Shift management and shift assignments.
+8. Staff attendance, clock-in/clock-out, attendance history, and worked hours.
+9. Leave request submission and admin leave approval.
+10. Billing dashboard and invoice list.
+11. Invoice creation, invoice details, payment recording, and payment history.
+12. PDF generation and saving/downloading, if implemented.
+13. Inventory list, inventory item forms, and stock-related workflows.
+14. Vendor directory and vendor details.
+15. Purchase-order creation, details, and status display.
+16. Dental lab case list, creation form, and case details.
+17. Department management.
+18. Staff profile and staff performance screens.
+19. Existing reports and analytics.
+20. Global search and other major shared navigation features.
+
+Include additional important screens discovered during inspection.
+
+For every workflow, record whether it **passed, failed, or could not be tested**. A screen opening is not proof that its complete workflow works.
+
+## 4. Capture Screenshots for the Presentation
+
+Use the actual Flutter Android app running in the available emulator/device whenever possible. Prefer a clean, presentation-ready phone viewport and capture additional tablet/desktop layouts when useful.
+
+- Capture genuine screenshots of the rendered application.
+- Do not create mock screenshots, reconstruct screens in an image editor, or substitute design mockups for actual app output.
+- Use demo data so screens appear populated, coherent, and professional.
+- Make sure screenshots do not show overflow errors, clipped text, loading spinners that never finish, blank forms, debug banners, stack traces, or irrelevant personal information.
+- Do not hide or crop out functional errors to make a screen appear successful.
+- If a screen has a known issue, report it and capture the issue separately for debugging rather than presenting it as a successful feature.
+- Capture each major screen and each important workflow step, including useful before/after states where applicable.
+- Capture mobile screenshots first because this is a Flutter Android application.
+- Keep screenshots at their original resolution and preserve legibility.
+
+### Screenshot organization
+
+Create an organized output directory in the project or an appropriate local output folder, for example:
+
+`presentation_screenshots/`
+
+Use subfolders such as:
+
+- `01_auth_dashboard/`
+- `02_patients_appointments/`
+- `03_staff_schedule_tasks/`
+- `04_shifts_attendance_leave/`
+- `05_billing_payments_pdf/`
+- `06_inventory_vendors_purchase_orders/`
+- `07_dental_lab/`
+- `08_departments_profiles/`
+- `09_reports_analytics/`
+- `10_search_navigation/`
+
+Use descriptive filenames, such as:
+
+- `admin_dashboard.png`
+- `patient_list.png`
+- `appointment_booking.png`
+- `staff_schedule_today.png`
+- `shift_management.png`
+- `attendance_worked_hours.png`
+- `leave_approval.png`
+- `billing_invoice_list.png`
+- `invoice_payment_history.png`
+- `invoice_pdf.png`
+- `inventory_items.png`
+- `vendor_directory.png`
+- `purchase_order_details.png`
+- `dental_lab_cases.png`
+- `reports_analytics.png`
+
+Use additional numbered screenshots for multi-step workflows.
+
+**Verify that every saved screenshot file exists and opens correctly.** If the environment cannot capture screenshots directly, state that limitation clearly and provide the exact manual capture steps. Do not claim screenshots were saved if they were not.
+
+## 5. Fix Blocking Issues Before Capturing Successful Screenshots
+
+During navigation, pay special attention to previously reported problems:
+
+- Staff schedule page still showing pixel overflow or misaligned date/department controls.
+- Attendance showing the wrong automatic clock-out time or missing worked hours.
+- Shift management showing the wrong effective shift.
+- Leave approval throwing errors or overflowing.
+- Billing screens overflowing on mobile.
+- Dental lab New button opening a blank or stuck form.
+- Vendor directory failing to open from either role.
+- Missing or incorrect demo data.
+- PDF generation or local download failures.
+
+Fix verified issues within the existing project scope, without unrelated refactoring. Add or update regression tests for each issue fixed.
+
+Do not spend time polishing a screenshot while the underlying functionality is broken.
+
+## 6. PDF and Local File Verification
+
+If billing already supports PDF generation, test the complete flow and capture the resulting invoice PDF screen or preview.
+
+If PDF generation or local downloading has not been implemented, do not pretend it works. Document what is missing and, if appropriate, propose a separate implementation task. Do not silently add unrelated functionality during this presentation-preparation task.
+
+## 7. Automated Tests and Build Checks
+
+After making changes:
+
+- Run the relevant existing Flutter tests.
+- Run the targeted tests for any fixes made.
+- Run `flutter analyze`.
+- Run `git diff --check`.
+- Build or launch the Android app if the environment supports it.
+- Confirm that screenshot/demo-data preparation has not broken existing functionality.
+- Clearly report any tests that failed, were skipped, or could not run.
+
+Do not claim that the entire app is verified merely because a few widget tests pass.
+
+## 8. Final Deliverables
+
+When finished, provide:
+
+1. **Screenshot gallery:** the actual saved screenshot files, organized by feature.
+2. **Screenshot index:** a Markdown or CSV file listing each screenshot, its filename, the screen/feature shown, and the workflow it demonstrates.
+3. **Demo-data summary:** what was added, which environment contains it, and how it can be reset safely.
+4. **Functionality checklist:** passed, failed, and untested workflows.
+5. **Bug-fix summary:** exact files changed and the issues fixed.
+6. **Test report:** actual Flutter test, analyzer, and build results.
+7. **Remaining issues:** anything that prevented a clean demonstration.
+8. **Presentation recommendations:** a suggested order for placing the screenshots into my PowerPoint slides.
+
+Start by inspecting the current project state and available Android emulator/device. Then proceed with demo preparation, verification, screenshot capture, and reporting. Do not stop after creating a plan; complete as much as the available environment safely permits.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-19T00:54:21+05:30.
+
+The user's current state is as follows:
+Other open documents:
+- d:\mkes-lovable\lib\features\billing\screens\billing_management_screen.dart (LANGUAGE_DART)
+- d:\mkes-lovable\lib\features\auth\models\profile_model.dart (LANGUAGE_DART)
+- d:\mkes-lovable\test\staff_leave_shift_attendance_mobile_fixes_test.dart (LANGUAGE_DART)
+- d:\mkes-lovable\lib\features\staff_portal\widgets\staff_shell.dart (LANGUAGE_DART)
+- d:\mkes-lovable\lib\features\admin\models\user_profile.dart (LANGUAGE_DART)
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.8 Flash (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

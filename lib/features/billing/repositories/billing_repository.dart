@@ -393,7 +393,7 @@ class BillingRepository {
       final existing = await _supabase
           .from('whatsapp_messages_outbox')
           .select('id')
-          .eq('template_key', 'invoice_${invoice.id}')
+          .or('template_key.eq.invoice_${invoice.id},message_text.ilike.%Invoice #${invoice.invoiceNumber}%')
           .maybeSingle();
 
       if (existing != null) return;
@@ -410,16 +410,26 @@ class BillingRepository {
           'Please find your official invoice document attached. We wish you great health and a speedy recovery!\n\n'
           'Reply STOP to unsubscribe.';
 
-      await _supabase.from('whatsapp_messages_outbox').insert({
-        'recipient_phone': clean10,
-        'patient_id': invoice.patientId,
-        'department': invoice.department.toLowerCase(),
-        'message_type': 'payment_receipt',
-        'template_key': 'invoice_${invoice.id}',
-        'media_url': 'invoice://${invoice.id}',
-        'message_text': messageText,
-        'status': 'pending',
-      });
+      try {
+        await _supabase.from('whatsapp_messages_outbox').insert({
+          'recipient_phone': clean10,
+          'patient_id': invoice.patientId,
+          'department': invoice.department.toLowerCase(),
+          'message_type': 'payment_receipt',
+          'template_key': 'invoice_${invoice.id}',
+          'media_url': 'invoice://${invoice.id}',
+          'message_text': messageText,
+          'status': 'pending',
+        });
+      } catch (_) {
+        // Fallback to SECURITY DEFINER stored procedure for staff/RLS
+        await _supabase.rpc('send_staff_whatsapp_message', params: {
+          'p_recipient_phone': clean10,
+          'p_patient_id': invoice.patientId,
+          'p_department': invoice.department.toLowerCase(),
+          'p_message_text': messageText,
+        });
+      }
     } catch (_) {
       // Non-blocking
     }

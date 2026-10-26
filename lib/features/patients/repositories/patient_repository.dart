@@ -113,7 +113,26 @@ class PatientRepository {
         .update(updateData)
         .eq('id', patient.id)
         .select()
-        .single();
+        .maybeSingle();
+
+    if (response == null) {
+      // Differentiate between patient record not found and RLS authorization failure
+      final existing = await _supabase
+          .from('patients')
+          .select('id')
+          .eq('id', patient.id)
+          .maybeSingle();
+
+      if (existing == null) {
+        throw Exception(
+          'Patient record not found (ID: ${patient.id}). It may have been deleted.',
+        );
+      } else {
+        throw Exception(
+          'Permission denied: You do not have authorization to update patient details. Only clinic administrators can edit patient records.',
+        );
+      }
+    }
 
     return PatientModel.fromJson(response);
   }

@@ -220,27 +220,31 @@ class _BillingManagementContentState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Billing & Invoices',
-                        style: AppTypography.headlineMd.copyWith(
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Billing & Invoices',
+                          style: AppTypography.headlineMd.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        widget.isStaff
-                            ? 'Create patient invoices and record payments'
-                            : 'Manage patient invoices, payments, and financial ledger',
-                        style: AppTypography.bodySm.copyWith(
-                          color: AppColors.onSurfaceVariant,
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.isStaff
+                              ? 'Create patient invoices and record payments'
+                              : 'Manage patient invoices, payments, and financial ledger',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: AppSpacing.md),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       if (!widget.isStaff) ...[
                         OutlinedButton.icon(
@@ -495,7 +499,7 @@ class _BillingManagementContentState
                       ),
                       DropdownMenuItem(
                         value: BillingDatePreset.custom,
-                        child: Text('Custom Range...'),
+                        child: Text('Custom Range'),
                       ),
                     ],
                     onChanged: (val) {
@@ -597,155 +601,186 @@ class _BillingManagementContentState
     );
   }
 
-Widget _buildDesktopTable(List<BillingInvoiceModel> invoices) {
-    return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(1.8), // Invoice #
-        1: FlexColumnWidth(1.1), // Date
-        2: FlexColumnWidth(2.3), // Patient
-        3: FlexColumnWidth(1.1), // Dept
-        4: FlexColumnWidth(1.4), // Total
-        5: FlexColumnWidth(1.4), // Paid
-        6: FlexColumnWidth(1.4), // Remaining
-        7: FlexColumnWidth(1.6), // Status
-        8: FlexColumnWidth(1.5), // Actions
-      },
-      children: [
-        TableRow(
-          decoration: const BoxDecoration(
-            color: AppColors.surfaceContainerLow,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-          ),
-          children: [
-            _tableHeader('Invoice #'),
-            _tableHeader('Date'),
-            _tableHeader('Patient'),
-            _tableHeader('Department'),
-            _tableHeader('Total (₹)'),
-            _tableHeader('Paid (₹)'),
-            _tableHeader('Remaining (₹)'),
-            _tableHeader('Status'),
-            _tableHeader('Actions'),
-          ],
-        ),
-        for (final inv in invoices)
-          TableRow(
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.outlineVariant, width: 0.5)),
+  Widget _buildDesktopTable(List<BillingInvoiceModel> invoices) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const double minTableWidth = 980.0;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: constraints.maxWidth < minTableWidth
+              ? const BouncingScrollPhysics()
+              : const NeverScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: constraints.maxWidth > minTableWidth
+                  ? constraints.maxWidth
+                  : minTableWidth,
             ),
-            children: [
-              _tableCell(
-                InkWell(
-                  onTap: () => _showInvoiceDetails(inv),
-                  child: Text(
-                    inv.invoiceNumber,
-                    style: AppTypography.bodySm.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                      decoration: TextDecoration.underline,
-                    ),
+            child: Table(
+              columnWidths: const {
+                0: FlexColumnWidth(1.8), // Invoice #
+                1: FixedColumnWidth(105), // Date
+                2: FlexColumnWidth(2.3), // Patient
+                3: FixedColumnWidth(95),  // Dept
+                4: FixedColumnWidth(100), // Total
+                5: FixedColumnWidth(90),  // Paid
+                6: FixedColumnWidth(110), // Remaining
+                7: FixedColumnWidth(115), // Status
+                8: FixedColumnWidth(155), // Actions
+              },
+              children: [
+                TableRow(
+                  decoration: const BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
                   ),
-                ),
-              ),
-              _tableCell(
-                Text(
-                  DateFormat('dd/MM/yyyy').format(inv.createdAt),
-                  style: AppTypography.bodySm,
-                ),
-              ),
-              _tableCell(
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      inv.patientName ?? '—',
-                      style: AppTypography.bodySm.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    _tableHeader('Invoice #'),
+                    _tableHeader('Date'),
+                    _tableHeader('Patient'),
+                    _tableHeader('Department'),
+                    _tableHeader('Total (₹)'),
+                    _tableHeader('Paid (₹)'),
+                    _tableHeader('Remaining (₹)'),
+                    _tableHeader('Status'),
+                    _tableHeader('Actions'),
+                  ],
+                ),
+                for (final inv in invoices)
+                  TableRow(
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: AppColors.outlineVariant, width: 0.5)),
                     ),
-                    if (inv.patientNumber != null)
-                      Text(
-                        inv.patientNumber!,
-                        style: AppTypography.labelCaps.copyWith(
-                          color: AppColors.outline,
-                          fontSize: 10,
+                    children: [
+                      _tableCell(
+                        InkWell(
+                          onTap: () => _showInvoiceDetails(inv),
+                          child: Text(
+                            inv.invoiceNumber,
+                            style: AppTypography.bodySm.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
                         ),
                       ),
-                  ],
-                ),
-              ),
-              _tableCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: inv.department == 'eye'
-                        ? AppColors.primaryContainer.withValues(alpha: 0.15)
-                        : AppColors.secondaryContainer.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    inv.department.toUpperCase(),
-                    style: AppTypography.labelCaps.copyWith(
-                      color: inv.department == 'eye'
-                          ? AppColors.primary
-                          : AppColors.secondary,
-                    ),
-                  ),
-                ),
-              ),
-              _tableCell(
-                Text(
-                  '₹${inv.totalAmount.toStringAsFixed(2)}',
-                  style: AppTypography.bodySm.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              _tableCell(
-                Text(
-                  '₹${inv.amountPaid.toStringAsFixed(2)}',
-                  style: AppTypography.bodySm,
-                ),
-              ),
-              _tableCell(
-                Text(
-                  '₹${inv.remainingAmount.toStringAsFixed(2)}',
-                  style: AppTypography.bodySm.copyWith(
-                    color: inv.remainingAmount > 0 ? AppColors.error : Colors.green[800],
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              _tableCell(_buildStatusBadge(inv)),
-              _tableCell(
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                      color: AppColors.primary,
-                      tooltip: 'Download Invoice PDF',
-                      onPressed: () => _generatePdf(inv),
-                    ),
-                    IconButton(
-                      key: Key('desktop_invoice_arrow_button_${inv.invoiceNumber}'),
-                      icon: const Icon(Icons.arrow_forward_ios, size: 14),
-                      color: AppColors.primary,
-                      tooltip: 'Open Invoice Details & Edit',
-                      onPressed: () => _showInvoiceDetails(inv),
-                    ),
-                      IconButton(
-                        icon: const Icon(Icons.payments_outlined, size: 18),
-                        color: Colors.green[700],
-                        tooltip: 'Record Payment',
-                        onPressed: () => _openRecordPayment(inv),
+                      _tableCell(
+                        Text(
+                          DateFormat('dd/MM/yyyy').format(inv.createdAt),
+                          style: AppTypography.bodySm,
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
                       ),
-                  ],
-                ),
-              ),
-            ],
+                      _tableCell(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              inv.patientName ?? '—',
+                              style: AppTypography.bodySm.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (inv.patientNumber != null)
+                              Text(
+                                inv.patientNumber!,
+                                style: AppTypography.labelCaps.copyWith(
+                                  color: AppColors.outline,
+                                  fontSize: 10,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      _tableCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: inv.department == 'eye'
+                                ? AppColors.primaryContainer.withValues(alpha: 0.15)
+                                : AppColors.secondaryContainer.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            inv.department.toUpperCase(),
+                            maxLines: 1,
+                            softWrap: false,
+                            style: AppTypography.labelCaps.copyWith(
+                              color: inv.department == 'eye'
+                                  ? AppColors.primary
+                                  : AppColors.secondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      _tableCell(
+                        Text(
+                          '₹${inv.totalAmount.toStringAsFixed(2)}',
+                          style: AppTypography.bodySm.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      _tableCell(
+                        Text(
+                          '₹${inv.amountPaid.toStringAsFixed(2)}',
+                          style: AppTypography.bodySm,
+                        ),
+                      ),
+                      _tableCell(
+                        Text(
+                          '₹${inv.remainingAmount.toStringAsFixed(2)}',
+                          style: AppTypography.bodySm.copyWith(
+                            color: inv.remainingAmount > 0 ? AppColors.error : Colors.green[800],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      _tableCell(_buildStatusBadge(inv)),
+                      _tableCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(2),
+                              icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                              color: AppColors.primary,
+                              tooltip: 'Download Invoice PDF',
+                              onPressed: () => _generatePdf(inv),
+                            ),
+                            IconButton(
+                              key: Key('desktop_invoice_arrow_button_${inv.invoiceNumber}'),
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(2),
+                              icon: const Icon(Icons.arrow_forward_ios, size: 14),
+                              color: AppColors.primary,
+                              tooltip: 'Open Invoice Details & Edit',
+                              onPressed: () => _showInvoiceDetails(inv),
+                            ),
+                            IconButton(
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(2),
+                              icon: const Icon(Icons.payments_outlined, size: 18),
+                              color: Colors.green[700],
+                              tooltip: 'Record Payment',
+                              onPressed: () => _openRecordPayment(inv),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ),
-      ],
+        );
+      },
     );
   }
 
@@ -754,95 +789,141 @@ Widget _buildDesktopTable(List<BillingInvoiceModel> invoices) {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: invoices.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
       itemBuilder: (context, index) {
         final inv = invoices[index];
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-          visualDensity: VisualDensity.compact,
-          onTap: () => _showInvoiceDetails(inv),
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  inv.invoiceNumber,
-                  style: AppTypography.bodyMd.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: _buildStatusBadge(inv),
-                ),
-              ),
-            ],
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.base),
+          elevation: 0,
+          color: AppColors.surfaceContainerLowest,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            side: const BorderSide(color: AppColors.outlineVariant),
           ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text(
-                '${inv.patientName ?? "Patient"} (${inv.patientNumber ?? "—"}) • ${inv.department.toUpperCase()}',
-                style: AppTypography.bodySm,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                spacing: AppSpacing.sm,
-                runSpacing: 2,
-                children: [
-                  Text(
-                    'Total: ₹${inv.totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    'Remaining: ₹${inv.remainingAmount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: inv.remainingAmount > 0 ? AppColors.error : Colors.green,
-                      fontWeight: FontWeight.w600,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _showInvoiceDetails(inv),
+                        child: Text(
+                          inv.invoiceNumber,
+                          style: AppTypography.bodyMd.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                padding: const EdgeInsets.all(4),
-                icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                color: AppColors.primary,
-                tooltip: 'Download Invoice PDF',
-                onPressed: () => _generatePdf(inv),
-              ),
-              IconButton(
-                key: Key('invoice_arrow_button_${inv.invoiceNumber}'),
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                padding: const EdgeInsets.all(4),
-                icon: const Icon(Icons.arrow_forward_ios, size: 14),
-                color: AppColors.primary,
-                tooltip: 'Open Invoice Details & Edit',
-                onPressed: () => _showInvoiceDetails(inv),
-              ),
-              if (inv.remainingAmount > 0 && !inv.isCancelled)
-                IconButton(
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  padding: const EdgeInsets.all(4),
-                  icon: const Icon(Icons.add_card, size: 18),
-                  color: Colors.green[700],
-                  tooltip: 'Record Payment',
-                  onPressed: () => _openRecordPayment(inv),
+                    const SizedBox(width: AppSpacing.xs),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: _buildStatusBadge(inv),
+                      ),
+                    ),
+                  ],
                 ),
-            ],
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${inv.patientName ?? "Patient"} (${inv.patientNumber ?? "—"})',
+                        style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: inv.department == 'eye'
+                            ? AppColors.primaryContainer.withValues(alpha: 0.15)
+                            : AppColors.secondaryContainer.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        inv.department.toUpperCase(),
+                        style: AppTypography.labelCaps.copyWith(
+                          color: inv.department == 'eye'
+                              ? AppColors.primary
+                              : AppColors.secondary,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Date: ${DateFormat('dd/MM/yyyy').format(inv.createdAt)}',
+                  style: AppTypography.bodySm.copyWith(color: AppColors.outline),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      'Total: ₹${inv.totalAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    Text(
+                      'Paid: ₹${inv.amountPaid.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    Text(
+                      'Remaining: ₹${inv.remainingAmount.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: inv.remainingAmount > 0 ? AppColors.error : Colors.green[800],
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: const EdgeInsets.all(6),
+                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                      color: AppColors.primary,
+                      tooltip: 'Download Invoice PDF',
+                      onPressed: () => _generatePdf(inv),
+                    ),
+                    if (inv.remainingAmount > 0 && !inv.isCancelled)
+                      IconButton(
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        padding: const EdgeInsets.all(6),
+                        icon: const Icon(Icons.add_card, size: 18),
+                        color: Colors.green[700],
+                        tooltip: 'Record Payment',
+                        onPressed: () => _openRecordPayment(inv),
+                      ),
+                    IconButton(
+                      key: Key('invoice_arrow_button_${inv.invoiceNumber}'),
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: const EdgeInsets.all(6),
+                      icon: const Icon(Icons.arrow_forward_ios, size: 14),
+                      color: AppColors.primary,
+                      tooltip: 'Open Invoice Details & Edit',
+                      onPressed: () => _showInvoiceDetails(inv),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },

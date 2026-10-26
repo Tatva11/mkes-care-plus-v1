@@ -36,14 +36,24 @@ class WhatsAppConversationsNotifier
     try {
       final supabase = ref.read(supabaseProvider);
       _subscriptionChannel?.unsubscribe();
-      _subscriptionChannel = supabase.channel('wa_inbox_live').onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'whatsapp_message_logs',
-        callback: (_) {
-          silentRefresh();
-        },
-      )..subscribe();
+      _subscriptionChannel = supabase.channel('wa_inbox_live')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'whatsapp_message_logs',
+          callback: (_) {
+            silentRefresh();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'whatsapp_messages_outbox',
+          callback: (_) {
+            silentRefresh();
+          },
+        )
+        ..subscribe();
     } catch (_) {}
   }
 

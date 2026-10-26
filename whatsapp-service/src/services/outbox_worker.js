@@ -197,9 +197,24 @@ class OutboxWorker {
       let result;
 
       // Handle Invoice PDF Delivery (Requirement 6)
-      if (outboxRecord.message_type === 'payment_receipt' || (outboxRecord.media_url && outboxRecord.media_url.startsWith('invoice://'))) {
+      const isInvoice = outboxRecord.message_type === 'payment_receipt' ||
+        (outboxRecord.media_url && outboxRecord.media_url.startsWith('invoice://')) ||
+        (outboxRecord.message_text && outboxRecord.message_text.includes('MKES CARE+ Invoice #')) ||
+        (outboxRecord.template_key && outboxRecord.template_key.startsWith('invoice_'));
+
+      if (isInvoice) {
         try {
-          const invRef = outboxRecord.media_url?.replace('invoice://', '') || outboxRecord.template_key?.replace('invoice_', '');
+          let invRef = (outboxRecord.media_url && outboxRecord.media_url.startsWith('invoice://'))
+            ? outboxRecord.media_url.replace('invoice://', '')
+            : (outboxRecord.template_key && outboxRecord.template_key !== 'custom' ? outboxRecord.template_key.replace('invoice_', '') : null);
+
+          if (!invRef && outboxRecord.message_text) {
+            const match = outboxRecord.message_text.match(/MKES CARE\+ Invoice #([^\*\n\s]+)/);
+            if (match && match[1]) {
+              invRef = match[1];
+            }
+          }
+
           const { media } = await invoicePdfService.generateInvoicePdf(invRef, outboxRecord);
           result = await whatsappClient.sendMediaWithHumanizedDelay(jid, media, message_text);
         } catch (pdfErr) {

@@ -223,28 +223,38 @@ class WhatsAppRepository {
   }) async {
     if (_supabase == null) return {'success': false, 'message': 'Database not connected'};
     try {
-      // 1. Attempt server-side RPC if available
+      final clean = _normalizePhone(phone);
+      final validPatientId = (patientId != null && patientId.trim().isNotEmpty) ? patientId.trim() : null;
+      final cleanDept = department.trim().toLowerCase().isEmpty ? 'general' : department.trim().toLowerCase();
+
+      // 1. Attempt server-side RPC first
       try {
         final rpcRes = await _supabase.rpc('send_staff_whatsapp_message', params: {
-          'p_recipient_phone': phone,
-          'p_patient_id': patientId,
-          'p_department': department,
-          'p_message_text': messageText,
+          'p_recipient_phone': clean,
+          'p_patient_id': validPatientId,
+          'p_department': cleanDept,
+          'p_message_text': messageText.trim(),
         });
 
         if (rpcRes is Map) {
-          return Map<String, dynamic>.from(rpcRes);
+          final resMap = Map<String, dynamic>.from(rpcRes);
+          if (resMap['success'] == true) {
+            return resMap;
+          }
+          if (resMap['message'] != null) {
+            return resMap;
+          }
         }
       } catch (_) {}
 
-      // 2. Direct transactional insert into outbox
+      // 2. Direct transactional insert into outbox (fallback)
       final response = await _supabase.from('whatsapp_messages_outbox').insert({
-        'recipient_phone': phone,
-        'patient_id': patientId,
-        'department': department.toLowerCase(),
+        'recipient_phone': clean,
+        'patient_id': validPatientId,
+        'department': cleanDept,
         'message_type': 'staff_reply',
         'template_key': 'staff_reply',
-        'message_text': messageText,
+        'message_text': messageText.trim(),
         'status': 'pending',
       }).select().single();
 

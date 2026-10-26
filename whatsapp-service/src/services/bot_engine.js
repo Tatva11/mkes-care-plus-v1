@@ -17,9 +17,15 @@ class BotEngine {
       return; // Ignore group chats or system broadcasts
     }
 
-    const rawPhone = msg.from.replace('@c.us', '');
+    const rawPhone = msg.from.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '');
     const cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
-    const body = (msg.body || '').trim();
+    let body = (msg.body || '').trim();
+    if (!body && msg.hasMedia) {
+      const mediaType = (msg.type || 'media').toUpperCase();
+      body = `[${mediaType}]`;
+    } else if (!body) {
+      body = '[Message]';
+    }
 
     logger.info(`Received inbound message from ${msg.from}: "${body}"`);
 
@@ -1399,12 +1405,20 @@ class BotEngine {
 
   static async _logInboundMessage(phone, body, msg, patientId = null) {
     try {
+      const cleanTen = PhoneNormalizer.extractTenDigits(phone);
+      const normalizedPhone = cleanTen || phone;
       await supabase.from('whatsapp_message_logs').insert({
         direction: 'inbound',
-        phone_number: phone,
+        phone_number: normalizedPhone,
         patient_id: patientId || null,
-        message_body: body,
-        raw_payload: { id: msg.id?._serialized, timestamp: msg.timestamp },
+        message_body: body || '[Message]',
+        raw_payload: {
+          id: msg.id?._serialized,
+          timestamp: msg.timestamp,
+          from: msg.from,
+          type: msg.type,
+          hasMedia: msg.hasMedia,
+        },
       });
     } catch (e) {
       logger.error(`Error logging inbound message: ${e.message}`);

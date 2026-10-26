@@ -44,7 +44,11 @@ class PhoneNormalizer {
    * Checks if an incoming sender JID is an individual WhatsApp chat (not a group).
    */
   static isIndividualChat(jid) {
-    return typeof jid === 'string' && jid.endsWith('@c.us');
+    if (typeof jid !== 'string') return false;
+    if (jid.endsWith('@g.us') || jid.includes('@broadcast') || jid.endsWith('@newsletter')) {
+      return false;
+    }
+    return jid.endsWith('@c.us') || jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');
   }
 }
 

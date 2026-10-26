@@ -305,7 +305,7 @@ class EyeSurgeryRepository {
       final existing = await _client
           .from('whatsapp_messages_outbox')
           .select('id')
-          .eq('template_key', 'eye_surgery_${surgery.id}')
+          .or('template_key.eq.eye_surgery_${surgery.id},message_text.ilike.%scheduled with ${surgery.assignedStaffName ?? "Clinical Surgical Team"}%')
           .maybeSingle();
 
       if (existing != null) return;
@@ -331,15 +331,25 @@ class EyeSurgeryRepository {
           '5. Items to Bring: Bring all current eye drops and existing medical records.\n\n'
           'Reply STOP to unsubscribe.';
 
-      await _client.from('whatsapp_messages_outbox').insert({
-        'recipient_phone': clean10,
-        'patient_id': surgery.patientId,
-        'department': 'eye',
-        'message_type': 'eye_surgery',
-        'template_key': 'eye_surgery_${surgery.id}',
-        'message_text': messageText,
-        'status': 'pending',
-      });
+      try {
+        await _client.from('whatsapp_messages_outbox').insert({
+          'recipient_phone': clean10,
+          'patient_id': surgery.patientId,
+          'department': 'eye',
+          'message_type': 'eye_surgery',
+          'template_key': 'eye_surgery_${surgery.id}',
+          'message_text': messageText,
+          'status': 'pending',
+        });
+      } catch (_) {
+        // Fallback to SECURITY DEFINER stored procedure for staff/RLS
+        await _client.rpc('send_staff_whatsapp_message', params: {
+          'p_recipient_phone': clean10,
+          'p_patient_id': surgery.patientId,
+          'p_department': 'eye',
+          'p_message_text': messageText,
+        });
+      }
     } catch (_) {}
   }
 
@@ -363,7 +373,7 @@ class EyeSurgeryRepository {
       final existing = await _client
           .from('whatsapp_messages_outbox')
           .select('id')
-          .eq('template_key', 'eye_postop_${surgery.id}')
+          .or('template_key.eq.eye_postop_${surgery.id},message_text.ilike.%MKES Eye Surgery Post-Operative Instructions%')
           .maybeSingle();
 
       if (existing != null) return;
@@ -379,15 +389,25 @@ class EyeSurgeryRepository {
           '4. Warning Signs: If you experience sudden vision deterioration, severe pain, or severe redness, contact our clinic immediately.\n\n'
           'Reply STOP to unsubscribe.';
 
-      await _client.from('whatsapp_messages_outbox').insert({
-        'recipient_phone': clean10,
-        'patient_id': surgery.patientId,
-        'department': 'eye',
-        'message_type': 'eye_postop',
-        'template_key': 'eye_postop_${surgery.id}',
-        'message_text': messageText,
-        'status': 'pending',
-      });
+      try {
+        await _client.from('whatsapp_messages_outbox').insert({
+          'recipient_phone': clean10,
+          'patient_id': surgery.patientId,
+          'department': 'eye',
+          'message_type': 'eye_postop',
+          'template_key': 'eye_postop_${surgery.id}',
+          'message_text': messageText,
+          'status': 'pending',
+        });
+      } catch (_) {
+        // Fallback to SECURITY DEFINER stored procedure for staff/RLS
+        await _client.rpc('send_staff_whatsapp_message', params: {
+          'p_recipient_phone': clean10,
+          'p_patient_id': surgery.patientId,
+          'p_department': 'eye',
+          'p_message_text': messageText,
+        });
+      }
     } catch (_) {}
   }
 

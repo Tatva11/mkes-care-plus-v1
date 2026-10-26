@@ -33,9 +33,14 @@ class _WhatsAppRequestsViewState extends ConsumerState<WhatsAppRequestsView> {
         _buildFilterHeader(),
         const Divider(height: 1, color: AppColors.outlineVariant),
         if (_showDaemonSettings) ...[
-          const SingleChildScrollView(
-            padding: EdgeInsets.all(AppSpacing.md),
-            child: WhatsAppAdminSettingsCard(),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.45,
+            ),
+            child: const SingleChildScrollView(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: WhatsAppAdminSettingsCard(),
+            ),
           ),
           const Divider(height: 1, color: AppColors.outlineVariant),
         ],
@@ -79,37 +84,40 @@ class _WhatsAppRequestsViewState extends ConsumerState<WhatsAppRequestsView> {
             ),
             data: (requests) {
               if (requests.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.mark_chat_read_outlined,
-                          size: 56,
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          'No WhatsApp requests found',
-                          style: AppTypography.headlineMd.copyWith(
-                            fontSize: 18,
-                            color: AppColors.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          _selectedStatus == 'pending_review'
-                              ? 'All incoming WhatsApp booking requests have been reviewed!'
-                              : 'No requests match the selected status and department filters.',
-                          style: AppTypography.bodySm.copyWith(
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.mark_chat_read_outlined,
+                            size: 56,
                             color: AppColors.onSurfaceVariant,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'No WhatsApp requests found',
+                            style: AppTypography.headlineMd.copyWith(
+                              fontSize: 18,
+                              color: AppColors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            _selectedStatus == 'pending_review'
+                                ? 'All incoming WhatsApp booking requests have been reviewed!'
+                                : 'No requests match the selected status and department filters.',
+                            style: AppTypography.bodySm.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -142,66 +150,87 @@ class _WhatsAppRequestsViewState extends ConsumerState<WhatsAppRequestsView> {
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-      child: Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.xs,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.filter_list, size: 18, color: AppColors.primary),
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                'Status:',
-                style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          _statusChip('Pending Review', 'pending_review'),
-          _statusChip('Approved', 'approved'),
-          _statusChip('Rejected', 'rejected'),
-          _statusChip('All', 'all'),
-          const SizedBox(width: AppSpacing.md),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Dept:',
-                style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          _deptChip('All', 'all'),
-          _deptChip('Eye', 'eye'),
-          _deptChip('Dental', 'dental'),
-          const SizedBox(width: AppSpacing.md),
-          FilledButton.tonalIcon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const WhatsAppInboxScreen(),
+          // Filter Chips Section: Horizontally scrollable
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.filter_list, size: 16, color: AppColors.primary),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      'Status:',
+                      style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                  ],
                 ),
-              );
-            },
-            icon: const Icon(Icons.forum_outlined, size: 16),
-            label: const Text('Shared Inbox'),
-            style: FilledButton.styleFrom(
-              visualDensity: VisualDensity.compact,
+                const SizedBox(width: AppSpacing.xs),
+                _statusChip('Pending Review', 'pending_review'),
+                const SizedBox(width: 4),
+                _statusChip('Approved', 'approved'),
+                const SizedBox(width: 4),
+                _statusChip('Rejected', 'rejected'),
+                const SizedBox(width: 4),
+                _statusChip('All', 'all'),
+                const SizedBox(width: AppSpacing.md),
+                Container(width: 1, height: 20, color: AppColors.outlineVariant),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  'Dept:',
+                  style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600, fontSize: 12),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                _deptChip('All', 'all'),
+                const SizedBox(width: 4),
+                _deptChip('Eye', 'eye'),
+                const SizedBox(width: 4),
+                _deptChip('Dental', 'dental'),
+              ],
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: () {
-              setState(() => _showDaemonSettings = !_showDaemonSettings);
-            },
-            icon: Icon(
-              _showDaemonSettings ? Icons.close : Icons.tune_outlined,
-              size: 16,
-            ),
-            label: Text(_showDaemonSettings ? 'Hide Settings' : 'Bot & Outbox Settings'),
-            style: OutlinedButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-            ),
+          const SizedBox(height: AppSpacing.xs),
+          // Action Buttons Section
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const WhatsAppInboxScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.forum_outlined, size: 16),
+                label: const Text('Shared Inbox'),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() => _showDaemonSettings = !_showDaemonSettings);
+                },
+                icon: Icon(
+                  _showDaemonSettings ? Icons.close : Icons.tune_outlined,
+                  size: 16,
+                ),
+                label: Text(_showDaemonSettings ? 'Hide Settings' : 'Bot & Outbox Settings'),
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -496,15 +525,15 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  radius: 20,
+                  radius: 18,
                   backgroundColor: deptColor.withValues(alpha: 0.15),
                   child: Icon(
                     isEye ? Icons.visibility_outlined : Icons.health_and_safety_outlined,
                     color: deptColor,
-                    size: 22,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,13 +543,13 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
                           Flexible(
                             child: Text(
                               req.patientName,
-                              style: AppTypography.headlineMd.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+                              style: AppTypography.headlineMd.copyWith(fontSize: 15, fontWeight: FontWeight.w600),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.xs),
+                          const SizedBox(width: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
                               color: deptColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
@@ -528,7 +557,7 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
                             child: Text(
                               req.department.toUpperCase(),
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 color: deptColor,
                               ),
@@ -539,17 +568,21 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          const Icon(Icons.chat_bubble_outline, size: 13, color: Color(0xFF25D366)),
+                          const Icon(Icons.chat_bubble_outline, size: 12, color: Color(0xFF25D366)),
                           const SizedBox(width: 4),
-                          Text(
-                            req.patientPhone,
-                            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                          Flexible(
+                            child: Text(
+                              req.patientPhone,
+                              style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: AppSpacing.xs),
                 _buildStatusBadge(req),
               ],
             ),
@@ -560,22 +593,50 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
                 color: AppColors.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.event_outlined, size: 16, color: AppColors.primary),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    dateFormatted,
-                    style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Icon(Icons.schedule_outlined, size: 16, color: AppColors.primary),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    '$timeFormatted (${req.durationMinutes} min)',
-                    style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Wrap(
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.event_outlined, size: 16, color: AppColors.primary),
+                            const SizedBox(width: AppSpacing.xs),
+                            Flexible(
+                              child: Text(
+                                dateFormatted,
+                                style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.schedule_outlined, size: 16, color: AppColors.primary),
+                            const SizedBox(width: AppSpacing.xs),
+                            Flexible(
+                              child: Text(
+                                '$timeFormatted (${req.durationMinutes} min)',
+                                style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             if (req.isRejected && req.staffRemarks != null) ...[
@@ -594,8 +655,11 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
             ],
             if (req.isPending) ...[
               const SizedBox(height: AppSpacing.md),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (_isProcessing)
                     const SizedBox(
@@ -613,7 +677,6 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
                       icon: const Icon(Icons.close, size: 16),
                       label: const Text('Reject'),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(backgroundColor: AppColors.secondary),
                       onPressed: _showApproveDialog,
@@ -638,7 +701,7 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
     if (req.isPending) {
       bg = Colors.amber.shade100;
       fg = Colors.amber.shade900;
-      text = 'Pending Review';
+      text = 'Pending';
     } else if (req.isApproved) {
       bg = Colors.green.shade100;
       fg = Colors.green.shade900;
@@ -654,14 +717,14 @@ class _WhatsAppRequestCardState extends ConsumerState<_WhatsAppRequestCard> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg),
       ),
     );
   }
