@@ -5,18 +5,35 @@
 
 class PhoneNormalizer {
   /**
-   * Extracts clean numeric digits only.
+   * Checks if an identifier is an opaque WhatsApp LID (Linked Device Identifier, e.g. 123456789012345@lid).
+   */
+  static isLid(raw) {
+    if (typeof raw !== 'string') return false;
+    return raw.trim().endsWith('@lid');
+  }
+
+  /**
+   * Extracts clean numeric digits only, stripping multi-device suffixes (:1, :12) and JID domains.
    */
   static cleanDigits(raw) {
     if (!raw) return '';
-    return String(raw).replace(/[^0-9]/g, '');
+    // Strip multi-device suffix e.g. :12@s.whatsapp.net or :1
+    const stripped = String(raw).replace(/:\d+(@|$)/, '$1');
+    return stripped.replace(/[^0-9]/g, '');
   }
 
   /**
    * Extracts the authoritative 10-digit national number.
-   * Handles: 9876543210, 09876543210, 919876543210, +91-9876543210
+   * Handles: 9876543210, 09876543210, 919876543210, +91-9876543210, 919876543210:12@s.whatsapp.net
+   * 
+   * CRITICAL SECURITY INVARIANT:
+   * Returns NULL if raw is an opaque WhatsApp LID (ends with @lid).
+   * Slicing arbitrary digits from an opaque LID creates false patient matches and violates DPDP consent.
    */
   static extractTenDigits(raw) {
+    if (this.isLid(raw)) {
+      return null;
+    }
     const digits = this.cleanDigits(raw);
     if (digits.length < 10) return null;
     return digits.slice(-10);

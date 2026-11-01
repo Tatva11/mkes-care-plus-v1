@@ -1,7 +1,8 @@
-const { supabase } = require('../config/supabase');
+const { supabase, hasServiceRole } = require('../config/supabase');
 const whatsappClient = require('./whatsapp_client');
 const invoicePdfService = require('./invoice_pdf_service');
 const PhoneNormalizer = require('../utils/phone_normalizer');
+const RecipientValidator = require('../utils/recipient_validator');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 
@@ -32,6 +33,10 @@ class OutboxWorker {
     if (!this.isRunning) return;
 
     try {
+      if (!hasServiceRole) {
+        logger.warn('[CONFIG REQUIRED] Outbox poller paused: SUPABASE_SERVICE_ROLE_KEY is required for background worker operations.');
+        return;
+      }
       const isDryRun = String(process.env.DRY_RUN || 'true').trim().toLowerCase() !== 'false';
       if (whatsappClient.isReady || isDryRun) {
         await this._processBatch();
@@ -225,12 +230,15 @@ class OutboxWorker {
         result = await whatsappClient.sendMessageWithHumanizedDelay(jid, message_text);
       }
 
+      const messageId = RecipientValidator.extractMessageId(result);
+
       // Mark Sent in Outbox
       await supabase
         .from('whatsapp_messages_outbox')
         .update({
           status: 'sent',
           sent_at: new Date().toISOString(),
+          whatsapp_message_id: messageId || null,
           lease_id: null,
           lease_expires_at: null,
           updated_at: new Date().toISOString(),
@@ -244,7 +252,13 @@ class OutboxWorker {
         phone_number: recipient_phone,
         patient_id: patient_id || null,
         message_body: message_text,
-        raw_payload: { messageId: result?.id?._serialized || null },
+        raw_payload: {
+          id: messageId,
+          messageId: messageId,
+          status: 'sent',
+          ack: 1,
+          timestamp: Math.floor(Date.now() / 1000),
+        },
       });
 
       logger.info(`Outbox message ${id} sent successfully.`);
@@ -285,6 +299,71 @@ class OutboxWorker {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id);
+  }
+
+  /**
+   * Reconciles message delivery receipt (ACK) from WhatsApp server.
+   * Maps ACK values: 1 = sent, 2 = delivered, 3 = read, -1 = error
+   */
+  async handleMessageAck(msg, ack, messageId) {
+    if (!messageId && !msg) return;
+    const msgId = messageId || RecipientValidator.extractMessageId(msg);
+    if (!msgId) return;
+
+    let statusStr = 'sent';
+    if (ack >= 3) {
+      statusStr = 'read';
+    } else if (ack === 2) {
+      statusStr = 'delivered';
+    } else if (ack === -1) {
+      statusStr = 'failed';
+    } else if (ack === 1) {
+      statusStr = 'sent';
+    } else {
+      return;
+    }
+
+    try {
+      const { data: logs } = await supabase
+        .from('whatsapp_message_logs')
+        .select('id, raw_payload, outbox_id')
+        .or(`raw_payload->>messageId.eq.${msgId},raw_payload->>id.eq.${msgId}`)
+        .limit(1);
+
+      if (logs && logs.length > 0) {
+        const logRow = logs[0];
+        const updatedPayload = {
+          ...(logRow.raw_payload || {}),
+          ack,
+          status: statusStr,
+          ack_updated_at: new Date().toISOString(),
+        };
+
+        await supabase
+          .from('whatsapp_message_logs')
+          .update({ raw_payload: updatedPayload })
+          .eq('id', logRow.id);
+
+        if (logRow.outbox_id) {
+          const updateFields = { updated_at: new Date().toISOString() };
+          if (statusStr === 'delivered') {
+            updateFields.delivered_at = new Date().toISOString();
+          } else if (statusStr === 'read') {
+            updateFields.read_at = new Date().toISOString();
+          } else if (statusStr === 'failed') {
+            updateFields.status = 'failed';
+            updateFields.last_error = 'WhatsApp server reported ACK_ERROR (-1)';
+          }
+          await supabase
+            .from('whatsapp_messages_outbox')
+            .update(updateFields)
+            .eq('id', logRow.outbox_id);
+        }
+        logger.debug(`Reconciled ACK ${ack} (${statusStr}) for message ${msgId}`);
+      }
+    } catch (err) {
+      logger.error(`Error handling message_ack for ${msgId}: ${err.message}`);
+    }
   }
 }
 

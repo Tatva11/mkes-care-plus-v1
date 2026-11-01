@@ -19,6 +19,7 @@ dependencies:
   path_provider: ^2.1.6
   open_filex: ^5.0.0
   printing: ^5.15.1
+  geolocator: ^13.0.2
 
 dev_dependencies:
   flutter_test:

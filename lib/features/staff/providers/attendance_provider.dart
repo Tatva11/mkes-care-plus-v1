@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/clinic_location_constants.dart';
+import '../../auth/providers/staff_location_provider.dart';
 import '../models/attendance_record.dart';
 import '../models/shift_configuration.dart';
 import '../repositories/attendance_repository.dart';
@@ -7,7 +9,7 @@ import '../repositories/attendance_repository.dart';
 final attendanceProvider = StateNotifierProvider.family<AttendanceNotifier,
     AsyncValue<List<AttendanceRecord>>, String>((ref, staffId) {
   final repo = ref.watch(attendanceRepositoryProvider);
-  return AttendanceNotifier(repo, staffId);
+  return AttendanceNotifier(repo, staffId, ref: ref);
 });
 
 final adminAttendanceForDateProvider =
@@ -51,9 +53,11 @@ class AttendanceNotifier
     extends StateNotifier<AsyncValue<List<AttendanceRecord>>> {
   final AttendanceRepository _repository;
   final String _staffId;
+  final Ref? _ref;
 
-  AttendanceNotifier(this._repository, this._staffId)
-      : super(const AsyncValue.loading()) {
+  AttendanceNotifier(this._repository, this._staffId, {Ref? ref})
+      : _ref = ref,
+        super(const AsyncValue.loading()) {
     fetchCurrentMonth();
   }
 
@@ -75,6 +79,18 @@ class AttendanceNotifier
 
   Future<void> checkIn(
       {String shift = 'morning', ShiftConfiguration? config}) async {
+    // Verify location freshness before check-in
+    if (_ref != null) {
+      final isNearClinic = await _ref
+          .read(staffLocationProvider.notifier)
+          .ensureValidLocation();
+      if (!isNearClinic) {
+        throw Exception(
+          'Location verification failed. You must be physically within the clinic ${ClinicLocationConstants.allowedRadiusMeters.toInt()}m radius to record attendance.',
+        );
+      }
+    }
+
     try {
       await _repository.checkIn(_staffId, shift: shift, config: config);
       await fetchCurrentMonth();
@@ -85,6 +101,18 @@ class AttendanceNotifier
 
   Future<void> checkOut(
       {String shift = 'morning', ShiftConfiguration? config}) async {
+    // Verify location freshness before check-out
+    if (_ref != null) {
+      final isNearClinic = await _ref
+          .read(staffLocationProvider.notifier)
+          .ensureValidLocation();
+      if (!isNearClinic) {
+        throw Exception(
+          'Location verification failed. You must be physically within the clinic ${ClinicLocationConstants.allowedRadiusMeters.toInt()}m radius to record attendance.',
+        );
+      }
+    }
+
     try {
       await _repository.checkOut(_staffId, shift: shift, config: config);
       await fetchCurrentMonth();

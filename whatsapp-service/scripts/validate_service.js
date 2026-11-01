@@ -8,12 +8,15 @@ const path = require('path');
 
 try {
   const dotenv = require('dotenv');
-  const serviceEnvPath = path.join(__dirname, '../.env');
-  const rootEnvPath = path.join(__dirname, '../../.env');
-  if (fs.existsSync(serviceEnvPath)) {
-    dotenv.config({ path: serviceEnvPath });
-  } else if (fs.existsSync(rootEnvPath)) {
-    dotenv.config({ path: rootEnvPath });
+  const candidatePaths = [
+    path.resolve(__dirname, '../../api.env'),
+    path.resolve(__dirname, '../../.env'),
+    path.resolve(__dirname, '../.env'),
+  ];
+  for (const envPath of candidatePaths) {
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath });
+    }
   }
   dotenv.config();
 } catch (_) {}

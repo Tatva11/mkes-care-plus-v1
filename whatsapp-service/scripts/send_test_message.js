@@ -21,12 +21,15 @@ const fs = require('fs');
 
 try {
   const dotenv = require('dotenv');
-  const serviceEnvPath = path.join(__dirname, '../.env');
-  const rootEnvPath = path.join(__dirname, '../../.env');
-  if (fs.existsSync(serviceEnvPath)) {
-    dotenv.config({ path: serviceEnvPath });
-  } else if (fs.existsSync(rootEnvPath)) {
-    dotenv.config({ path: rootEnvPath });
+  const candidatePaths = [
+    path.resolve(__dirname, '../../api.env'),
+    path.resolve(__dirname, '../../.env'),
+    path.resolve(__dirname, '../.env'),
+  ];
+  for (const envPath of candidatePaths) {
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath });
+    }
   }
   dotenv.config();
 } catch (_) {}
@@ -41,10 +44,10 @@ let customMessage = null;
 let isLookupOnly = false;
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--phone' || args[i] === '-p') {
+  if (args[i] === '--phone' || args[i] === '-p' || args[i] === '--to') {
     targetPhone = args[i + 1];
     i++;
-  } else if (args[i] === '--message' || args[i] === '-m') {
+  } else if (args[i] === '--message' || args[i] === '-m' || args[i] === '--text') {
     customMessage = args[i + 1];
     i++;
   } else if (args[i] === '--lookup-only' || args[i] === '-l') {

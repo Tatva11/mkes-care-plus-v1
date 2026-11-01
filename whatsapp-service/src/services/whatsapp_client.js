@@ -14,6 +14,20 @@ class WhatsAppClientManager {
     this.sessionPath = process.env.WA_SESSION_PATH || 'C:\\MKES_CARE_PLUS\\wa_session';
     this.qrAttempt = 0;
     this._messageListeners = [];
+    this._messageCreateListeners = [];
+    this._messageAckListeners = [];
+  }
+
+  onMessageCreate(callback) {
+    if (typeof callback === 'function') {
+      this._messageCreateListeners.push(callback);
+    }
+  }
+
+  onMessageAck(callback) {
+    if (typeof callback === 'function') {
+      this._messageAckListeners.push(callback);
+    }
   }
 
   onMessage(callback) {
@@ -187,11 +201,34 @@ class WhatsAppClientManager {
     });
 
     this.client.on('message', async (msg) => {
-      for (const listener of this._messageListeners) {
+      if (!msg.fromMe) {
+        for (const listener of this._messageListeners) {
+          try {
+            await listener(msg);
+          } catch (err) {
+            logger.error(`Unhandled error in WhatsApp message listener: ${err.message}`, err);
+          }
+        }
+      }
+    });
+
+    this.client.on('message_create', async (msg) => {
+      for (const listener of this._messageCreateListeners) {
         try {
           await listener(msg);
         } catch (err) {
-          logger.error(`Unhandled error in WhatsApp message listener: ${err.message}`, err);
+          logger.error(`Unhandled error in WhatsApp message_create listener: ${err.message}`, err);
+        }
+      }
+    });
+
+    this.client.on('message_ack', async (msg, ack) => {
+      const messageId = RecipientValidator.extractMessageId(msg);
+      for (const listener of this._messageAckListeners) {
+        try {
+          await listener(msg, ack, messageId);
+        } catch (err) {
+          logger.error(`Unhandled error in WhatsApp message_ack listener: ${err.message}`, err);
         }
       }
     });
@@ -340,6 +377,61 @@ class WhatsAppClientManager {
       logger.error(`Failed to send media to ${toJid}: ${err.message}`, err);
       throw err;
     }
+  }
+
+  /**
+   * Attempts to resolve an opaque WhatsApp LID (e.g. 123456789012345@lid) to a verified phone number.
+   * Returns standard WhatsApp phone JID (e.g. "919820012345@c.us") or null if unresolvable.
+   */
+  async resolveLidToPhone(lid) {
+    if (!lid || typeof lid !== 'string' || !lid.endsWith('@lid')) {
+      return null;
+    }
+
+    // 1. WhatsApp Web Client native resolution via getContactLidAndPhone
+    if (this.client && typeof this.client.getContactLidAndPhone === 'function') {
+      try {
+        const results = await this.client.getContactLidAndPhone([lid]);
+        if (Array.isArray(results) && results.length > 0 && results[0]?.pn) {
+          const pn = results[0].pn;
+          if (pn && typeof pn === 'string' && !pn.endsWith('@lid')) {
+            return pn;
+          }
+        }
+      } catch (err) {
+        logger.debug(`Client getContactLidAndPhone failed for ${lid}: ${err.message}`);
+      }
+    }
+
+    // 2. WhatsApp Web Client contact lookup
+    if (this.client && typeof this.client.getContactById === 'function') {
+      try {
+        const contact = await this.client.getContactById(lid);
+        if (contact && contact.number && typeof contact.number === 'string') {
+          const clean = contact.number.replace(/[^0-9]/g, '');
+          if (clean.length >= 10 && clean.length <= 13 && !contact.number.endsWith('@lid')) {
+            return `${clean}@c.us`;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Database stored mapping in previous audit logs
+    try {
+      const { data: logEntry } = await supabase
+        .from('whatsapp_message_logs')
+        .select('phone_number, raw_payload')
+        .eq('raw_payload->>sender_lid', lid)
+        .neq('phone_number', lid)
+        .limit(1)
+        .maybeSingle();
+
+      if (logEntry && logEntry.phone_number && !logEntry.phone_number.endsWith('@lid')) {
+        return logEntry.phone_number;
+      }
+    } catch (_) {}
+
+    return null;
   }
 }
 

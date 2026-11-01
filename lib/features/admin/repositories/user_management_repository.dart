@@ -142,4 +142,46 @@ class UserManagementRepository {
     // but client-side delete requires an RPC or Edge Function.
     await _supabase.rpc('delete_user_by_admin', params: {'target_user_id': id});
   }
+
+  /// Grants a temporary GPS geofence bypass to a specific staff member.
+  /// [durationHours] must be 1, 4, 8, or 24.
+  Future<void> grantGpsBypass({
+    required String staffId,
+    required int durationHours,
+    String? reason,
+  }) async {
+    try {
+      await _supabase.rpc(
+        'admin_grant_gps_bypass',
+        params: {
+          'p_staff_id': staffId,
+          'p_duration_hours': durationHours,
+          'p_reason': reason,
+        },
+      );
+    } catch (e) {
+      debugPrint('Error granting GPS bypass: $e');
+      _throwFriendlyError(_errorText(e));
+    }
+  }
+
+  /// Immediately revokes a temporary GPS bypass for a specific staff member,
+  /// reinstating normal geofence restrictions and terminating active sessions.
+  Future<void> revokeGpsBypass({
+    required String staffId,
+    String? reason,
+  }) async {
+    try {
+      await _supabase.rpc(
+        'admin_revoke_gps_bypass',
+        params: {
+          'p_staff_id': staffId,
+          'p_reason': reason,
+        },
+      );
+    } catch (e) {
+      debugPrint('Error revoking GPS bypass: $e');
+      _throwFriendlyError(_errorText(e));
+    }
+  }
 }

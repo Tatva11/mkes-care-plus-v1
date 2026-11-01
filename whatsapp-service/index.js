@@ -3,12 +3,15 @@ const fs = require('fs');
 
 try {
   const dotenv = require('dotenv');
-  const localEnv = path.join(__dirname, '.env');
-  const rootEnv = path.join(__dirname, '../.env');
-  if (fs.existsSync(localEnv)) {
-    dotenv.config({ path: localEnv });
-  } else if (fs.existsSync(rootEnv)) {
-    dotenv.config({ path: rootEnv });
+  const candidateEnvPaths = [
+    path.resolve(__dirname, '../api.env'),
+    path.resolve(__dirname, '../.env'),
+    path.resolve(__dirname, '.env'),
+  ];
+  for (const envPath of candidateEnvPaths) {
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath });
+    }
   }
   dotenv.config();
 } catch (_) {}
@@ -18,6 +21,7 @@ const outboxWorker = require('./src/services/outbox_worker');
 const botEngine = require('./src/services/bot_engine');
 const automationScheduler = require('./src/services/scheduler');
 const notificationWatcher = require('./src/services/notification_watcher');
+const { hasServiceRole } = require('./src/config/supabase');
 const logger = require('./src/utils/logger');
 
 logger.info('====================================================');
@@ -30,13 +34,18 @@ if (isDryRun) {
 } else {
   logger.warn('  [CAUTION] DRY_RUN=false: LIVE PRODUCTION DISPATCH IS ARMED.');
 }
+if (!hasServiceRole) {
+  logger.warn('  [CONFIG NOTICE] SUPABASE_SERVICE_ROLE_KEY is not provisioned.');
+  logger.warn('  Outbox worker and batch schedulers are paused until provisioned.');
+}
 logger.info('====================================================');
 
-// 1. Initialize WhatsApp Web Client only when live mode is explicitly enabled
-if (!isDryRun) {
+// 1. Initialize WhatsApp Web Client (unless explicitly disabled in test harnesses)
+const disableClient = String(process.env.DISABLE_WHATSAPP_CLIENT || 'false').trim().toLowerCase() === 'true';
+if (!disableClient) {
   whatsappClient.initialize();
 } else {
-  logger.info('WhatsApp client not initialized: DRY_RUN safe mode is enabled.');
+  logger.info('WhatsApp client initialization skipped: DISABLE_WHATSAPP_CLIENT=true.');
 }
 
 // 2. Wire Inbound Message Event to Bot Engine
@@ -44,15 +53,36 @@ whatsappClient.onMessage(async (msg) => {
   try {
     await botEngine.handleIncomingMessage(msg);
   } catch (err) {
-    logger.error(`Unhandled error processing message: ${err.message}`, err);
+    logger.error(`Unhandled error processing inbound message: ${err.message}`, err);
+  }
+});
+
+// 2b. Wire Device Sent Message Event (captures replies sent from physical clinic phone)
+whatsappClient.onMessageCreate(async (msg) => {
+  try {
+    if (msg.fromMe) {
+      await botEngine.handleDeviceSentMessage(msg);
+    }
+  } catch (err) {
+    logger.error(`Unhandled error processing device sent message: ${err.message}`, err);
+  }
+});
+
+// 2c. Wire WhatsApp Message Acknowledgement Event (sent -> delivered -> read -> failed)
+whatsappClient.onMessageAck(async (msg, ack, messageId) => {
+  try {
+    await outboxWorker.handleMessageAck(msg, ack, messageId);
+  } catch (err) {
+    logger.error(`Unhandled error processing message ack: ${err.message}`, err);
   }
 });
 
 // 3. Start Outbox Poller Worker
-if (String(process.env.DRY_RUN || 'true').trim().toLowerCase() === 'false') {
-    outboxWorker.start();
+const disableOutbox = String(process.env.DISABLE_OUTBOX_WORKER || 'false').trim().toLowerCase() === 'true';
+if (!disableOutbox) {
+  outboxWorker.start();
 } else {
-    logger.info('Outbox worker not started: DRY_RUN safe mode is enabled.');
+  logger.info('Outbox worker not started: DISABLE_OUTBOX_WORKER=true.');
 }
 
 // 4. Start Automation Scheduler (resilient host-level cron)

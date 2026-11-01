@@ -6,7 +6,7 @@ class WhatsAppMessage {
   final String? patientId;
   final String? patientName;
   final String messageBody;
-  final String status; // 'sent' | 'pending' | 'failed' | 'inbound'
+  final String status; // 'sent' | 'delivered' | 'read' | 'pending' | 'failed' | 'inbound'
   final DateTime timestamp;
   final String? department;
 
@@ -25,8 +25,39 @@ class WhatsAppMessage {
 
   bool get isInbound => direction.toLowerCase() == 'inbound';
   bool get isOutbound => direction.toLowerCase() == 'outbound';
+  bool get isRead => status.toLowerCase() == 'read';
+  bool get isDelivered => status.toLowerCase() == 'delivered' || isRead;
+  bool get isSent => status.toLowerCase() == 'sent' || isDelivered;
+  bool get isPending => status.toLowerCase() == 'pending' || status.toLowerCase() == 'processing';
+  bool get isFailed => status.toLowerCase() == 'failed';
 
   factory WhatsAppMessage.fromJson(Map<String, dynamic> json) {
+    String derivedStatus = json['status']?.toString() ?? '';
+    if (derivedStatus.isEmpty) {
+      if (json['raw_payload'] != null && json['raw_payload'] is Map) {
+        final raw = json['raw_payload'] as Map;
+        if (raw['status'] != null) {
+          derivedStatus = raw['status'].toString();
+        } else if (raw['ack'] != null) {
+          final ack = int.tryParse(raw['ack'].toString()) ?? 0;
+          if (ack >= 3) {
+            derivedStatus = 'read';
+          } else if (ack == 2) {
+            derivedStatus = 'delivered';
+          } else if (ack == 1) {
+            derivedStatus = 'sent';
+          } else if (ack == -1) {
+            derivedStatus = 'failed';
+          }
+        }
+      }
+    }
+    if (derivedStatus.isEmpty) {
+      derivedStatus = json['direction']?.toString().toLowerCase() == 'inbound'
+          ? 'inbound'
+          : 'sent';
+    }
+
     return WhatsAppMessage(
       id: json['id']?.toString() ?? '',
       outboxId: json['outbox_id']?.toString(),
@@ -44,11 +75,12 @@ class WhatsAppMessage {
       messageBody: json['message_body']?.toString() ??
           json['message_text']?.toString() ??
           '',
-      status: json['status']?.toString() ??
-          (json['direction'] == 'inbound' ? 'inbound' : 'sent'),
+      status: derivedStatus,
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+          : (json['created_at'] != null
+              ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+              : DateTime.now()),
       department: json['department']?.toString(),
     );
   }

@@ -561,28 +561,45 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
         Expanded(
           child: Container(
             color: AppColors.surfaceContainerLow.withValues(alpha: 0.3),
-            child: conv.messages.isEmpty
-                ? Center(
-                    child: Text(
-                      'No messages in this conversation yet.',
-                      style: AppTypography.bodyMd
-                          .copyWith(color: AppColors.onSurfaceVariant),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    itemCount: conv.messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = conv.messages[index];
-                      return _buildMessageBubble(msg);
-                    },
-                  ),
+            child: _buildMessagesList(conv),
           ),
         ),
 
         // Message Input Bar
         _buildMessageComposer(conv),
       ],
+    );
+  }
+
+  Widget _buildMessagesList(WhatsAppConversation conv) {
+    final dedicatedMessagesAsync =
+        ref.watch(activeConversationMessagesProvider(conv.phoneNumber));
+
+    final messages = dedicatedMessagesAsync.value ?? conv.messages;
+
+    if (dedicatedMessagesAsync.isLoading && messages.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (messages.isEmpty) {
+      return Center(
+        child: Text(
+          'No messages in this conversation yet.',
+          style: AppTypography.bodyMd
+              .copyWith(color: AppColors.onSurfaceVariant),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      itemCount: messages.length,
+      itemBuilder: (context, index) {
+        final msg = messages[index];
+        return _buildMessageBubble(msg);
+      },
     );
   }
 
@@ -644,15 +661,21 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
                     if (isOut) ...[
                       const SizedBox(width: 4),
                       Icon(
-                        msg.status == 'sent'
+                        msg.status == 'read'
                             ? Icons.done_all
-                            : (msg.status == 'failed'
-                                ? Icons.error_outline
-                                : Icons.schedule),
+                            : (msg.status == 'delivered'
+                                ? Icons.done_all
+                                : (msg.status == 'sent'
+                                    ? Icons.done
+                                    : (msg.status == 'failed'
+                                        ? Icons.error_outline
+                                        : Icons.schedule))),
                         size: 14,
                         color: msg.status == 'failed'
                             ? Colors.yellowAccent
-                            : Colors.white.withValues(alpha: 0.7),
+                            : (msg.status == 'read'
+                                ? Colors.lightBlueAccent
+                                : Colors.white.withValues(alpha: 0.7)),
                       ),
                     ],
                   ],
@@ -660,9 +683,47 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
               ],
             ),
           ),
+          if (isOut && msg.status == 'failed' && msg.outboxId != null) ...[
+            const SizedBox(height: 2),
+            InkWell(
+              onTap: () => _handleRetryMessage(msg),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.refresh, size: 12, color: AppColors.error),
+                  const SizedBox(width: 2),
+                  Text(
+                    'Retry sending',
+                    style: AppTypography.labelCaps.copyWith(
+                      color: AppColors.error,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _handleRetryMessage(WhatsAppMessage msg) async {
+    if (msg.outboxId == null) return;
+    final success = await ref
+        .read(whatsappConversationsProvider.notifier)
+        .retryMessage(outboxId: msg.outboxId!, phone: msg.phoneNumber);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'Message rescheduled for retry.'
+              : 'Failed to reschedule retry.'),
+          backgroundColor: success ? Colors.green : AppColors.error,
+        ),
+      );
+    }
   }
 
   Widget _buildMessageComposer(WhatsAppConversation conv) {

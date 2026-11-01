@@ -88,4 +88,28 @@ class UsersNotifier extends StateNotifier<AsyncValue<List<UserProfile>>> {
     await _repository.deleteUser(id);
     await fetchUsers();
   }
+
+  Future<void> grantGpsBypass({
+    required String staffId,
+    required int durationHours,
+    String? reason,
+  }) async {
+    await _repository.grantGpsBypass(
+      staffId: staffId,
+      durationHours: durationHours,
+      reason: reason,
+    );
+    await fetchUsers();
+  }
+
+  Future<void> revokeGpsBypass({
+    required String staffId,
+    String? reason,
+  }) async {
+    await _repository.revokeGpsBypass(
+      staffId: staffId,
+      reason: reason,
+    );
+    await fetchUsers();
+  }
 }

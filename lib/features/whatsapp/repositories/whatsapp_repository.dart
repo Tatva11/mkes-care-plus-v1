@@ -83,7 +83,7 @@ class WhatsAppRepository {
         final outboxRows = await _supabase
             .from('whatsapp_messages_outbox')
             .select('id, recipient_phone, patient_id, department, message_text, status, created_at, patients(id, name, patient_number, department, whatsapp_opt_out)')
-            .inFilter('status', ['pending', 'processing'])
+            .inFilter('status', ['pending', 'processing', 'failed'])
             .order('created_at', ascending: false)
             .limit(50);
 
@@ -177,22 +177,95 @@ class WhatsAppRepository {
     }
   }
 
-  /// Fetches messages for a specific phone number.
+  /// Fetches messages for a specific phone number (logs + active/failed outbox).
   Future<List<WhatsAppMessage>> fetchMessagesForPhone(String phone) async {
     if (_supabase == null) return [];
     try {
       final clean = _normalizePhone(phone);
-      final response = await _supabase
+      if (clean.isEmpty) return [];
+
+      final logFuture = _supabase
           .from('whatsapp_message_logs')
-          .select('*, patients(id, name, patient_number)')
+          .select('*, patients(id, name, patient_number, department, whatsapp_opt_out)')
           .ilike('phone_number', '%$clean')
           .order('timestamp', ascending: true);
 
-      return (response as List)
-          .map((json) => WhatsAppMessage.fromJson(Map<String, dynamic>.from(json as Map)))
-          .toList();
+      final outboxFuture = _supabase
+          .from('whatsapp_messages_outbox')
+          .select('id, recipient_phone, patient_id, department, message_text, status, created_at, patients(id, name, patient_number, department, whatsapp_opt_out)')
+          .ilike('recipient_phone', '%$clean')
+          .inFilter('status', ['pending', 'processing', 'failed'])
+          .order('created_at', ascending: true);
+
+      final results = await Future.wait([logFuture, outboxFuture]);
+      final logRows = results[0] as List;
+      final outboxRows = results[1] as List;
+
+      final List<WhatsAppMessage> allMessages = [];
+      final Set<String> loggedOutboxIds = {};
+
+      for (final raw in logRows) {
+        final json = Map<String, dynamic>.from(raw as Map);
+        final msg = WhatsAppMessage.fromJson(json);
+        if (msg.outboxId != null) {
+          loggedOutboxIds.add(msg.outboxId!);
+        }
+        allMessages.add(msg);
+      }
+
+      for (final raw in outboxRows) {
+        final json = Map<String, dynamic>.from(raw as Map);
+        final outboxId = json['id']?.toString() ?? '';
+        if (loggedOutboxIds.contains(outboxId)) continue;
+
+        final rawPhone = json['recipient_phone']?.toString() ?? '';
+        final matchedPatient = (json['patients'] != null && json['patients'] is Map)
+            ? Map<String, dynamic>.from(json['patients'] as Map)
+            : null;
+
+        final msg = WhatsAppMessage(
+          id: outboxId,
+          outboxId: outboxId,
+          direction: 'outbound',
+          phoneNumber: rawPhone,
+          patientId: json['patient_id']?.toString() ?? matchedPatient?['id']?.toString(),
+          patientName: matchedPatient?['name']?.toString(),
+          messageBody: json['message_text']?.toString() ?? '',
+          status: json['status']?.toString() ?? 'pending',
+          timestamp: json['created_at'] != null
+              ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+              : DateTime.now(),
+          department: json['department']?.toString() ?? matchedPatient?['department']?.toString(),
+        );
+
+        final duplicate = allMessages.any((m) =>
+            m.isOutbound &&
+            m.messageBody.trim() == msg.messageBody.trim() &&
+            m.timestamp.difference(msg.timestamp).inSeconds.abs() < 120);
+
+        if (!duplicate) {
+          allMessages.add(msg);
+        }
+      }
+
+      allMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      return allMessages;
     } catch (e) {
       return [];
+    }
+  }
+
+  /// Retries sending a failed outbox message via secure server-side RPC.
+  Future<bool> retryOutboxMessage(String outboxId) async {
+    if (_supabase == null || outboxId.isEmpty) return false;
+    try {
+      final res = await _supabase.rpc('retry_failed_whatsapp_message', params: {
+        'p_outbox_id': outboxId,
+      });
+      if (res is Map && res['success'] == true) return true;
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -214,7 +287,7 @@ class WhatsAppRepository {
     }
   }
 
-  /// Enqueues a message to be sent via the WhatsApp service.
+  /// Enqueues a message to be sent via the WhatsApp service strictly through validated server RPC.
   Future<Map<String, dynamic>> sendMessage({
     required String phone,
     String? patientId,
@@ -227,41 +300,17 @@ class WhatsAppRepository {
       final validPatientId = (patientId != null && patientId.trim().isNotEmpty) ? patientId.trim() : null;
       final cleanDept = department.trim().toLowerCase().isEmpty ? 'general' : department.trim().toLowerCase();
 
-      // 1. Attempt server-side RPC first
-      try {
-        final rpcRes = await _supabase.rpc('send_staff_whatsapp_message', params: {
-          'p_recipient_phone': clean,
-          'p_patient_id': validPatientId,
-          'p_department': cleanDept,
-          'p_message_text': messageText.trim(),
-        });
+      final rpcRes = await _supabase.rpc('send_staff_whatsapp_message', params: {
+        'p_recipient_phone': clean,
+        'p_patient_id': validPatientId,
+        'p_department': cleanDept,
+        'p_message_text': messageText.trim(),
+      });
 
-        if (rpcRes is Map) {
-          final resMap = Map<String, dynamic>.from(rpcRes);
-          if (resMap['success'] == true) {
-            return resMap;
-          }
-          if (resMap['message'] != null) {
-            return resMap;
-          }
-        }
-      } catch (_) {}
-
-      // 2. Direct transactional insert into outbox (fallback)
-      final response = await _supabase.from('whatsapp_messages_outbox').insert({
-        'recipient_phone': clean,
-        'patient_id': validPatientId,
-        'department': cleanDept,
-        'message_type': 'staff_reply',
-        'template_key': 'staff_reply',
-        'message_text': messageText.trim(),
-        'status': 'pending',
-      }).select().single();
-
-      return {
-        'success': true,
-        'outbox_id': response['id']?.toString(),
-      };
+      if (rpcRes is Map) {
+        return Map<String, dynamic>.from(rpcRes);
+      }
+      return {'success': false, 'message': 'Unexpected response from server.'};
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }

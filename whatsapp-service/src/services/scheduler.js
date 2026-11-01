@@ -4,7 +4,7 @@
  * Provides automatic host-level triggering as a resilient companion to database pg_cron.
  */
 
-const { supabase } = require('../config/supabase');
+const { supabase, hasServiceRole } = require('../config/supabase');
 const SlotService = require('./slot_service');
 const logger = require('../utils/logger');
 
@@ -32,6 +32,11 @@ class AutomationScheduler {
     // Safety Requirement: Keep unattended schedulers and background workers disabled unless explicitly approved
     if (mode !== 'active' && mode !== 'enabled') {
       logger.info(`AutomationScheduler: host-level background scheduler is DISABLED by default safety policy (SCHEDULER_MODE='${mode}').`);
+      return;
+    }
+
+    if (!hasServiceRole) {
+      logger.warn('[CONFIG REQUIRED] AutomationScheduler paused: SUPABASE_SERVICE_ROLE_KEY is required to invoke batch automation procedures.');
       return;
     }
 

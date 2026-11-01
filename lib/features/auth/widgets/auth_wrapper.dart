@@ -7,6 +7,8 @@ import '../providers/auth_provider.dart';
 import '../screens/role_selection_screen.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
 import '../../staff_portal/screens/staff_dashboard_screen.dart';
+import '../providers/staff_location_provider.dart';
+import 'staff_geofence_guard.dart';
 
 /// Central authentication routing wrapper.
 ///
@@ -41,6 +43,7 @@ class AuthWrapper extends ConsumerWidget {
           debugPrint('[LOGOUT] AuthWrapper showing RoleSelectionScreen');
           WidgetsBinding.instance.addPostFrameCallback((_) {
             ref.read(pushNotificationServiceProvider).deactivateToken();
+            ref.read(staffLocationProvider.notifier).clearLocation();
           });
           return const RoleSelectionScreen();
         }
@@ -63,7 +66,9 @@ class AuthWrapper extends ConsumerWidget {
               case 'admin':
                 return const AdminDashboardScreen();
               case 'staff':
-                return const StaffDashboardScreen();
+                return const StaffGeofenceGuard(
+                  child: StaffDashboardScreen(),
+                );
               case 'inactive':
                 _signOutWithMessage(
                   context,

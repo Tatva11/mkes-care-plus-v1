@@ -18,6 +18,11 @@ class UserProfile {
       nextShift; // Scheduled future shift: 'morning' | 'afternoon' | 'evening' | 'both'
   final DateTime? shiftEffectiveDate; // Date from which nextShift takes effect
 
+  final DateTime? gpsBypassUntil;
+  final String? gpsBypassGrantedBy;
+  final DateTime? gpsBypassGrantedAt;
+  final String? gpsBypassReason;
+
   UserProfile({
     required this.id,
     required this.fullName,
@@ -35,6 +40,10 @@ class UserProfile {
     this.assignedShift = 'morning',
     this.nextShift,
     this.shiftEffectiveDate,
+    this.gpsBypassUntil,
+    this.gpsBypassGrantedBy,
+    this.gpsBypassGrantedAt,
+    this.gpsBypassReason,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -59,6 +68,12 @@ class UserProfile {
         return DateTime(local.year, local.month, local.day);
       }
       return null;
+    }
+
+    DateTime? parseTimestamp(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) return value;
+      return DateTime.tryParse(value.toString())?.toLocal();
     }
 
     final rawShift =
@@ -86,6 +101,10 @@ class UserProfile {
       assignedShift: rawShift,
       nextShift: rawNextShift,
       shiftEffectiveDate: parseCalendarDate(json['shift_effective_date']),
+      gpsBypassUntil: parseTimestamp(json['gps_bypass_until']),
+      gpsBypassGrantedBy: json['gps_bypass_granted_by'] as String?,
+      gpsBypassGrantedAt: parseTimestamp(json['gps_bypass_granted_at']),
+      gpsBypassReason: json['gps_bypass_reason'] as String?,
     );
   }
 
@@ -107,6 +126,13 @@ class UserProfile {
       if (shiftEffectiveDate != null)
         'shift_effective_date':
             '${shiftEffectiveDate!.year.toString().padLeft(4, '0')}-${shiftEffectiveDate!.month.toString().padLeft(2, '0')}-${shiftEffectiveDate!.day.toString().padLeft(2, '0')}',
+      if (gpsBypassUntil != null)
+        'gps_bypass_until': gpsBypassUntil!.toIso8601String(),
+      if (gpsBypassGrantedBy != null)
+        'gps_bypass_granted_by': gpsBypassGrantedBy,
+      if (gpsBypassGrantedAt != null)
+        'gps_bypass_granted_at': gpsBypassGrantedAt!.toIso8601String(),
+      if (gpsBypassReason != null) 'gps_bypass_reason': gpsBypassReason,
     };
   }
 
@@ -127,6 +153,10 @@ class UserProfile {
     String? assignedShift,
     String? nextShift,
     DateTime? shiftEffectiveDate,
+    DateTime? gpsBypassUntil,
+    String? gpsBypassGrantedBy,
+    DateTime? gpsBypassGrantedAt,
+    String? gpsBypassReason,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -145,8 +175,16 @@ class UserProfile {
       assignedShift: assignedShift ?? this.assignedShift,
       nextShift: nextShift ?? this.nextShift,
       shiftEffectiveDate: shiftEffectiveDate ?? this.shiftEffectiveDate,
+      gpsBypassUntil: gpsBypassUntil ?? this.gpsBypassUntil,
+      gpsBypassGrantedBy: gpsBypassGrantedBy ?? this.gpsBypassGrantedBy,
+      gpsBypassGrantedAt: gpsBypassGrantedAt ?? this.gpsBypassGrantedAt,
+      gpsBypassReason: gpsBypassReason ?? this.gpsBypassReason,
     );
   }
+
+  /// Whether a temporary GPS bypass is currently active and unexpired for this staff member.
+  bool get isGpsBypassActive =>
+      gpsBypassUntil != null && DateTime.now().isBefore(gpsBypassUntil!);
 
   /// Effective shift for today considering scheduled effective dates.
   String get activeShift => getShiftForDate(DateTime.now());

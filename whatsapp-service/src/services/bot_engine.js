@@ -2,6 +2,7 @@ const { supabase } = require('../config/supabase');
 const whatsappClient = require('./whatsapp_client');
 const SlotService = require('./slot_service');
 const PhoneNormalizer = require('../utils/phone_normalizer');
+const RecipientValidator = require('../utils/recipient_validator');
 const logger = require('../utils/logger');
 const { pushNotificationBackend } = require('./push_notification_backend');
 const { BOT_STEPS, OPT_OUT_COMMANDS, CLINIC, DEPARTMENTS } = require('../config/constants');
@@ -17,8 +18,29 @@ class BotEngine {
       return; // Ignore group chats or system broadcasts
     }
 
-    const rawPhone = msg.from.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, '');
-    const cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
+    const isSenderLid = PhoneNormalizer.isLid(msg.from);
+    let resolvedPhone = null;
+    if (isSenderLid) {
+      resolvedPhone = await whatsappClient.resolveLidToPhone(msg.from);
+    }
+
+    let rawPhone;
+    let cleanTen = null;
+
+    if (resolvedPhone) {
+      rawPhone = resolvedPhone.replace(/@(c\.us|s\.whatsapp\.net)$/, '');
+      cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
+      logger.info(`Resolved sender LID ${msg.from} to verified phone: ${rawPhone}`);
+    } else if (isSenderLid) {
+      // Unresolved LID: retain the opaque LID identifier as the handle. Never slice arbitrary digits.
+      rawPhone = msg.from;
+      cleanTen = null;
+      logger.info(`Sender is LID ${msg.from}; phone resolution unavailable. Retaining conversation as unmatched.`);
+    } else {
+      rawPhone = msg.from.replace(/@(c\.us|s\.whatsapp\.net)$/, '');
+      cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
+    }
+
     let body = (msg.body || '').trim();
     if (!body && msg.hasMedia) {
       const mediaType = (msg.type || 'media').toUpperCase();
@@ -1407,21 +1429,131 @@ class BotEngine {
     try {
       const cleanTen = PhoneNormalizer.extractTenDigits(phone);
       const normalizedPhone = cleanTen || phone;
+      const msgId = RecipientValidator.extractMessageId(msg);
+
+      // Idempotency: avoid duplicate rows if message re-emitted on reconnect
+      if (msgId) {
+        try {
+          const { data: existing } = await supabase
+            .from('whatsapp_message_logs')
+            .select('id')
+            .or(`raw_payload->>id.eq.${msgId},raw_payload->>messageId.eq.${msgId}`)
+            .maybeSingle();
+
+          if (existing) {
+            logger.debug(`Inbound message ${msgId} already logged. Skipping duplicate.`);
+            return;
+          }
+        } catch (_) {}
+      }
+
       await supabase.from('whatsapp_message_logs').insert({
         direction: 'inbound',
         phone_number: normalizedPhone,
         patient_id: patientId || null,
         message_body: body || '[Message]',
         raw_payload: {
-          id: msg.id?._serialized,
-          timestamp: msg.timestamp,
+          id: msgId,
+          messageId: msgId,
+          timestamp: msg.timestamp || Math.floor(Date.now() / 1000),
           from: msg.from,
-          type: msg.type,
-          hasMedia: msg.hasMedia,
+          sender_lid: PhoneNormalizer.isLid(msg.from) ? msg.from : undefined,
+          type: msg.type || 'chat',
+          hasMedia: Boolean(msg.hasMedia),
+          status: 'inbound',
         },
       });
     } catch (e) {
       logger.error(`Error logging inbound message: ${e.message}`);
+    }
+  }
+
+  /**
+   * Captures outbound messages sent directly from the physical WhatsApp device
+   * or WhatsApp Web, synchronizing them into the shared clinic inbox.
+   */
+  static async handleDeviceSentMessage(msg) {
+    if (!msg || !msg.fromMe) return;
+    const to = msg.to || '';
+    if (!PhoneNormalizer.isIndividualChat(to)) return;
+
+    const isRecipientLid = PhoneNormalizer.isLid(to);
+    let resolvedPhone = null;
+    if (isRecipientLid) {
+      resolvedPhone = await whatsappClient.resolveLidToPhone(to);
+    }
+
+    let rawPhone;
+    let cleanTen = null;
+    if (resolvedPhone) {
+      rawPhone = resolvedPhone.replace(/@(c\.us|s\.whatsapp\.net)$/, '');
+      cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
+    } else if (isRecipientLid) {
+      rawPhone = to;
+      cleanTen = null;
+    } else {
+      rawPhone = to.replace(/@(c\.us|s\.whatsapp\.net)$/, '');
+      cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
+    }
+    const normalizedPhone = cleanTen || rawPhone;
+    const msgId = RecipientValidator.extractMessageId(msg);
+    let body = (msg.body || '').trim();
+    if (!body && msg.hasMedia) {
+      body = `[${(msg.type || 'media').toUpperCase()}]`;
+    } else if (!body) {
+      body = '[Message]';
+    }
+
+    try {
+      // Check if already logged by outbox worker
+      if (msgId) {
+        try {
+          const { data: existing } = await supabase
+            .from('whatsapp_message_logs')
+            .select('id')
+            .or(`raw_payload->>messageId.eq.${msgId},raw_payload->>id.eq.${msgId}`)
+            .maybeSingle();
+
+          if (existing) {
+            return; // Already logged
+          }
+        } catch (_) {}
+      }
+
+      // Lookup patient association
+      let patientId = null;
+      if (cleanTen) {
+        try {
+          const { data: patientRows } = await supabase
+            .from('patients')
+            .select('id')
+            .ilike('mobile', `%${cleanTen}`)
+            .limit(1);
+          if (patientRows && patientRows.length > 0) {
+            patientId = patientRows[0].id;
+          }
+        } catch (_) {}
+      }
+
+      await supabase.from('whatsapp_message_logs').insert({
+        direction: 'outbound',
+        phone_number: normalizedPhone,
+        patient_id: patientId,
+        message_body: body,
+        raw_payload: {
+          id: msgId,
+          messageId: msgId,
+          timestamp: msg.timestamp || Math.floor(Date.now() / 1000),
+          to: msg.to,
+          fromMe: true,
+          source: 'device_sync',
+          status: 'sent',
+          ack: 1,
+        },
+      });
+      logger.info(`Synced outbound message sent from physical device to ${normalizedPhone}`);
+    } catch (err) {
+      logger.error(`Error logging device sent message: ${err.message}`);
     }
   }
 }

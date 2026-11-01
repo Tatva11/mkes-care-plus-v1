@@ -81,6 +81,17 @@ class _MockUsersNotifier extends StateNotifier<AsyncValue<List<UserProfile>>>
   Future<void> deleteUser(String userId) async {}
   @override
   Future<void> toggleStatus(String userId, bool currentStatus) async {}
+  @override
+  Future<void> grantGpsBypass({
+    required String staffId,
+    required int durationHours,
+    String? reason,
+  }) async {}
+  @override
+  Future<void> revokeGpsBypass({
+    required String staffId,
+    String? reason,
+  }) async {}
 }
 
 class _MockAdminAllLeaveNotifier
