@@ -71,4 +71,19 @@ module.exports = {
     STAFF_REPLY: 'staff_reply',
     CUSTOM: 'custom',
   },
+
+  // Configurable Account Operating Modes
+  ACCOUNT_MODES: {
+    DEVELOPMENT: 'development',
+    CLINIC_PRODUCTION: 'clinic_production',
+  },
+
+  // Message Ingestion Boundaries (Strict Patient Privacy)
+  INGESTION_POLICY: {
+    PATIENT_ONLY: true, // Only messages from verified registered patients enter Supabase
+    DROP_UNKNOWN_SENDERS: true,
+    DROP_HISTORICAL_BACKFILL: true,
+    DROP_GROUPS_AND_BROADCASTS: true,
+  },
 };
+

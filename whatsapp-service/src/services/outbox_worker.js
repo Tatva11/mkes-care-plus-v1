@@ -158,31 +158,12 @@ class OutboxWorker {
       }
     }
 
-    // Pre-flight check 4: Test phone whitelist enforcement (if configured)
-    const whitelistStr = process.env.TEST_PHONE_WHITELIST;
-    if (whitelistStr) {
-      const allowedNumbers = whitelistStr.split(',').map((n) => PhoneNormalizer.extractTenDigits(n.trim()));
-      if (!allowedNumbers.includes(tenDigits)) {
-        logger.info(`[TEST MODE] Recipient ${recipient_phone} (${tenDigits}) not in TEST_PHONE_WHITELIST. Leaving pending for production.`);
-        await supabase
-          .from('whatsapp_messages_outbox')
-          .update({
-            status: 'pending',
-            scheduled_for: new Date(Date.now() + 300000).toISOString(),
-            lease_id: null,
-            lease_expires_at: null,
-            last_error: '[TEST MODE] Held: outside TEST_PHONE_WHITELIST',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', id);
-        return;
-      }
-    }
-
-    // Pre-flight check 5: DRY_RUN simulation (DEFAULT: active unless explicitly 'false')
+    // Pre-flight check 4: DRY_RUN Controlled Dispatch Switch
+    // When DRY_RUN=true, simulate sending and preserve outbox record in pending state.
+    // When DRY_RUN=false, allow actual sending to all eligible registered patient numbers.
     const isDryRun = String(process.env.DRY_RUN || 'true').trim().toLowerCase() !== 'false';
     if (isDryRun) {
-      logger.info(`[DRY RUN] Verified outbox ${id} -> Would dispatch to ${jid} (${outboxRecord.message_type}). Body preview: "${message_text.replace(/\n/g, ' ').substring(0, 80)}..."`);
+      logger.info(`[DRY RUN SIMULATION] Outbox ${id} to ${recipient_phone} (${tenDigits}) safely simulated (DRY_RUN=true).`);
       await supabase
         .from('whatsapp_messages_outbox')
         .update({
@@ -190,7 +171,7 @@ class OutboxWorker {
           scheduled_for: new Date(Date.now() + 300000).toISOString(),
           lease_id: null,
           lease_expires_at: null,
-          last_error: '[DRY RUN] Simulated send successful - safely preserved for live delivery',
+          last_error: '[DRY RUN] Simulated dispatch - safely preserved for live delivery when DRY_RUN=false',
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
@@ -230,15 +211,33 @@ class OutboxWorker {
         result = await whatsappClient.sendMessageWithHumanizedDelay(jid, message_text);
       }
 
+      // Check if dispatch was simulated (do not mark sent prematurely)
+      if (result && result.simulated) {
+        logger.info(`[SIMULATION] Dispatch returned simulated result for outbox ${id}. Preserving pending state.`);
+        await supabase
+          .from('whatsapp_messages_outbox')
+          .update({
+            status: 'pending',
+            scheduled_for: new Date(Date.now() + 300000).toISOString(),
+            lease_id: null,
+            lease_expires_at: null,
+            last_error: '[DRY RUN] Simulated dispatch',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+        return;
+      }
+
       const messageId = RecipientValidator.extractMessageId(result);
 
-      // Mark Sent in Outbox
+      // Mark Sent in Outbox only upon verified WhatsApp dispatch
       await supabase
         .from('whatsapp_messages_outbox')
         .update({
           status: 'sent',
           sent_at: new Date().toISOString(),
           whatsapp_message_id: messageId || null,
+          last_error: null,
           lease_id: null,
           lease_expires_at: null,
           updated_at: new Date().toISOString(),
@@ -347,8 +346,10 @@ class OutboxWorker {
         if (logRow.outbox_id) {
           const updateFields = { updated_at: new Date().toISOString() };
           if (statusStr === 'delivered') {
+            updateFields.status = 'delivered';
             updateFields.delivered_at = new Date().toISOString();
           } else if (statusStr === 'read') {
+            updateFields.status = 'read';
             updateFields.read_at = new Date().toISOString();
           } else if (statusStr === 'failed') {
             updateFields.status = 'failed';

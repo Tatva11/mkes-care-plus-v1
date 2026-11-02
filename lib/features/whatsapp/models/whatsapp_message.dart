@@ -30,6 +30,7 @@ class WhatsAppMessage {
   bool get isSent => status.toLowerCase() == 'sent' || isDelivered;
   bool get isPending => status.toLowerCase() == 'pending' || status.toLowerCase() == 'processing';
   bool get isFailed => status.toLowerCase() == 'failed';
+  bool get isCancelled => status.toLowerCase() == 'cancelled';
 
   factory WhatsAppMessage.fromJson(Map<String, dynamic> json) {
     String derivedStatus = json['status']?.toString() ?? '';

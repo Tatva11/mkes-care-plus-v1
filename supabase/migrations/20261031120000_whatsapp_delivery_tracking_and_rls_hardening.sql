@@ -73,7 +73,7 @@ CREATE POLICY "Staff and Admins view outbox"
     )
   );
 
--- 4. Secure Stored Procedure: Retry Failed WhatsApp Message
+-- 4. Secure Stored Procedure: Retry Failed WhatsApp Message (Atomic & NULL-Safe)
 CREATE OR REPLACE FUNCTION public.retry_failed_whatsapp_message(
   p_outbox_id UUID
 )
@@ -85,27 +85,23 @@ AS $$
 DECLARE
   v_caller_id UUID := auth.uid();
   v_caller_role TEXT;
-  v_current_status TEXT;
+  v_updated_id UUID;
 BEGIN
-  IF v_caller_id IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Unauthorized: User not authenticated.');
+  -- Allow service_role execution without caller profile
+  IF (coalesce(auth.jwt()->>'role', '') = 'service_role' OR auth.role() = 'service_role') THEN
+    -- service role authorized
+  ELSE
+    IF v_caller_id IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Unauthorized: User not authenticated.');
+    END IF;
+
+    SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id AND is_active = true;
+    IF v_caller_role IS NULL OR v_caller_role NOT IN ('admin', 'staff') THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Forbidden: Only active clinic staff or administrators can retry messages.');
+    END IF;
   END IF;
 
-  SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id AND is_active = true;
-  IF v_caller_role NOT IN ('admin', 'staff') THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Forbidden: Only active clinic staff or administrators can retry messages.');
-  END IF;
-
-  SELECT status INTO v_current_status FROM public.whatsapp_messages_outbox WHERE id = p_outbox_id;
-  IF v_current_status IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Outbox record not found.');
-  END IF;
-
-  -- Security Guard: Staff cannot reset messages that are already sent, delivered, or processing
-  IF v_current_status != 'failed' THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Only failed messages can be rescheduled for retry.');
-  END IF;
-
+  -- Atomic conditional update prevents race conditions and concurrent retry storms
   UPDATE public.whatsapp_messages_outbox
   SET status = 'pending',
       retry_count = 0,
@@ -114,7 +110,16 @@ BEGIN
       lease_expires_at = null,
       last_error = null,
       updated_at = now()
-  WHERE id = p_outbox_id;
+  WHERE id = p_outbox_id AND status = 'failed'
+  RETURNING id INTO v_updated_id;
+
+  IF v_updated_id IS NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM public.whatsapp_messages_outbox WHERE id = p_outbox_id) THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Outbox record not found.');
+    ELSE
+      RETURN jsonb_build_object('success', false, 'message', 'Only failed messages can be rescheduled for retry.');
+    END IF;
+  END IF;
 
   RETURN jsonb_build_object('success', true);
 END;
@@ -123,7 +128,7 @@ $$;
 REVOKE ALL ON FUNCTION public.retry_failed_whatsapp_message(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.retry_failed_whatsapp_message(UUID) TO authenticated, service_role;
 
--- 5. Secure Stored Procedure: Cancel Pending WhatsApp Message
+-- 5. Secure Stored Procedure: Cancel Pending WhatsApp Message (Atomic & NULL-Safe)
 CREATE OR REPLACE FUNCTION public.cancel_whatsapp_outbox_message(
   p_outbox_id UUID
 )
@@ -135,34 +140,39 @@ AS $$
 DECLARE
   v_caller_id UUID := auth.uid();
   v_caller_role TEXT;
-  v_current_status TEXT;
+  v_updated_id UUID;
 BEGIN
-  IF v_caller_id IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Unauthorized: User not authenticated.');
+  -- Allow service_role execution without caller profile
+  IF (coalesce(auth.jwt()->>'role', '') = 'service_role' OR auth.role() = 'service_role') THEN
+    -- service role authorized
+  ELSE
+    IF v_caller_id IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Unauthorized: User not authenticated.');
+    END IF;
+
+    SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id AND is_active = true;
+    IF v_caller_role IS NULL OR v_caller_role NOT IN ('admin', 'staff') THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Forbidden: Only active clinic staff or administrators can cancel messages.');
+    END IF;
   END IF;
 
-  SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id AND is_active = true;
-  IF v_caller_role NOT IN ('admin', 'staff') THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Forbidden: Only active clinic staff or administrators can cancel messages.');
-  END IF;
-
-  SELECT status INTO v_current_status FROM public.whatsapp_messages_outbox WHERE id = p_outbox_id;
-  IF v_current_status IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Outbox record not found.');
-  END IF;
-
-  -- Security Guard: Only pending messages waiting for dispatch can be cancelled
-  IF v_current_status != 'pending' THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Only pending messages can be cancelled.');
-  END IF;
-
+  -- Atomic conditional update prevents cancelling in-flight or already dispatched messages
   UPDATE public.whatsapp_messages_outbox
   SET status = 'cancelled',
-      last_error = 'Cancelled by staff user ' || v_caller_id,
+      last_error = 'Cancelled by ' || coalesce(v_caller_id::text, 'service_role'),
       lease_id = null,
       lease_expires_at = null,
       updated_at = now()
-  WHERE id = p_outbox_id;
+  WHERE id = p_outbox_id AND status = 'pending'
+  RETURNING id INTO v_updated_id;
+
+  IF v_updated_id IS NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM public.whatsapp_messages_outbox WHERE id = p_outbox_id) THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Outbox record not found.');
+    ELSE
+      RETURN jsonb_build_object('success', false, 'message', 'Only pending messages can be cancelled.');
+    END IF;
+  END IF;
 
   RETURN jsonb_build_object('success', true);
 END;
@@ -171,12 +181,15 @@ $$;
 REVOKE ALL ON FUNCTION public.cancel_whatsapp_outbox_message(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.cancel_whatsapp_outbox_message(UUID) TO authenticated, service_role;
 
--- 6. Stored Procedure: send_staff_whatsapp_message with created_by provenance tracking
+-- 6. Stored Procedure: send_staff_whatsapp_message with provenance and complete STOP check
 CREATE OR REPLACE FUNCTION public.send_staff_whatsapp_message(
   p_recipient_phone TEXT,
   p_patient_id UUID,
   p_department TEXT,
-  p_message_text TEXT
+  p_message_text TEXT,
+  p_media_url TEXT DEFAULT NULL,
+  p_template_key TEXT DEFAULT 'custom',
+  p_message_type TEXT DEFAULT 'custom'
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -187,25 +200,33 @@ DECLARE
   v_caller_id UUID := auth.uid();
   v_caller_role TEXT;
   v_clean_phone TEXT;
+  v_ten_digits TEXT;
   v_clean_dept TEXT;
   v_is_opted_out BOOLEAN := false;
+  v_resolved_patient_id UUID := p_patient_id;
   v_outbox_id UUID;
 BEGIN
-  IF v_caller_id IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Unauthorized: User not authenticated.');
+  -- Allow service_role execution without caller profile
+  IF (coalesce(auth.jwt()->>'role', '') = 'service_role' OR auth.role() = 'service_role') THEN
+    -- service role authorized
+  ELSE
+    IF v_caller_id IS NULL THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Unauthorized: User not authenticated.');
+    END IF;
+
+    SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id AND is_active = true;
+    IF v_caller_role IS NULL OR v_caller_role NOT IN ('admin', 'staff') THEN
+      RETURN jsonb_build_object('success', false, 'message', 'Forbidden: Only clinic staff or administrators can send WhatsApp messages.');
+    END IF;
   END IF;
 
-  SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id AND is_active = true;
-  IF v_caller_role NOT IN ('admin', 'staff') THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Forbidden: Only clinic staff or administrators can send WhatsApp messages.');
-  END IF;
-
-  v_clean_phone := trim(p_recipient_phone);
+  v_clean_phone := regexp_replace(coalesce(p_recipient_phone, ''), '[^0-9]', '', 'g');
   IF length(v_clean_phone) < 10 THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Invalid phone number format.');
+    RETURN jsonb_build_object('success', false, 'message', 'Invalid phone number format: must contain at least 10 digits.');
   END IF;
+  v_ten_digits := right(v_clean_phone, 10);
 
-  IF trim(p_message_text) = '' THEN
+  IF trim(coalesce(p_message_text, '')) = '' THEN
     RETURN jsonb_build_object('success', false, 'message', 'Message body cannot be empty.');
   END IF;
 
@@ -214,13 +235,29 @@ BEGIN
     v_clean_dept := 'general';
   END IF;
 
-  -- Check opt-out status
-  IF p_patient_id IS NOT NULL THEN
-    SELECT whatsapp_opt_out INTO v_is_opted_out FROM public.patients WHERE id = p_patient_id;
+  -- 1. Direct patient opt-out check if patient_id is provided
+  IF v_resolved_patient_id IS NOT NULL THEN
+    SELECT whatsapp_opt_out INTO v_is_opted_out FROM public.patients WHERE id = v_resolved_patient_id;
   END IF;
 
-  IF v_is_opted_out THEN
+  -- 2. Complete STOP/opt-out check across national 10-digit phone match
+  IF NOT coalesce(v_is_opted_out, false) THEN
+    SELECT EXISTS (
+      SELECT 1 FROM public.patients 
+      WHERE regexp_replace(coalesce(mobile, ''), '[^0-9]', '', 'g') LIKE '%' || v_ten_digits
+        AND whatsapp_opt_out = true
+    ) INTO v_is_opted_out;
+  END IF;
+
+  IF coalesce(v_is_opted_out, false) THEN
     RETURN jsonb_build_object('success', false, 'message', 'Patient has opted out of WhatsApp messages (STOP).');
+  END IF;
+
+  -- 3. Automatic patient binding if not explicitly supplied
+  IF v_resolved_patient_id IS NULL THEN
+    SELECT id INTO v_resolved_patient_id FROM public.patients
+    WHERE regexp_replace(coalesce(mobile, ''), '[^0-9]', '', 'g') LIKE '%' || v_ten_digits
+    ORDER BY created_at ASC LIMIT 1;
   END IF;
 
   INSERT INTO public.whatsapp_messages_outbox (
@@ -229,15 +266,17 @@ BEGIN
     department,
     message_type,
     template_key,
+    media_url,
     message_text,
     status,
     created_by
   ) VALUES (
     v_clean_phone,
-    p_patient_id,
+    v_resolved_patient_id,
     v_clean_dept,
-    'custom',
-    'custom',
+    coalesce(p_message_type, 'custom'),
+    coalesce(p_template_key, 'custom'),
+    p_media_url,
     trim(p_message_text),
     'pending',
     v_caller_id
@@ -247,6 +286,30 @@ BEGIN
 END;
 $$;
 
+-- 4-argument overload for strict backward compatibility
+CREATE OR REPLACE FUNCTION public.send_staff_whatsapp_message(
+  p_recipient_phone TEXT,
+  p_patient_id UUID,
+  p_department TEXT,
+  p_message_text TEXT
+)
+RETURNS JSONB
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT public.send_staff_whatsapp_message(
+    p_recipient_phone,
+    p_patient_id,
+    p_department,
+    p_message_text,
+    NULL,
+    'custom',
+    'custom'
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.send_staff_whatsapp_message(TEXT, UUID, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.send_staff_whatsapp_message(TEXT, UUID, TEXT, TEXT, TEXT, TEXT, TEXT) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.send_staff_whatsapp_message(TEXT, UUID, TEXT, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.send_staff_whatsapp_message(TEXT, UUID, TEXT, TEXT) TO authenticated, service_role;
 

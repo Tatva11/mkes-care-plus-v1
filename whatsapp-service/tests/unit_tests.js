@@ -527,6 +527,8 @@ assert('Live run writes exactly 1 genuine audit log', testAuditLogs.length === 1
 // Client-level safeguard tests
 const whatsappClient = require('../src/services/whatsapp_client');
 const savedDryRun = process.env.DRY_RUN;
+const savedWhitelist = process.env.TEST_PHONE_WHITELIST;
+delete process.env.TEST_PHONE_WHITELIST; // isolate whitelist to test pure DRY_RUN transitions
 
 delete process.env.DRY_RUN; // unset -> must default to safe mode
 const clientResUnset = await whatsappClient.sendMessageWithHumanizedDelay('919876543210@c.us', 'Safe test 1');
@@ -565,6 +567,11 @@ try {
 assert('Trimmed case-insensitive FALSE correctly arms live dispatch', attemptedTrimmedRealSend === true);
 
 process.env.DRY_RUN = savedDryRun || 'true'; // restore safe default
+if (savedWhitelist !== undefined) {
+  process.env.TEST_PHONE_WHITELIST = savedWhitelist;
+} else {
+  delete process.env.TEST_PHONE_WHITELIST;
+}
 
 // -----------------------------------------------------------------------------
 // Test Suite 15: Appointment Approval Availability Recheck & Concurrency

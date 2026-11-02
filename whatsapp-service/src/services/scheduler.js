@@ -51,6 +51,33 @@ class AutomationScheduler {
     logger.info('AutomationScheduler stopped.');
   }
 
+  getISTInfo() {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(now).reduce((acc, p) => {
+      acc[p.type] = p.value;
+      return acc;
+    }, {});
+
+    const year = parts.year;
+    const month = parts.month;
+    const day = parts.day;
+    const hours = parseInt(parts.hour, 10);
+    const minutes = parseInt(parts.minute, 10);
+    const todayStr = `${year}-${month}-${day}`;
+
+    return { hours, minutes, todayStr };
+  }
+
   getISTDate() {
     // Current time in IST (UTC + 5:30)
     const now = new Date();
@@ -73,10 +100,7 @@ class AutomationScheduler {
   }
 
   async runPendingSchedules() {
-    const ist = this.getISTDate();
-    const hours = ist.getHours();
-    const minutes = ist.getMinutes();
-    const todayStr = ist.toISOString().split('T')[0];
+    const { hours, minutes, todayStr } = this.getISTInfo();
 
     // 1. Same-Day 8:00 AM IST Appointment Reminders (Promptly at 08:00 AM on appointment date)
     if (hours === 8 && minutes >= 0 && minutes < 15) {
@@ -136,6 +160,15 @@ class AutomationScheduler {
       }
     }
 
+    // 6b. Dental Lab (Restoration Ready) Notifications (Hourly between 09:00 and 19:00 IST) - In Scope
+    if (hours >= 9 && hours <= 19) {
+      const hourlyBlock = `${todayStr}-${hours}`;
+      if (this.lastRuns.dentalLab !== hourlyBlock) {
+        this.lastRuns.dentalLab = hourlyBlock;
+        await this._executeBatchRpc('enqueue_dental_lab_notifications_batch', 'Dental Lab (Restoration Ready) Notifications');
+      }
+    }
+
     // 7. Billing Payment Reminders (At 10:00 AM IST)
     if (hours === 10 && minutes >= 0 && minutes < 10) {
       if (this.lastRuns.paymentReminders !== todayStr) {
@@ -144,7 +177,15 @@ class AutomationScheduler {
       }
     }
 
-    // NOTE: Per clinical requirement, Google Review requests, festival greetings, and optical workflows are excluded from active scope.
+    // 8. Google Review Requests (At 18:00 / 6:00 PM IST for completed consultations) - In Scope
+    if (hours === 18 && minutes >= 0 && minutes < 10) {
+      if (this.lastRuns.googleReviews !== todayStr) {
+        this.lastRuns.googleReviews = todayStr;
+        await this._executeBatchRpc('enqueue_google_review_requests_batch', 'Google Review Requests');
+      }
+    }
+
+    // NOTE: Optical workflows are strictly EXCLUDED from all WhatsApp automations per clinical scope policy.
   }
 
   async _executeBatchRpc(rpcName, jobLabel) {
@@ -206,6 +247,12 @@ class AutomationScheduler {
 
       let enqueuedCount = 0;
       for (const a of appts) {
+        const deptLower = (a.department || '').toLowerCase().trim();
+        if (!['eye', 'dental'].includes(deptLower)) {
+          logger.debug(`Skipping appointment ${a.id}: department ${a.department} is strictly excluded from WhatsApp automation.`);
+          continue;
+        }
+
         const patient = a.patients;
         if (!patient || patient.whatsapp_opt_out || !patient.mobile) continue;
         

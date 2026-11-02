@@ -220,8 +220,8 @@ graph TD
 | Symptom | Probable Cause | Action Required |
 | :--- | :--- | :--- |
 | Terminal shows `[ERROR] Protocol error: Target closed` | Chrome/Puppeteer process crashed | Restart service: `pm2 restart mkes-wa-bridge`. |
-| Disconnected from WhatsApp (`session_status: disconnected`) | Clinic phone logged out from WhatsApp Mobile | Delete session folder `C:\MKES_CARE_PLUS\wa_session`, run `npm start` interactively, and re-scan the QR code. |
-| Inbound messages not triggering replies | Patient is opted out (`whatsapp_opt_out = true`) | Check `whatsapp_settings.is_enabled` and verify patient row in database. |
+| Disconnected from WhatsApp (`session_status: disconnected`) | Connected mobile phone logged out or session expired | Run `npm run pair`, scan refreshed QR code, and allow session to settle. |
+| Inbound messages not triggering replies | Patient is opted out (`whatsapp_opt_out = true`) or unmatched personal sender | Check `whatsapp_settings.is_enabled`, registered patient match in Supabase, and opt-out flag. |
 | Appointment slots not showing | Clinic hours closed, or all doctors occupied | Verify `operating_hours_start` and `operating_hours_end` in `whatsapp_settings`. |
 | Duplicate reminder prevention | 20-hour deduplication window active | Normal behavior; the system intentionally prevents sending more than one 24h reminder to the same patient. |
 
@@ -334,9 +334,11 @@ NOTIFY pgrst, 'reload schema';
 | Action Step | Location / Host | Prerequisites | Risk Level | Approval Required? |
 | :--- | :--- | :--- | :--- | :--- |
 | **1. Apply SQL Migration** | Cloud Supabase (`mfalgfodhsszyxnfiofi`) | Pre-migration backup verified (`861,733 bytes`) | Medium (Schema extension) | **YES — User Approval Required** |
-| **2. Provision Production Key** | Clinic PC (`whatsapp-service/.env`) | Elevated Service Role Secret from Supabase Dashboard | Sensitive (Secret storage) | **YES — Administrator Placement** |
-| **3. Install Windows Service** | Clinic Reception Windows PC | Node.js LTS, Chrome, Administrator cmd | Low (Local host registration) | No (Routine host script) |
-| **4. Interactive QR Scan** | Clinic Reception Desktop + Smartphone | Clinic WhatsApp business number on phone | Low (Local credential caching) | **YES — Staff Physical Action** |
-| **5. Controlled Staging Test** | Clinic Host PC (`DRY_RUN=true`) | `TEST_PHONE_WHITELIST=<admin_mobile>` | Zero (No live dispatch) | No (Safe dry-run) |
-| **6. Production Go-Live** | Clinic Host PC (`DRY_RUN=false`) | Staging verified; whitelists removed | Live (Active messaging) | **YES — Final Sign-off** |
+| **2. Development Testing** | Developer PC & Phone (`WA_ACCOUNT_MODE=development`) | Elevated Service Role Secret, `PATIENT_ONLY_INBOX=true` | Zero (Personal chats dropped, DRY_RUN=true) | Ready — Active Testing |
+| **3. Production Key Placement** | Clinic PC (`whatsapp-service/.env`) | Elevated Service Role Secret from Supabase Dashboard | Sensitive (Secret storage) | **YES — Administrator Placement** |
+| **4. Install Windows Service** | Clinic Reception Windows PC | Node.js LTS, Chrome, Administrator cmd | Low (Local host registration) | No (Routine host script) |
+| **5. Production QR Pairing** | Clinic Reception PC + Smartphone | Set `WA_ACCOUNT_MODE=clinic_production`, dedicated clinic WhatsApp | Low (Local credential caching) | **YES — Staff Physical Action** |
+| **6. Controlled Staging Test** | Clinic Host PC (`DRY_RUN=true`) | `TEST_PHONE_WHITELIST=<admin_mobile>` | Zero (No live dispatch) | No (Safe dry-run) |
+| **7. Production Go-Live** | Clinic Host PC (`DRY_RUN=false`) | Staging verified; whitelists removed | Live (Active messaging) | **YES — Final Sign-off** |
+
 

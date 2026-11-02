@@ -1,90 +1,130 @@
-# MKES CARE+ — WhatsApp Integration Service (Windows PC Host)
+# MKES CARE+ — WhatsApp Integration Service
 
 **Version:** 1.0.0  
-**Host Platform:** Windows 10/11 Pro / Windows Server (Clinic Reception Host)  
+**Target Environments:** Development / Test Host (Personal Phone & PC) & Production Clinic Host (Clinic Reception PC & WhatsApp)  
 **Target Departments:** Eye Clinic & Dental Care (*Optical strictly excluded*)
 
 ---
 
-## 1. Overview
+## 1. Overview & Dual Account Architecture
 
-The MKES CARE+ WhatsApp Bridge Daemon is a dedicated Node.js microservice that runs locally on the clinic reception Windows PC. It connects the clinic's **existing WhatsApp number** using `whatsapp-web.js` and communicates with the Supabase database via the elevated service-role key.
+The MKES CARE+ WhatsApp Bridge Daemon is a dedicated Node.js microservice powered by `whatsapp-web.js` that integrates WhatsApp messaging with Supabase while strictly enforcing patient privacy.
 
-### Key Capabilities
-- **Transactional Outbox Worker:** Dispatches automated clinical reminders, dental lab notifications, and payment receipts with 6–14s humanized delays and exponential backoff.
-- **In-Chat Conversational Booking:** Patients book consultations directly within WhatsApp by replying to numbered menus (`1`=Today, `2`=Tomorrow, `3`=Upcoming date).
-- **Double-Booking Prevention:** True slot availability is checked dynamically against real clinic appointments using the `get_available_appointment_slots` database RPC.
-- **Patient Consent & Opt-Outs:** Receiving `STOP`, `UNSUBSCRIBE`, or `OPTOUT` immediately marks the patient as opted out and cancels any pending messages.
-- **Persistent Session Storage:** Session tokens and IndexedDB are preserved in `C:\MKES_CARE_PLUS\wa_session` using `LocalAuth`.
-- **Windows Service Resilience:** Managed by PM2 or NSSM with automatic restart upon system reboot.
-
----
-
-## 2. Windows PC Setup Instructions
-
-### Prerequisites
-1. **Windows 10/11 Pro** with Administrator access.
-2. **Node.js LTS (v18 or v20)** installed from [nodejs.org](https://nodejs.org).
-3. **Google Chrome** installed on the Windows PC.
-
-### Installation Steps
-1. Navigate to the `whatsapp-service` directory in Command Prompt (or PowerShell):
-   ```cmd
-   cd C:\MKES PRO\mkes-care-plus-lovable\whatsapp-service
-   ```
-2. Copy `.env.example` to `.env`:
-   ```cmd
-   copy .env.example .env
-   ```
-3. Open `.env` and fill in your Supabase Service Role Key:
-   ```ini
-   SUPABASE_URL=https://mfalgfodhsszyxnfiofi.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=your_actual_service_role_key_here
-   WA_SESSION_PATH=C:\MKES_CARE_PLUS\wa_session
-   ```
-4. Install Node dependencies:
-   ```cmd
-   npm install
-   ```
-5. Run pre-flight validation:
-   ```cmd
-   npm run validate
-   ```
+### Configurable Operating Modes:
+- **`development` (Active Development Mode):**  
+  Uses the developer's personal WhatsApp account on their personal phone and computer. In this mode:
+  - The connected WhatsApp account is treated as a temporary development/test account, **NOT** the permanent clinic account.
+  - No clinic phone numbers are hardcoded or assumed.
+  - Strict in-memory privacy filtering ensures the developer's personal chats, groups, and family contacts are never mirrored or logged into Supabase.
+- **`clinic_production` (Eventual Production Mode):**  
+  Switches the service to the dedicated clinic phone number and reception Windows PC simply by setting `WA_ACCOUNT_MODE=clinic_production` in `.env`.
 
 ---
 
-## 3. Pairing the Clinic's Existing WhatsApp Number
+## 2. Strict Patient Privacy & Ingestion Boundaries
 
-1. Start the service manually in a terminal to complete initial QR code pairing:
+MKES CARE+ enforces an in-memory privacy pipeline before any database operation:
+
+1. **Patient-Only Ingestion:**
+   - Inbound and device-sent messages are accepted **only** if the sender or recipient matches a verified, registered patient in the Supabase `patients` table.
+   - Phone numbers are normalized to 10 national digits before matching.
+   - Personal contacts, unknown senders, groups (`@g.us`), broadcasts (`@broadcast`), and channels (`@newsletter`) are dropped in memory before reaching the database.
+   - Unmatched senders never trigger automatic patient creation.
+2. **Safe LID Handling:**
+   - WhatsApp Linked Identity (`@lid`) chats are resolved through the client phone mapping. If unresolvable, the message is dropped rather than guessing patient identity.
+3. **New Messages Only (Zero Historical Backfill):**
+   - Only messages received after the session startup or pairing timestamp (`WA_CAPTURE_START_TIMESTAMP`) are captured.
+   - Past personal or business chats are never imported or backfilled.
+4. **Message Deduplication:**
+   - In-memory message ID cache and database idempotency guards prevent duplicate processing across reconnects.
+5. **Opt-Out vs Staff Visibility:**
+   - Patients who send `STOP`, `UNSUBSCRIBE`, or `OPTOUT` are registered as opted out. Automated reminder outbox dispatches and conversational bot replies are suppressed.
+   - Subsequent inbound messages from opted-out patients remain visible to authorized clinic staff in the Flutter inbox for manual clinical follow-up.
+   - Staff replies in Flutter and SQL RPCs are strictly restricted to registered patients.
+
+---
+
+## 3. Environment Configuration
+
+Copy `.env.example` to `.env` and configure:
+
+```ini
+# Supabase Backend Configuration
+SUPABASE_URL=https://mfalgfodhsszyxnfiofi.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+
+# Persistent WhatsApp Web Session Directory
+WA_SESSION_PATH=C:\MKES_CARE_PLUS\wa_session
+
+# Account Operating Mode: 'development' or 'clinic_production'
+WA_ACCOUNT_MODE=development
+WA_ACCOUNT_LABEL=Developer Test Account
+
+# Privacy Guard (Strict Patient-Only Inbox)
+PATIENT_ONLY_INBOX=true
+WA_CAPTURE_START_TIMESTAMP=0
+
+# Safety Guard: DRY_RUN=true simulates dispatch without sending real messages
+DRY_RUN=true
+TEST_PHONE_WHITELIST=8080030111
+```
+
+---
+
+## 4. Pairing & Live QR Server
+
+To link your phone for development or production:
+
+1. Launch the dedicated pairing daemon:
    ```cmd
-   npm start
+   npm run pair
    ```
-2. A QR code will be displayed in the terminal window (and simultaneously synced to the `whatsapp_settings` table in Supabase).
-3. Open WhatsApp on the clinic reception smartphone:
-   - Tap **Settings** (or three dots) → **Linked Devices** → **Link a Device**.
-   - Point the camera at the terminal QR code.
-4. Once paired, the terminal will log:
+2. Open the zero-cache live pairing server:
+   - Navigate to [http://127.0.0.1:3900](http://127.0.0.1:3900) in your web browser.
+3. On your mobile phone:
+   - Open **WhatsApp** &rarr; **Settings / Menu ⋮** &rarr; **Linked Devices** &rarr; **Link a Device**.
+   - Scan the QR code displayed on the screen.
+4. Once linked, the daemon automatically settles and closes cleanly.
+5. Verify session persistence at any time:
+   ```cmd
+   npm run verify-session
    ```
-   [INFO] WhatsApp Web client is READY and connected!
-   ```
-5. Future reboots will automatically re-authenticate using the cached session in `C:\MKES_CARE_PLUS\wa_session` without needing a QR scan.
 
 ---
 
-## 4. Installing as an Auto-Starting Windows Service
+## 5. Running the Service
 
-To ensure the service runs continuously in the background whenever the Windows PC boots:
-1. Right-click `scripts\install_windows_service.bat` and select **Run as Administrator**.
-2. Useful PM2 commands:
-   - Check status: `pm2 status`
-   - View live logs: `pm2 logs mkes-wa-bridge`
-   - Restart service: `pm2 restart mkes-wa-bridge`
-   - Stop service: `pm2 stop mkes-wa-bridge`
+Start the full WhatsApp service:
+```cmd
+npm start
+```
+
+### Production Windows Service (Clinic Reception Host)
+To register the service to auto-start on Windows boot:
+```cmd
+scripts\install_windows_service.bat
+```
+PM2 commands:
+- `pm2 status`
+- `pm2 logs mkes-wa-bridge`
+- `pm2 restart mkes-wa-bridge`
+- `pm2 stop mkes-wa-bridge`
 
 ---
 
-## 5. Security & DPDP Compliance
+## 6. Testing & Verification
 
-- **Key Isolation:** The `SUPABASE_SERVICE_ROLE_KEY` resides strictly within `.env` on this local Windows machine and is never deployed to Flutter web clients.
-- **Opt-Out Compliance:** Any patient who replies `STOP` is permanently exempted from automated reminders until they re-subscribe.
-- **Data Minimization:** Messages contain only scheduling details (dates, times, doctor names, clinic location); medical records and sensitive diagnoses are never sent via WhatsApp.
+Run the comprehensive test suites:
+```cmd
+# Patient Inbox Privacy & Account Configuration (34 tests)
+node tests/patient_inbox_privacy_and_account_tests.js
+
+# Consolidated Security & Concurrency (16 tests)
+node tests/consolidated_security_and_concurrency_tests.js
+
+# Session Persistence & Locking (19 tests)
+node tests/session_persistence_tests.js
+
+# Sprint 10 Functional Verification (17 tests)
+node tests/sprint10_five_issues_verification_test.js
+```

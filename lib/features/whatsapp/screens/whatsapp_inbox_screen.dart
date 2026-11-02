@@ -5,21 +5,26 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../billing/models/billing_invoice_model.dart';
+import '../../billing/providers/billing_provider.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patients_provider.dart';
 import '../../patients/screens/patient_details_screen.dart';
 import '../models/whatsapp_message.dart';
 import '../providers/whatsapp_inbox_provider.dart';
+import '../repositories/whatsapp_repository.dart';
 
 class WhatsAppInboxScreen extends ConsumerStatefulWidget {
   const WhatsAppInboxScreen({
     super.key,
     this.initialPhoneNumber,
     this.initialPatient,
+    this.initialInvoice,
   });
 
   final String? initialPhoneNumber;
   final PatientModel? initialPatient;
+  final BillingInvoiceModel? initialInvoice;
 
   @override
   ConsumerState<WhatsAppInboxScreen> createState() => _WhatsAppInboxScreenState();
@@ -34,8 +39,9 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
   @override
   void initState() {
     super.initState();
-    final initialPhone =
-        widget.initialPhoneNumber ?? widget.initialPatient?.mobile;
+    final initialPhone = widget.initialPhoneNumber ??
+        widget.initialPatient?.mobile ??
+        widget.initialInvoice?.patientMobile;
     if (initialPhone != null && initialPhone.trim().isNotEmpty) {
       final digits = initialPhone.replaceAll(RegExp(r'[^0-9]'), '');
       final clean = digits.length >= 10 ? digits.substring(digits.length - 10) : digits;
@@ -557,6 +563,9 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
             ),
           ),
 
+        // Associated Invoices Bar (Requirement 2)
+        _buildAssociatedInvoicesSection(conv),
+
         // Messages List
         Expanded(
           child: Container(
@@ -568,6 +577,260 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
         // Message Input Bar
         _buildMessageComposer(conv),
       ],
+    );
+  }
+
+  Widget _buildAssociatedInvoicesSection(WhatsAppConversation conv) {
+    final patientId = conv.patientId ??
+        widget.initialPatient?.id ??
+        widget.initialInvoice?.patientId;
+    if (patientId == null || patientId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final invoicesAsync =
+        ref.watch(patientOutstandingInvoicesProvider(patientId));
+
+    return invoicesAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (invoices) {
+        if (invoices.isEmpty && widget.initialInvoice == null) {
+          return const SizedBox.shrink();
+        }
+
+        final allInvoices = [...invoices];
+        if (widget.initialInvoice != null &&
+            !allInvoices.any((i) => i.id == widget.initialInvoice!.id)) {
+          allInvoices.insert(0, widget.initialInvoice!);
+        }
+
+        final totalPending = allInvoices.fold<double>(
+          0.0,
+          (sum, inv) => sum + inv.remainingAmount,
+        );
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs + 2,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            border: Border(
+              bottom: BorderSide(color: AppColors.outlineVariant),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.receipt_long,
+                      size: 16, color: AppColors.primary),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    'Associated Invoices (${allInvoices.length})',
+                    style: AppTypography.labelCaps.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                  if (totalPending > 0) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Total Due: ₹${totalPending.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: Colors.amber.shade900,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  Text(
+                    'Tap invoice to pre-fill reminder',
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.outline,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: allInvoices.map((inv) {
+                    final isInitial = widget.initialInvoice?.id == inv.id;
+                    final isPaid = inv.isPaid;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ActionChip(
+                        avatar: Icon(
+                          isPaid ? Icons.check_circle : Icons.pending_actions,
+                          size: 14,
+                          color: isPaid
+                              ? Colors.green.shade700
+                              : (isInitial
+                                  ? AppColors.primary
+                                  : Colors.amber.shade800),
+                        ),
+                        label: Text(
+                          '${inv.invoiceNumber}: ₹${inv.remainingAmount.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isInitial
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        backgroundColor: isInitial
+                            ? AppColors.primaryContainer.withValues(alpha: 0.3)
+                            : AppColors.surfaceContainerHigh,
+                        onPressed: () => _showSendInvoiceDialog(inv, conv),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSendInvoiceDialog(BillingInvoiceModel inv, WhatsAppConversation conv) {
+    final patientName = conv.patientName ?? widget.initialPatient?.name ?? 'Valued Patient';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.picture_as_pdf, color: AppColors.primary, size: 22),
+            const SizedBox(width: AppSpacing.sm),
+            Text('Invoice #${inv.invoiceNumber}'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Patient: $patientName (+91 ${conv.phoneNumber})',
+                style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text('Department: ${inv.department.toUpperCase()}'),
+            Text('Total Amount: ₹${inv.totalAmount.toStringAsFixed(2)}'),
+            Text('Amount Paid: ₹${inv.amountPaid.toStringAsFixed(2)}'),
+            Text(
+              'Balance Due: ₹${inv.remainingAmount.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: inv.remainingAmount > 0 ? AppColors.error : Colors.green,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.attachment, size: 16, color: AppColors.primary),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Includes generated hospital PDF invoice attachment (A4 format with official letterhead)',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              final reminderText =
+                  'Dear $patientName,\n\n'
+                  'This is a friendly reminder from MKES CARE+ regarding Invoice #${inv.invoiceNumber} '
+                  'with a balance of ₹${inv.remainingAmount.toStringAsFixed(0)}.\n\n'
+                  'Kindly settle the dues at your earliest convenience. Thank you!';
+              _messageController.text = reminderText;
+              _messageController.selection = TextSelection.fromPosition(
+                TextPosition(offset: reminderText.length),
+              );
+            },
+            child: const Text('Pre-fill Text'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            icon: const Icon(Icons.send, size: 16),
+            label: const Text('Send PDF via WhatsApp'),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final messenger = ScaffoldMessenger.of(context);
+              final statusText = inv.isPaid ? 'PAID' : 'BALANCE DUE: ₹${inv.remainingAmount.toStringAsFixed(2)}';
+              final messageText =
+                  '🧾 *MKES CARE+ Invoice #${inv.invoiceNumber}*\n\n'
+                  'Dear $patientName,\n'
+                  'Please find your official clinical invoice for ₹${inv.totalAmount.toStringAsFixed(2)} attached.\n\n'
+                  'Status: $statusText\n'
+                  'Amount Paid: ₹${inv.amountPaid.toStringAsFixed(2)}\n\n'
+                  'Thank you for visiting MKES CARE+ Hospital. Reply STOP to unsubscribe.';
+
+              final res = await ref.read(whatsappRepositoryProvider).sendStaffReply(
+                recipientPhone: conv.phoneNumber,
+                patientId: inv.patientId,
+                department: inv.department,
+                messageText: messageText,
+                mediaUrl: 'invoice://${inv.id}',
+                templateKey: 'invoice_${inv.id}',
+                messageType: 'payment_receipt',
+              );
+
+              if (mounted) {
+                if (res['success'] == true) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Invoice #${inv.invoiceNumber} PDF queued for WhatsApp delivery.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  ref.read(whatsappConversationsProvider.notifier).refresh();
+                } else {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to queue invoice: ${res['message']}'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -650,7 +913,7 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      DateFormat('h:mm a').format(msg.timestamp),
+                      DateFormat('h:mm a').format(_toIST(msg.timestamp)),
                       style: AppTypography.labelCaps.copyWith(
                         color: isOut
                             ? Colors.white.withValues(alpha: 0.7)
@@ -669,13 +932,17 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
                                     ? Icons.done
                                     : (msg.status == 'failed'
                                         ? Icons.error_outline
-                                        : Icons.schedule))),
+                                        : (msg.status == 'cancelled'
+                                            ? Icons.block
+                                            : Icons.schedule)))),
                         size: 14,
                         color: msg.status == 'failed'
                             ? Colors.yellowAccent
-                            : (msg.status == 'read'
-                                ? Colors.lightBlueAccent
-                                : Colors.white.withValues(alpha: 0.7)),
+                            : (msg.status == 'cancelled'
+                                ? Colors.grey
+                                : (msg.status == 'read'
+                                    ? Colors.lightBlueAccent
+                                    : Colors.white.withValues(alpha: 0.7))),
                       ),
                     ],
                   ],
@@ -703,6 +970,36 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
               ),
             ),
           ],
+          if (isOut && msg.isPending && msg.outboxId != null) ...[
+            const SizedBox(height: 2),
+            InkWell(
+              onTap: () => _handleCancelMessage(msg),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.cancel_outlined, size: 12, color: AppColors.outline),
+                  const SizedBox(width: 2),
+                  Text(
+                    'Cancel message',
+                    style: AppTypography.labelCaps.copyWith(
+                      color: AppColors.outline,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (isOut && msg.isCancelled) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Cancelled',
+              style: AppTypography.labelCaps.copyWith(
+                color: Colors.grey,
+                fontSize: 10,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -721,6 +1018,24 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
               ? 'Message rescheduled for retry.'
               : 'Failed to reschedule retry.'),
           backgroundColor: success ? Colors.green : AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleCancelMessage(WhatsAppMessage msg) async {
+    if (msg.outboxId == null) return;
+    final success = await ref
+        .read(whatsappConversationsProvider.notifier)
+        .cancelMessage(outboxId: msg.outboxId!, phone: msg.phoneNumber);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'Message cancelled successfully.'
+              : 'Failed to cancel message. It may have already been dispatched.'),
+          backgroundColor: success ? AppColors.primary : AppColors.error,
         ),
       );
     }
@@ -779,11 +1094,15 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
                   maxLines: 3,
                   minLines: 1,
                   decoration: InputDecoration(
-                    hintText: conv.isOptedOut
-                        ? 'Patient has opted out of WhatsApp messages'
-                        : 'Type message to send via MKES CARE+ WhatsApp...',
+                    hintText: !conv.isMatchedPatient && widget.initialPatient == null
+                        ? 'Staff replies are restricted to registered patients'
+                        : (conv.isOptedOut
+                            ? 'Patient has opted out of WhatsApp messages'
+                            : 'Type message to send via MKES CARE+ WhatsApp...'),
                     isDense: true,
-                    enabled: !conv.isOptedOut && !_isSending,
+                    enabled: (conv.isMatchedPatient || widget.initialPatient != null) &&
+                        !conv.isOptedOut &&
+                        !_isSending,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       borderSide:
@@ -794,7 +1113,9 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
               ),
               const SizedBox(width: AppSpacing.sm),
               FilledButton.icon(
-                onPressed: conv.isOptedOut || _isSending
+                onPressed: (!conv.isMatchedPatient && widget.initialPatient == null) ||
+                        conv.isOptedOut ||
+                        _isSending
                     ? null
                     : () => _handleSendMessage(conv),
                 icon: _isSending
@@ -819,6 +1140,18 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
   Future<void> _handleSendMessage(WhatsAppConversation conv) async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+
+    if (!conv.isMatchedPatient && widget.initialPatient == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Staff replies are restricted to registered patients.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _isSending = true);
 
@@ -978,17 +1311,29 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
     );
   }
 
-  String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
+  DateTime _toIST(DateTime dt) {
+    return dt.isUtc
+        ? dt.add(const Duration(hours: 5, minutes: 30))
+        : dt.toUtc().add(const Duration(hours: 5, minutes: 30));
+  }
 
-    if (diff.inDays == 0) {
-      return DateFormat('h:mm a').format(dt);
-    } else if (diff.inDays == 1) {
+  String _formatTime(DateTime dt) {
+    final ist = _toIST(dt);
+    final nowIst = _toIST(DateTime.now());
+    final isToday =
+        ist.year == nowIst.year && ist.month == nowIst.month && ist.day == nowIst.day;
+    final yesterday = nowIst.subtract(const Duration(days: 1));
+    final isYesterday = ist.year == yesterday.year &&
+        ist.month == yesterday.month &&
+        ist.day == yesterday.day;
+
+    if (isToday) {
+      return DateFormat('h:mm a').format(ist);
+    } else if (isYesterday) {
       return 'Yesterday';
-    } else if (diff.inDays < 7) {
-      return DateFormat('EEE').format(dt);
+    } else if (nowIst.difference(ist).inDays < 7) {
+      return DateFormat('EEE').format(ist);
     }
-    return DateFormat('dd/MM').format(dt);
+    return DateFormat('dd/MM').format(ist);
   }
 }

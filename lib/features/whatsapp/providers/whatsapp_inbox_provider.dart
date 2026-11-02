@@ -124,6 +124,20 @@ class WhatsAppConversationsNotifier
     return success;
   }
 
+  /// Cancels a pending message from outbox
+  Future<bool> cancelMessage({
+    required String outboxId,
+    required String phone,
+  }) async {
+    final repo = ref.read(whatsappRepositoryProvider);
+    final success = await repo.cancelOutboxMessage(outboxId);
+    if (success) {
+      await silentRefresh();
+      ref.invalidate(activeConversationMessagesProvider(phone));
+    }
+    return success;
+  }
+
   Future<bool> linkPatient({
     required String phone,
     required String patientId,

@@ -31,6 +31,7 @@ try {
 } catch (_) {}
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const instanceLock = require('../src/utils/instance_lock');
 
 const sessionPath = process.env.WA_SESSION_PATH || 'C:\\MKES_CARE_PLUS\\wa_session';
 
@@ -47,10 +48,23 @@ if (!fs.existsSync(path.join(sessionPath, 'session'))) {
   process.exit(1);
 }
 
+// Acquire single instance lock
+const lockRes = instanceLock.acquireLock(sessionPath, 'SessionVerification');
+if (!lockRes.success) {
+  console.error('[FAIL] Session directory is currently locked by another active process:');
+  console.error('       ' + lockRes.error);
+  process.exit(1);
+}
+
+// Clean stale Chromium locks (e.g. broken symlinks from past crashes)
+instanceLock.cleanupChromiumLocks(sessionPath);
+
 const client = new Client({
   authStrategy: new LocalAuth({
     dataPath: sessionPath,
   }),
+  authTimeoutMs: 120000,
+  userAgent: process.env.WA_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
   puppeteer: {
     headless: true,
     args: [
@@ -61,6 +75,8 @@ const client = new Client({
       '--no-first-run',
       '--no-zygote',
       '--disable-gpu',
+      '--disable-blink-features=AutomationControlled',
+      '--ignore-certificate-errors',
     ],
   },
 });
@@ -79,6 +95,7 @@ async function cleanup(exitCode = 0) {
       await client.destroy();
     }
   } catch (_) {}
+  instanceLock.releaseLock();
   process.exit(exitCode);
 }
 
@@ -123,11 +140,13 @@ client.on('auth_failure', async (msg) => {
 
 client.on('ready', async () => {
   isResolved = true;
+  const accountMode = process.env.WA_ACCOUNT_MODE || 'development';
   console.log('\n====================================================');
   console.log('  [PASS] VERIFIED: WhatsApp Session is ACTIVE & READY!');
   if (client.info) {
     console.log('  Connected Phone Number: +' + (client.info.wid?.user || 'Unknown'));
     console.log('  Connected Account Name: ' + (client.info.pushname || 'N/A'));
+    console.log('  Account Mode:           ' + (accountMode === 'development' ? 'Development / Test Mode (Personal Phone)' : 'Clinic Production Mode'));
     console.log('  Platform:               ' + (client.info.platform || 'WhatsApp Web'));
   }
   console.log('  Session persistence confirmed across restarts.');

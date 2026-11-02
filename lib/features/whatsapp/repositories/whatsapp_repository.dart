@@ -24,7 +24,7 @@ class WhatsAppRepository {
   }
 
   /// Fetches all conversations grouped by phone number with automatic patient linking.
-  Future<List<WhatsAppConversation>> fetchConversations() async {
+  Future<List<WhatsAppConversation>> fetchConversations({int limit = 1000, int offset = 0}) async {
     if (_supabase == null) return [];
     try {
       // 1. Fetch all active patients to build normalized 10-digit phone lookup map
@@ -44,12 +44,15 @@ class WhatsAppRepository {
         }
       } catch (_) {}
 
-      // 2. Fetch message logs
-      final logRows = await _supabase
+      // 2. Fetch message logs with scalable pagination instead of arbitrary global 250 cutoff
+      final logQuery = _supabase
           .from('whatsapp_message_logs')
           .select('*, patients(id, name, patient_number, department, whatsapp_opt_out)')
-          .order('timestamp', ascending: false)
-          .limit(250);
+          .order('timestamp', ascending: false);
+
+      final dynamic logRows = offset > 0
+          ? await logQuery.range(offset, offset + limit - 1)
+          : await logQuery.limit(limit);
 
       final Map<String, List<WhatsAppMessage>> groupedMessages = {};
       final Map<String, Map<String, dynamic>?> patientMetadata = {};
@@ -83,7 +86,7 @@ class WhatsAppRepository {
         final outboxRows = await _supabase
             .from('whatsapp_messages_outbox')
             .select('id, recipient_phone, patient_id, department, message_text, status, created_at, patients(id, name, patient_number, department, whatsapp_opt_out)')
-            .inFilter('status', ['pending', 'processing', 'failed'])
+            .inFilter('status', ['pending', 'processing', 'failed', 'cancelled'])
             .order('created_at', ascending: false)
             .limit(50);
 
@@ -178,7 +181,7 @@ class WhatsAppRepository {
   }
 
   /// Fetches messages for a specific phone number (logs + active/failed outbox).
-  Future<List<WhatsAppMessage>> fetchMessagesForPhone(String phone) async {
+  Future<List<WhatsAppMessage>> fetchMessagesForPhone(String phone, {int limit = 300}) async {
     if (_supabase == null) return [];
     try {
       final clean = _normalizePhone(phone);
@@ -188,14 +191,16 @@ class WhatsAppRepository {
           .from('whatsapp_message_logs')
           .select('*, patients(id, name, patient_number, department, whatsapp_opt_out)')
           .ilike('phone_number', '%$clean')
-          .order('timestamp', ascending: true);
+          .order('timestamp', ascending: true)
+          .limit(limit);
 
       final outboxFuture = _supabase
           .from('whatsapp_messages_outbox')
           .select('id, recipient_phone, patient_id, department, message_text, status, created_at, patients(id, name, patient_number, department, whatsapp_opt_out)')
           .ilike('recipient_phone', '%$clean')
-          .inFilter('status', ['pending', 'processing', 'failed'])
-          .order('created_at', ascending: true);
+          .inFilter('status', ['pending', 'processing', 'failed', 'cancelled'])
+          .order('created_at', ascending: true)
+          .limit(100);
 
       final results = await Future.wait([logFuture, outboxFuture]);
       final logRows = results[0] as List;
@@ -269,6 +274,20 @@ class WhatsAppRepository {
     }
   }
 
+  /// Cancels a pending outbox message via secure server-side RPC.
+  Future<bool> cancelOutboxMessage(String outboxId) async {
+    if (_supabase == null || outboxId.isEmpty) return false;
+    try {
+      final res = await _supabase.rpc('cancel_whatsapp_outbox_message', params: {
+        'p_outbox_id': outboxId,
+      });
+      if (res is Map && res['success'] == true) return true;
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Fetches all messages associated with a patient.
   Future<List<WhatsAppMessage>> fetchMessagesForPatient(String patientId) async {
     if (_supabase == null) return [];
@@ -305,6 +324,41 @@ class WhatsAppRepository {
         'p_patient_id': validPatientId,
         'p_department': cleanDept,
         'p_message_text': messageText.trim(),
+      });
+
+      if (rpcRes is Map) {
+        return Map<String, dynamic>.from(rpcRes);
+      }
+      return {'success': false, 'message': 'Unexpected response from server.'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Sends a staff message or media attachment via the validated server RPC send_staff_whatsapp_message.
+  Future<Map<String, dynamic>> sendStaffReply({
+    required String recipientPhone,
+    String? patientId,
+    required String department,
+    required String messageText,
+    String? mediaUrl,
+    String? templateKey,
+    String? messageType,
+  }) async {
+    if (_supabase == null) return {'success': false, 'message': 'Database not connected'};
+    try {
+      final clean = _normalizePhone(recipientPhone);
+      final validPatientId = (patientId != null && patientId.trim().isNotEmpty) ? patientId.trim() : null;
+      final cleanDept = department.trim().toLowerCase().isEmpty ? 'general' : department.trim().toLowerCase();
+
+      final rpcRes = await _supabase.rpc('send_staff_whatsapp_message', params: {
+        'p_recipient_phone': clean,
+        'p_patient_id': validPatientId,
+        'p_department': cleanDept,
+        'p_message_text': messageText.trim(),
+        'p_media_url': mediaUrl,
+        'p_template_key': templateKey ?? 'custom',
+        'p_message_type': messageType ?? 'custom',
       });
 
       if (rpcRes is Map) {
@@ -402,6 +456,8 @@ class WhatsAppRepository {
         'pending': 0,
         'processing': 0,
         'sent': 0,
+        'delivered': 0,
+        'read': 0,
         'failed': 0,
         'cancelled': 0,
       };
@@ -417,6 +473,8 @@ class WhatsAppRepository {
         'pending': 0,
         'processing': 0,
         'sent': 0,
+        'delivered': 0,
+        'read': 0,
         'failed': 0,
         'cancelled': 0,
       };
@@ -471,4 +529,53 @@ class WhatsAppRepository {
       return false;
     }
   }
+
+  /// Retries a failed message via the SECURITY DEFINER RPC.
+  Future<Map<String, dynamic>> retryFailedMessage(String outboxId) async {
+    if (_supabase == null) return {'success': false, 'message': 'Database not connected'};
+    try {
+      final res = await _supabase.rpc('retry_failed_whatsapp_message', params: {
+        'p_outbox_id': outboxId,
+      });
+      if (res is Map) {
+        return Map<String, dynamic>.from(res);
+      }
+      return {'success': false, 'message': 'Unexpected response from server.'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Cancels a pending outbox message via the SECURITY DEFINER RPC.
+  Future<Map<String, dynamic>> cancelPendingMessage(String outboxId) async {
+    if (_supabase == null) return {'success': false, 'message': 'Database not connected'};
+    try {
+      final res = await _supabase.rpc('cancel_whatsapp_outbox_message', params: {
+        'p_outbox_id': outboxId,
+      });
+      if (res is Map) {
+        return Map<String, dynamic>.from(res);
+      }
+      return {'success': false, 'message': 'Unexpected response from server.'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Fetches failed outbox messages for admin inspection and retry.
+  Future<List<Map<String, dynamic>>> fetchFailedOutboxMessages({int limit = 50}) async {
+    if (_supabase == null) return [];
+    try {
+      final res = await _supabase
+          .from('whatsapp_messages_outbox')
+          .select('id, recipient_phone, department, message_type, message_text, last_error, retry_count, max_retries, created_at, patients(name)')
+          .eq('status', 'failed')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
 }
+

@@ -25,8 +25,12 @@ const { hasServiceRole } = require('./src/config/supabase');
 const logger = require('./src/utils/logger');
 
 logger.info('====================================================');
+logger.info('====================================================');
 logger.info('  MKES CARE+ WhatsApp Bridge Daemon Starting...     ');
-logger.info('  Host: Windows PC Local Service                   ');
+const accountMode = process.env.WA_ACCOUNT_MODE || 'development';
+const accountLabel = process.env.WA_ACCOUNT_LABEL || (accountMode === 'development' ? 'Developer Test Account (Personal Phone)' : 'Clinic Account');
+logger.info(`  Account: ${accountLabel} [${accountMode.toUpperCase()}]`);
+logger.info('  Policy: Patient-only inbox (Personal chats strictly filtered)');
 logger.info('  Clinical Scope: Eye & Dental (Optical Excluded)   ');
 const isDryRun = String(process.env.DRY_RUN || 'true').trim().toLowerCase() !== 'false';
 if (isDryRun) {
@@ -57,7 +61,7 @@ whatsappClient.onMessage(async (msg) => {
   }
 });
 
-// 2b. Wire Device Sent Message Event (captures replies sent from physical clinic phone)
+// 2b. Wire Device Sent Message Event (captures replies sent to registered patients from connected mobile device)
 whatsappClient.onMessageCreate(async (msg) => {
   try {
     if (msg.fromMe) {
@@ -107,14 +111,11 @@ const shutdown = () => {
   outboxWorker.stop();
   automationScheduler.stop();
   notificationWatcher.stop();
-  if (whatsappClient.client) {
-    whatsappClient.client.destroy().then(() => {
-      logger.info('WhatsApp client destroyed cleanly.');
-      process.exit(0);
-    });
-  } else {
+  whatsappClient.destroy().then(() => {
     process.exit(0);
-  }
+  }).catch(() => {
+    process.exit(0);
+  });
 };
 
 process.on('SIGINT', shutdown);

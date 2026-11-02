@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../patients/providers/patients_provider.dart';
 import '../providers/whatsapp_inbox_provider.dart';
 import '../repositories/whatsapp_repository.dart';
+import '../screens/whatsapp_inbox_screen.dart';
 
 class WhatsAppAdminSettingsCard extends ConsumerStatefulWidget {
   const WhatsAppAdminSettingsCard({super.key});
@@ -96,19 +98,64 @@ class _WhatsAppAdminSettingsCardState
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('Error loading stats: $e'),
               data: (stats) {
-                return Row(
+                final totalSent = (stats['sent'] ?? 0) +
+                    (stats['delivered'] ?? 0) +
+                    (stats['read'] ?? 0);
+                final failedCount = stats['failed'] ?? 0;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatCard('Pending', '${stats['pending'] ?? 0}',
-                        Colors.orange),
-                    const SizedBox(width: AppSpacing.sm),
-                    _buildStatCard(
-                        'Sent', '${stats['sent'] ?? 0}', Colors.green),
-                    const SizedBox(width: AppSpacing.sm),
-                    _buildStatCard(
-                        'Failed', '${stats['failed'] ?? 0}', AppColors.error),
-                    const SizedBox(width: AppSpacing.sm),
-                    _buildStatCard(
-                        'Cancelled', '${stats['cancelled'] ?? 0}', Colors.grey),
+                    Row(
+                      children: [
+                        _buildStatCard('Pending', '${stats['pending'] ?? 0}',
+                            Colors.orange),
+                        const SizedBox(width: AppSpacing.sm),
+                        _buildStatCard('Sent', '$totalSent', Colors.green),
+                        const SizedBox(width: AppSpacing.sm),
+                        _buildStatCard(
+                          'Failed',
+                          '$failedCount',
+                          AppColors.error,
+                          onTap: () => _showFailedMessagesDialog(context),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        _buildStatCard(
+                            'Cancelled', '${stats['cancelled'] ?? 0}', Colors.grey),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // Quick Action Buttons
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        FilledButton.tonalIcon(
+                          icon: const Icon(Icons.forum_outlined, size: 16),
+                          label: const Text('Shared Patient Inbox'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const WhatsAppInboxScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.person_off_outlined, size: 16),
+                          label: const Text('Opt-Out Manager'),
+                          onPressed: () => _showOptOutManagementDialog(context),
+                        ),
+                        if (failedCount > 0)
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.error,
+                            ),
+                            icon: const Icon(Icons.warning_amber_rounded, size: 16),
+                            label: Text('Inspect $failedCount Failed Messages'),
+                            onPressed: () => _showFailedMessagesDialog(context),
+                          ),
+                      ],
+                    ),
                   ],
                 );
               },
@@ -260,23 +307,323 @@ class _WhatsAppAdminSettingsCardState
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color) {
+  void _showFailedMessagesDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final repo = ref.read(whatsappRepositoryProvider);
+            return AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.error),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Expanded(
+                    child: Text('Failed WhatsApp Messages'),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 20),
+                    tooltip: 'Refresh',
+                    onPressed: () {
+                      setDialogState(() {});
+                    },
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 650,
+                height: 450,
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: repo.fetchFailedOutboxMessages(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error loading failed messages: ${snapshot.error}'));
+                    }
+                    final items = snapshot.data ?? [];
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check_circle_outline, size: 48, color: Colors.green),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text('No failed messages found in outbox.',
+                                style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600)),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text('All queued notifications delivered successfully.',
+                                style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                          ],
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, idx) {
+                        final m = items[idx];
+                        final id = m['id']?.toString() ?? '';
+                        final phone = m['recipient_phone']?.toString() ?? '';
+                        final dept = (m['department']?.toString() ?? 'clinic').toUpperCase();
+                        final error = m['last_error']?.toString() ?? 'Unknown delivery failure';
+                        final retries = m['retry_count'] ?? 0;
+                        final maxRetries = m['max_retries'] ?? 3;
+                        final patientName = (m['patients'] is Map) ? m['patients']['name']?.toString() : null;
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surfaceContainerHigh,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(dept, style: AppTypography.labelCaps.copyWith(fontSize: 9, fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Expanded(
+                                    child: Text(
+                                      patientName != null ? '$patientName ($phone)' : phone,
+                                      style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  Text(
+                                    'Retries: $retries/$maxRetries',
+                                    style: AppTypography.labelCaps.copyWith(fontSize: 10, color: AppColors.outline),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Error: $error',
+                                style: AppTypography.bodySm.copyWith(color: AppColors.error, fontSize: 11),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton.icon(
+                                    icon: const Icon(Icons.cancel_outlined, size: 14),
+                                    label: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                                    onPressed: () async {
+                                      final res = await repo.cancelPendingMessage(id);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(res['message']?.toString() ?? 'Message cancelled'),
+                                            backgroundColor: res['success'] == true ? Colors.grey : AppColors.error,
+                                          ),
+                                        );
+                                        setDialogState(() {});
+                                        ref.invalidate(whatsappOutboxStatsProvider);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  FilledButton.tonalIcon(
+                                    icon: const Icon(Icons.refresh, size: 14),
+                                    label: const Text('Retry Now', style: TextStyle(fontSize: 12)),
+                                    onPressed: () async {
+                                      final res = await repo.retryFailedMessage(id);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(res['message']?.toString() ?? 'Queued for retry'),
+                                            backgroundColor: res['success'] == true ? Colors.green : AppColors.error,
+                                          ),
+                                        );
+                                        setDialogState(() {});
+                                        ref.invalidate(whatsappOutboxStatsProvider);
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showOptOutManagementDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final repo = ref.read(whatsappRepositoryProvider);
+            final patientsAsync = ref.watch(patientsProvider);
+
+            return AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.person_off_outlined, color: AppColors.primary),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Expanded(
+                    child: Text('WhatsApp Opt-Out Manager'),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 600,
+                height: 450,
+                child: Column(
+                  children: [
+                    TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Search patients by name or phone...',
+                        prefixIcon: Icon(Icons.search, size: 20),
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          searchQuery = val.trim().toLowerCase();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Patients who texted STOP or requested opt-out are excluded from automated messages.',
+                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11),
+                    ),
+                    const Divider(height: AppSpacing.md),
+                    Expanded(
+                      child: patientsAsync.when(
+                        loading: () => const Center(child: CircularProgressIndicator()),
+                        error: (err, _) => Center(child: Text('Error loading patients: $err')),
+                        data: (patients) {
+                          final filtered = patients.where((p) {
+                            if (searchQuery.isEmpty) return true;
+                            return p.name.toLowerCase().contains(searchQuery) ||
+                                (p.mobile != null && p.mobile!.contains(searchQuery));
+                          }).toList();
+
+                          if (filtered.isEmpty) {
+                            return const Center(child: Text('No matching patients found.'));
+                          }
+
+                          return ListView.separated(
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (context, idx) {
+                              final patient = filtered[idx];
+                              final isOptedOut = patient.whatsappOptOut;
+
+                              return ListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                leading: CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: isOptedOut
+                                      ? AppColors.error.withValues(alpha: 0.15)
+                                      : Colors.green.withValues(alpha: 0.15),
+                                  child: Icon(
+                                    isOptedOut ? Icons.block : Icons.check,
+                                    size: 14,
+                                    color: isOptedOut ? AppColors.error : Colors.green,
+                                  ),
+                                ),
+                                title: Text(patient.name, style: AppTypography.bodySm.copyWith(fontWeight: FontWeight.w600)),
+                                subtitle: Text(
+                                  '${patient.mobile ?? "No phone"} • ${patient.department ?? "General"}',
+                                  style: AppTypography.labelCaps.copyWith(fontSize: 10, color: AppColors.outline),
+                                ),
+                                trailing: Switch(
+                                  value: isOptedOut,
+                                  activeTrackColor: AppColors.error,
+                                  inactiveThumbColor: Colors.green,
+                                  inactiveTrackColor: Colors.green.withValues(alpha: 0.3),
+                                  onChanged: (val) async {
+                                    final success = await repo.setPatientOptOut(patient.id, val);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(success
+                                              ? '${patient.name} opt-out updated: ${val ? "Opted Out" : "Subscribed"}'
+                                              : 'Failed to update opt-out status'),
+                                          backgroundColor: success ? (val ? AppColors.error : Colors.green) : AppColors.error,
+                                        ),
+                                      );
+                                    }
+                                    ref.invalidate(patientsProvider);
+                                    setDialogState(() {});
+                                  },
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, Color color, {VoidCallback? onTap}) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: AppTypography.labelCaps.copyWith(color: color, fontSize: 10)),
-            const SizedBox(height: 2),
-            Text(value, style: AppTypography.headlineMd.copyWith(fontSize: 20, color: color, fontWeight: FontWeight.bold)),
-          ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(label, style: AppTypography.labelCaps.copyWith(color: color, fontSize: 10)),
+                  if (onTap != null)
+                    Icon(Icons.open_in_new, size: 11, color: color),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(value, style: AppTypography.headlineMd.copyWith(fontSize: 20, color: color, fontWeight: FontWeight.bold)),
+            ],
+          ),
         ),
       ),
     );
@@ -293,3 +640,4 @@ class _WhatsAppAdminSettingsCardState
     );
   }
 }
+

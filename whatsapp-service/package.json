@@ -12,7 +12,8 @@
     "test-message": "node scripts/send_test_message.js",
     "test": "node tests/unit_tests.js",
     "test:rescheduling": "node tests/rescheduling_and_notifications_tests.js",
-    "validate": "node scripts/validate_service.js"
+    "validate": "node scripts/validate_service.js",
+    "postinstall": "node scripts/patch_wwebjs.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

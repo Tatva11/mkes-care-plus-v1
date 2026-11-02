@@ -9,37 +9,136 @@ const { BOT_STEPS, OPT_OUT_COMMANDS, CLINIC, DEPARTMENTS } = require('../config/
 
 const RESTART_COMMANDS = ['HI', 'HELLO', 'HEY', 'START', 'RESTART', 'MENU', 'RESET', 'CANCEL', '0'];
 
+let _captureStartTimeSec = parseInt(process.env.WA_CAPTURE_START_TIMESTAMP, 10) || Math.floor(Date.now() / 1000);
+const _processedMessageIds = new Map();
+
 class BotEngine {
   /**
+   * Retrieves the current timestamp cutoff for incoming message capture.
+   * Messages prior to this timestamp are rejected to prevent historical chat backfill.
+   */
+  static getCaptureStartTime() {
+    return _captureStartTimeSec;
+  }
+
+  /**
+   * Dynamically sets or resets the capture start cutoff.
+   */
+  static setCaptureStartTime(timestampSec) {
+    _captureStartTimeSec = timestampSec;
+    logger.info(`[CAPTURE CUTOFF] Active message capture window started at ${timestampSec} (${new Date(timestampSec * 1000).toISOString()}). Historical messages are strictly dropped.`);
+  }
+
+  /**
+   * Verifies if a message ID was already processed.
+   */
+  static isMessageAlreadyProcessed(msgId) {
+    if (!msgId) return false;
+    return _processedMessageIds.has(msgId);
+  }
+
+  /**
+   * Records a message ID in the in-memory deduplication cache.
+   */
+  static markMessageProcessed(msgId) {
+    if (!msgId) return;
+    _processedMessageIds.set(msgId, Date.now());
+    if (_processedMessageIds.size > 2000) {
+      const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+      for (const [id, time] of _processedMessageIds.entries()) {
+        if (time < twoHoursAgo) {
+          _processedMessageIds.delete(id);
+        }
+      }
+    }
+  }
+
+  /**
    * Main entry point for all incoming WhatsApp messages.
+   * STRICT FILTERING: Only eligible patient messages received after pairing start
+   * matching registered Supabase patients are ingested. Personal chats are dropped.
    */
   static async handleIncomingMessage(msg) {
-    if (!PhoneNormalizer.isIndividualChat(msg.from)) {
-      return; // Ignore group chats or system broadcasts
+    // 0. Drop clinic-sent outgoing messages: do not notify staff about outgoing messages sent by clinic
+    if (msg.fromMe) {
+      return;
     }
 
+    // 1. Strict Non-Individual Chat Filter: Drop groups, broadcasts, status updates
+    if (!PhoneNormalizer.isIndividualChat(msg.from)) {
+      logger.debug(`[NON-INDIVIDUAL DROP] Ignored group/broadcast message from ${msg.from}`);
+      return;
+    }
+
+    // 2. Strict Historical Message Cutoff: Reject messages before capture start time (no chat backfill)
+    const msgTime = msg.timestamp || 0;
+    const captureStart = BotEngine.getCaptureStartTime();
+    if (msgTime > 0 && msgTime < captureStart) {
+      logger.debug(`[HISTORICAL DROP] Ignored historical message from ${msg.from} (msg.timestamp: ${msgTime} < captureStart: ${captureStart}). No chat backfill.`);
+      return;
+    }
+
+    // 3. Strict Deduplication Check
+    const msgId = RecipientValidator.extractMessageId(msg);
+    if (msgId && BotEngine.isMessageAlreadyProcessed(msgId)) {
+      logger.debug(`[DUPLICATE DROP] Inbound message ${msgId} already processed. Dropping duplicate.`);
+      return;
+    }
+
+    // 4. Safe LID Identity Handling: Never guess patient identity from unverified LID
     const isSenderLid = PhoneNormalizer.isLid(msg.from);
     let resolvedPhone = null;
     if (isSenderLid) {
       resolvedPhone = await whatsappClient.resolveLidToPhone(msg.from);
+      if (!resolvedPhone) {
+        logger.debug(`[UNRESOLVED LID DROP] Ignored incoming message from unresolved LID ${msg.from}. Patient identity cannot be verified safely.`);
+        return;
+      }
     }
 
-    let rawPhone;
-    let cleanTen = null;
-
-    if (resolvedPhone) {
-      rawPhone = resolvedPhone.replace(/@(c\.us|s\.whatsapp\.net)$/, '');
-      cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
-      logger.info(`Resolved sender LID ${msg.from} to verified phone: ${rawPhone}`);
-    } else if (isSenderLid) {
-      // Unresolved LID: retain the opaque LID identifier as the handle. Never slice arbitrary digits.
-      rawPhone = msg.from;
-      cleanTen = null;
-      logger.info(`Sender is LID ${msg.from}; phone resolution unavailable. Retaining conversation as unmatched.`);
-    } else {
-      rawPhone = msg.from.replace(/@(c\.us|s\.whatsapp\.net)$/, '');
-      cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
+    // 5. Phone Normalization: Extract exactly 10 national digits
+    const rawPhone = (resolvedPhone || msg.from).replace(/@(c\.us|s\.whatsapp\.net)$/, '');
+    const cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
+    if (!cleanTen || cleanTen.length !== 10) {
+      logger.debug(`[INVALID PHONE DROP] Sender ${rawPhone} cannot be normalized to 10 national digits.`);
+      return;
     }
+
+    // 6. Patient Resolution: Look up registered patient by phone number
+    let patient = null;
+    let isAmbiguous = false;
+    let candidatePatients = [];
+
+    try {
+      const { data: patientRows, error: lookupErr } = await supabase
+        .from('patients')
+        .select('*')
+        .ilike('mobile', `%${cleanTen}`);
+
+      if (lookupErr) {
+        logger.error(`Error looking up patient for ${cleanTen}: ${lookupErr.message}`);
+        return;
+      }
+
+      if (!patientRows || patientRows.length === 0) {
+        // UNMATCHED SENDER: Unknown phone number.
+        // Handle safely WITHOUT automatically creating patient records.
+        patient = null;
+        logger.info(`[INBOUND UNKNOWN] Incoming message from unknown phone ${cleanTen}. Processing safely without auto-creating patient.`);
+      } else if (patientRows.length === 1) {
+        patient = patientRows[0];
+      } else {
+        isAmbiguous = true;
+        candidatePatients = patientRows;
+        logger.warn(`Ambiguous phone number ${cleanTen}: Matches ${patientRows.length} distinct registered patient profiles.`);
+      }
+    } catch (e) {
+      logger.error(`Exception querying patient for ${cleanTen}: ${e.message}`);
+      return;
+    }
+
+    // Mark message ID as processed to prevent any duplicate execution
+    if (msgId) BotEngine.markMessageProcessed(msgId);
 
     let body = (msg.body || '').trim();
     if (!body && msg.hasMedia) {
@@ -49,42 +148,23 @@ class BotEngine {
       body = '[Message]';
     }
 
-    logger.info(`Received inbound message from ${msg.from}: "${body}"`);
+    logger.info(`Received inbound message from registered patient ${cleanTen} (${patient?.name || 'Patient'}): "${body}"`);
 
-    // 1. Lookup Patient Record in Database (Handle unambiguous vs ambiguous match safely)
-    let patient = null;
-    let isAmbiguous = false;
-    let candidatePatients = [];
+    // 7. Audit log incoming message with verified registered patient association
+    await this._logInboundMessage(cleanTen, body, msg, patient?.id);
 
-    if (cleanTen) {
-      try {
-        const { data: patientRows } = await supabase
-          .from('patients')
-          .select('*')
-          .ilike('mobile', `%${cleanTen}`);
+    // 8. Notify Clinic Staff of New Inbound Message (In-App Notification)
+    // Always notify staff of incoming patient messages, even if opted out
+    await this._notifyStaffOfInboundMessage(patient, cleanTen, body);
 
-        if (patientRows && patientRows.length === 1) {
-          patient = patientRows[0];
-        } else if (patientRows && patientRows.length > 1) {
-          isAmbiguous = true;
-          candidatePatients = patientRows;
-          logger.warn(`Ambiguous phone number ${cleanTen}: Matches ${patientRows.length} distinct patient profiles.`);
-        }
-      } catch (e) {
-        logger.error(`Error looking up patient for ${cleanTen}: ${e.message}`);
-      }
-    }
-
-    // 2. Audit log incoming message with matched patient association
-    await this._logInboundMessage(rawPhone, body, msg, patient?.id);
-
-    // 3. Check Opt-Out Command (DPDP Act Compliance)
-    const upperBody = body.toUpperCase();
-    if (OPT_OUT_COMMANDS.includes(upperBody)) {
-      logger.info(`Processing opt-out request for phone: ${rawPhone}`);
+    // 9. Check Opt-Out Command (DPDP Act Compliance)
+    const upperBody = body.trim().toUpperCase();
+    const cleanBody = upperBody.replace(/[.!?,;]+$/g, '').trim();
+    if (OPT_OUT_COMMANDS.includes(upperBody) || OPT_OUT_COMMANDS.includes(cleanBody)) {
+      logger.info(`Processing opt-out request for registered patient phone: ${cleanTen}`);
       try {
         await supabase.rpc('register_patient_whatsapp_opt_out', {
-          p_phone_number: rawPhone,
+          p_phone_number: cleanTen,
         });
       } catch (optErr) {
         logger.error(`Error in register_patient_whatsapp_opt_out RPC: ${optErr.message}`);
@@ -96,36 +176,34 @@ class BotEngine {
       return;
     }
 
-    // Check if patient previously opted out
+    // Check if patient previously opted out: incoming messages remain visible in staff inbox,
+    // but automated bot replies are halted.
     if (patient && patient.whatsapp_opt_out) {
-      logger.info(`Incoming message from opted-out patient ${patient.id}. Ignoring automated reply.`);
+      logger.info(`Incoming message from opted-out patient ${patient.id}. Logged for staff view; automated bot reply skipped.`);
       return;
     }
 
-    // 4. Retrieve or Create Conversation Session
-    const session = await this._getOrCreateSession(rawPhone, patient);
+    // 10. Retrieve or Create Conversation Session
+    const session = await this._getOrCreateSession(cleanTen, patient);
 
-    // 5. Repeated / duplicate message debounce check (within 2 seconds)
+    // 11. Repeated / duplicate message debounce check (within 2 seconds)
     const now = Date.now();
     if (
       session.last_message_body === body &&
       session.last_message_time &&
       now - session.last_message_time < 2000
     ) {
-      logger.warn(`Debouncing duplicate inbound message from ${rawPhone}: "${body}"`);
+      logger.warn(`Debouncing duplicate inbound message from ${cleanTen}: "${body}"`);
       return;
     }
 
     // Update last message debounce tracking
-    await this._updateSession(rawPhone, {
+    await this._updateSession(cleanTen, {
       last_message_body: body,
       last_message_time: now,
     });
 
-    // 6. Notify Clinic Staff of New Inbound Message (In-App Notification)
-    await this._notifyStaffOfInboundMessage(patient, rawPhone, body);
-
-    // 7. Handle Optical Department exclusion guard
+    // 12. Handle Optical Department exclusion guard
     if (upperBody.includes('OPTICAL') || upperBody.includes('GLASSES') || upperBody.includes('SPECTACLES')) {
       await whatsappClient.sendMessageWithHumanizedDelay(
         msg.from,
@@ -134,7 +212,7 @@ class BotEngine {
       return;
     }
 
-    // 8. Handle Ambiguous Identity Guard (Do NOT guess patient identity)
+    // 13. Handle Ambiguous Identity Guard (Do NOT guess patient identity)
     if (isAmbiguous && session.current_step === BOT_STEPS.IDLE) {
       const namesList = candidatePatients.map((p, idx) => `• ${p.name || 'Patient'} (${p.patient_number || 'Record #' + (idx + 1)})`).join('\n');
       await whatsappClient.sendMessageWithHumanizedDelay(
@@ -145,7 +223,7 @@ class BotEngine {
         `To ensure medical privacy and accurate scheduling, please reply with the patient's *Full Name* or *Patient Number* so our reception team can verify your record.\n\n` +
         `_Reply STOP to unsubscribe._`
       );
-      await this._updateSession(rawPhone, {
+      await this._updateSession(cleanTen, {
         current_step: BOT_STEPS.AWAITING_AMBIGUOUS_CLARIFICATION,
         candidate_patient_ids: candidatePatients.map((p) => p.id),
       });
@@ -155,7 +233,7 @@ class BotEngine {
     // Handle Ambiguous Identity Clarification Response
     if (session.current_step === BOT_STEPS.AWAITING_AMBIGUOUS_CLARIFICATION) {
       if (RESTART_COMMANDS.includes(upperBody)) {
-        await this._resetSession(rawPhone);
+        await this._resetSession(cleanTen);
         await this._handleIdleState(session, body, msg.from, 'Valued Patient', 'dental');
         return;
       }
@@ -166,7 +244,7 @@ class BotEngine {
       if (matched) {
         patient = matched;
         logger.info(`Patient clarified identity from ambiguous group: ${patient.id} (${patient.name})`);
-        await this._updateSession(rawPhone, {
+        await this._updateSession(cleanTen, {
           patient_id: patient.id,
           current_step: BOT_STEPS.IDLE,
         });
@@ -180,10 +258,10 @@ class BotEngine {
       }
     }
 
-    // 9. Handle Department switching keywords
+    // 14. Handle Department switching keywords
     if (upperBody === 'EYE' || upperBody === 'DENTAL') {
       const targetDept = upperBody.toLowerCase();
-      await this._updateSession(rawPhone, {
+      await this._updateSession(cleanTen, {
         selected_department: targetDept,
         current_step: BOT_STEPS.AWAITING_DATE_CHOICE,
         selected_date: null,
@@ -196,14 +274,14 @@ class BotEngine {
       return;
     }
 
-    // 10. Check Rescheduling Intent in IDLE or Initial Messages
+    // 15. Check Rescheduling Intent in IDLE or Initial Messages
     if (this._isReschedulingIntent(body)) {
-      logger.info(`Rescheduling intent detected from ${rawPhone}: "${body}"`);
+      logger.info(`Rescheduling intent detected from ${cleanTen}: "${body}"`);
       await this._initiateReschedulingWorkflow(session, msg.from, patient, body);
       return;
     }
 
-    // 10b. Check if patient is replying to a Ready Lab Case notification (Option 1, 2, 3 or custom slot)
+    // 15b. Check if patient is replying to a Ready Lab Case notification (Option 1, 2, 3 or custom slot)
     if (patient?.id) {
       const readyCase = await this._getPendingReadyDentalLabCase(patient.id);
       if (readyCase) {
@@ -212,7 +290,7 @@ class BotEngine {
       }
     }
 
-    // 11. Universal Restart / Menu command check
+    // 16. Universal Restart / Menu command check
     if (RESTART_COMMANDS.includes(upperBody)) {
       if (session.current_step === BOT_STEPS.CONFIRMATION_PENDING && upperBody !== 'RESTART') {
         await whatsappClient.sendMessageWithHumanizedDelay(
@@ -221,13 +299,13 @@ class BotEngine {
         );
         return;
       }
-      await this._resetSession(rawPhone);
+      await this._resetSession(cleanTen);
       session.current_step = BOT_STEPS.IDLE;
       await this._handleIdleState(session, body, msg.from, patient?.name || 'Valued Patient', session.selected_department || 'dental');
       return;
     }
 
-    // 12. Route through State Machine
+    // 17. Route through State Machine
     await this._routeState(session, body, msg.from, patient);
   }
 
@@ -1183,23 +1261,49 @@ class BotEngine {
 
   static async _notifyStaffOfInboundMessage(patient, phone, body) {
     try {
-      const patientTitle = patient?.name ? `WhatsApp from ${patient.name}` : `WhatsApp from +91 ${phone}`;
+      const displayName = patient?.name || 'Inquiry';
+      const patientTitle = `WhatsApp: ${displayName} (${phone})`;
       const snippet = body.length > 80 ? body.substring(0, 80) + '...' : body;
       const dept = (patient?.department || 'dental').toLowerCase();
 
-      // Optical Exclusion
-      if (dept === 'optical') return;
+      // Optical Exclusion (for known optical patients)
+      if (patient && dept === 'optical') return;
 
-      const { data: admins } = await supabase
+      // Determine authorized staff:
+      // If known patient department, notify admins and staff of that department.
+      // If unknown patient, notify all admins and active staff.
+      let query = supabase
         .from('profiles')
         .select('id')
-        .eq('is_active', true)
-        .or(`role.eq.admin,and(role.eq.staff,department.ilike.%${dept}%)`);
+        .eq('is_active', true);
 
-      if (admins && admins.length > 0) {
-        for (const admin of admins) {
+      if (patient && dept) {
+        query = query.or(`role.eq.admin,and(role.eq.staff,department.ilike.%${dept}%)`);
+      } else {
+        query = query.or('role.eq.admin,role.eq.staff');
+      }
+
+      const { data: staffList } = await query;
+
+      if (staffList && staffList.length > 0) {
+        const tenSecondsAgo = new Date(Date.now() - 10000).toISOString();
+        for (const staff of staffList) {
+          // Prevent duplicate notifications within 10 seconds for the same staff and phone
+          const { data: recentNotifs } = await supabase
+            .from('notifications')
+            .select('id')
+            .eq('user_id', staff.id)
+            .eq('type', 'whatsapp_reply')
+            .ilike('title', `%${phone}%`)
+            .gte('created_at', tenSecondsAgo)
+            .limit(1);
+
+          if (recentNotifs && recentNotifs.length > 0) {
+            continue;
+          }
+
           await supabase.from('notifications').insert({
-            user_id: admin.id,
+            user_id: staff.id,
             title: patientTitle,
             message: snippet,
             type: 'whatsapp_reply',
@@ -1213,9 +1317,9 @@ class BotEngine {
       await pushNotificationBackend.dispatchToDepartmentStaff({
         department: dept,
         type: 'whatsapp_reply',
-        title: 'New Patient Message',
-        body: `Message received from ${patient?.name || ('+91 ' + phone)}.`,
-        patientName: patient?.name,
+        title: 'New WhatsApp Message',
+        body: `${displayName} (${phone}): ${snippet}`,
+        patientName: displayName,
         relatedId: patient?.id || null,
         idempotencyKey: `inbound_${phone}_${Date.now()}`,
       });
@@ -1469,42 +1573,62 @@ class BotEngine {
   }
 
   /**
-   * Captures outbound messages sent directly from the physical WhatsApp device
-   * or WhatsApp Web, synchronizing them into the shared clinic inbox.
+   * Captures outbound messages sent directly from the connected WhatsApp device,
+   * strictly synchronizing ONLY conversations with registered clinic patients.
+   * Personal conversations with friends, family, and non-patients are completely ignored.
    */
   static async handleDeviceSentMessage(msg) {
     if (!msg || !msg.fromMe) return;
     const to = msg.to || '';
     if (!PhoneNormalizer.isIndividualChat(to)) return;
 
+    // 1. Strict Historical Message Cutoff: Reject messages before capture start time
+    const msgTime = msg.timestamp || 0;
+    const captureStart = BotEngine.getCaptureStartTime();
+    if (msgTime > 0 && msgTime < captureStart) {
+      return;
+    }
+
+    // 2. Strict Deduplication Check
+    const msgId = RecipientValidator.extractMessageId(msg);
+    if (msgId && BotEngine.isMessageAlreadyProcessed(msgId)) {
+      return;
+    }
+
+    // 3. Safe LID Identity Handling: Never mirror unverified LID
     const isRecipientLid = PhoneNormalizer.isLid(to);
     let resolvedPhone = null;
     if (isRecipientLid) {
       resolvedPhone = await whatsappClient.resolveLidToPhone(to);
+      if (!resolvedPhone) {
+        return; // Unresolved LID, do not mirror
+      }
     }
 
-    let rawPhone;
-    let cleanTen = null;
-    if (resolvedPhone) {
-      rawPhone = resolvedPhone.replace(/@(c\.us|s\.whatsapp\.net)$/, '');
-      cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
-    } else if (isRecipientLid) {
-      rawPhone = to;
-      cleanTen = null;
-    } else {
-      rawPhone = to.replace(/@(c\.us|s\.whatsapp\.net)$/, '');
-      cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
-    }
-    const normalizedPhone = cleanTen || rawPhone;
-    const msgId = RecipientValidator.extractMessageId(msg);
-    let body = (msg.body || '').trim();
-    if (!body && msg.hasMedia) {
-      body = `[${(msg.type || 'media').toUpperCase()}]`;
-    } else if (!body) {
-      body = '[Message]';
+    // 4. Phone Normalization: Extract 10 digits
+    const rawPhone = (resolvedPhone || to).replace(/@(c\.us|s\.whatsapp\.net)$/, '');
+    const cleanTen = PhoneNormalizer.extractTenDigits(rawPhone);
+    if (!cleanTen || cleanTen.length !== 10) {
+      return;
     }
 
+    // 5. Patient-Only Outbound Filter: Must match a registered patient in Supabase
     try {
+      const { data: patientRows, error: lookupErr } = await supabase
+        .from('patients')
+        .select('id, name')
+        .ilike('mobile', `%${cleanTen}`)
+        .limit(1);
+
+      if (lookupErr || !patientRows || patientRows.length === 0) {
+        // NON-PATIENT: Personal conversation with family/friend. DO NOT MIRROR!
+        logger.debug(`[PERSONAL OUTBOUND DROP] Ignored device-sent message to ${rawPhone}: Not a registered patient in Supabase.`);
+        return;
+      }
+
+      const patient = patientRows[0];
+      if (msgId) BotEngine.markMessageProcessed(msgId);
+
       // Check if already logged by outbox worker
       if (msgId) {
         try {
@@ -1520,25 +1644,17 @@ class BotEngine {
         } catch (_) {}
       }
 
-      // Lookup patient association
-      let patientId = null;
-      if (cleanTen) {
-        try {
-          const { data: patientRows } = await supabase
-            .from('patients')
-            .select('id')
-            .ilike('mobile', `%${cleanTen}`)
-            .limit(1);
-          if (patientRows && patientRows.length > 0) {
-            patientId = patientRows[0].id;
-          }
-        } catch (_) {}
+      let body = (msg.body || '').trim();
+      if (!body && msg.hasMedia) {
+        body = `[${(msg.type || 'media').toUpperCase()}]`;
+      } else if (!body) {
+        body = '[Message]';
       }
 
       await supabase.from('whatsapp_message_logs').insert({
         direction: 'outbound',
-        phone_number: normalizedPhone,
-        patient_id: patientId,
+        phone_number: cleanTen,
+        patient_id: patient.id,
         message_body: body,
         raw_payload: {
           id: msgId,
@@ -1551,7 +1667,7 @@ class BotEngine {
           ack: 1,
         },
       });
-      logger.info(`Synced outbound message sent from physical device to ${normalizedPhone}`);
+      logger.info(`Synced outbound device message to registered patient ${cleanTen} (${patient.name || 'Patient'})`);
     } catch (err) {
       logger.error(`Error logging device sent message: ${err.message}`);
     }

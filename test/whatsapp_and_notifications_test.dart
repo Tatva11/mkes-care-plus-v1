@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mkes_care/features/auth/screens/role_selection_screen.dart';
+import 'package:mkes_care/features/billing/models/billing_invoice_model.dart';
 import 'package:mkes_care/features/notifications/models/notification_model.dart';
 import 'package:mkes_care/features/patients/models/patient_model.dart';
 import 'package:mkes_care/features/whatsapp/models/whatsapp_message.dart';
@@ -294,4 +295,91 @@ void main() {
       expect(imageWidget.fit, equals(BoxFit.contain));
     });
   });
+
+  group('6. Patient & Invoice Association in WhatsApp Inbox', () {
+    test('BillingInvoiceModel correctly calculates remaining amount and payment status', () {
+      final inv = BillingInvoiceModel(
+        id: 'inv-001',
+        invoiceNumber: 'INV-2026-001',
+        patientId: 'pat-999',
+        patientName: 'Tirtha Shah',
+        patientMobile: '8080030111',
+        department: 'dental',
+        subtotal: 5000,
+        discount: 500,
+        totalAmount: 4500,
+        amountPaid: 2000,
+        paymentStatus: 'partially_paid',
+        createdAt: DateTime(2026, 11, 1),
+        updatedAt: DateTime(2026, 11, 1),
+      );
+
+      expect(inv.remainingAmount, equals(2500));
+      expect(inv.isPaid, isFalse);
+      expect(inv.isPartiallyPaid, isTrue);
+      expect(inv.patientMobile, equals('8080030111'));
+    });
+
+    test('WhatsAppMessage identifies cancelled and delivered statuses accurately', () {
+      final cancelledMsg = WhatsAppMessage(
+        id: 'msg-cancelled',
+        direction: 'outbound',
+        phoneNumber: '8080030111',
+        messageBody: 'Appointment notification',
+        status: 'cancelled',
+        timestamp: DateTime.now(),
+      );
+      expect(cancelledMsg.isCancelled, isTrue);
+      expect(cancelledMsg.isPending, isFalse);
+      expect(cancelledMsg.isSent, isFalse);
+
+      final deliveredMsg = WhatsAppMessage(
+        id: 'msg-delivered',
+        direction: 'outbound',
+        phoneNumber: '8080030111',
+        messageBody: 'Appointment reminder',
+        status: 'delivered',
+        timestamp: DateTime.now(),
+      );
+      expect(deliveredMsg.isDelivered, isTrue);
+      expect(deliveredMsg.isSent, isTrue);
+    });
+  });
+
+  group('7. Focused WhatsApp Fixes — Notification Deep-Linking & Routing', () {
+    test('Extracts 10-digit patient phone from notification title correctly', () {
+      final notifTitleMatched = 'WhatsApp: Ramesh Patel (9820012345)';
+      final match1 = RegExp(r'\b([6-9]\d{9})\b').firstMatch(notifTitleMatched);
+      expect(match1, isNotNull);
+      expect(match1!.group(1), equals('9820012345'));
+
+      final notifTitleUnmatched = 'WhatsApp: Inquiry (9819988776)';
+      final match2 = RegExp(r'\b([6-9]\d{9})\b').firstMatch(notifTitleUnmatched);
+      expect(match2, isNotNull);
+      expect(match2!.group(1), equals('9819988776'));
+    });
+
+    test('NotificationModel with whatsapp_reply displays green chat bubble', () {
+      final notif = NotificationModel(
+        id: 'wa-reply-1',
+        userId: 'staff-user-1',
+        title: 'WhatsApp: Ramesh Patel (9820012345)',
+        message: 'Hello doctor, can I get my prescription?',
+        type: 'whatsapp_reply',
+        isRead: false,
+        createdAt: DateTime.now(),
+      );
+
+      expect(notif.icon, equals(Icons.chat_bubble_outline));
+      expect(notif.iconColor, equals(Colors.green));
+      expect(notif.isRead, isFalse);
+    });
+
+    test('PushNotificationService routes whatsapp_reply to /whatsapp/inbox', () {
+      final service = PushNotificationService();
+      final route = service.handleNotificationTap({'type': 'whatsapp_reply', 'phone': '9820012345'});
+      expect(route, equals('/whatsapp/inbox'));
+    });
+  });
 }
+
