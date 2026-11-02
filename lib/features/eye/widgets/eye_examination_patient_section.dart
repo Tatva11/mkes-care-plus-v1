@@ -92,7 +92,8 @@ class EyeExaminationPatientSection extends ConsumerWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                            color: AppColors.primaryContainer
+                                .withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -177,12 +178,13 @@ class EyeExaminationPatientSection extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       'Failed to load examinations: $error',
-                      style: AppTypography.bodySm.copyWith(color: AppColors.error),
+                      style:
+                          AppTypography.bodySm.copyWith(color: AppColors.error),
                     ),
                   ),
                   TextButton(
-                    onPressed: () =>
-                        ref.invalidate(eyeExaminationsForPatientProvider(patient.id)),
+                    onPressed: () => ref.invalidate(
+                        eyeExaminationsForPatientProvider(patient.id)),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -218,7 +220,8 @@ class EyeExaminationPatientSection extends ConsumerWidget {
                       Text(
                         'Tap "Record Exam" to add visual acuity, IOP, and clinical findings.',
                         style: AppTypography.bodySm.copyWith(
-                          color: AppColors.onSurfaceVariant.withValues(alpha: 0.8),
+                          color:
+                              AppColors.onSurfaceVariant.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -228,7 +231,8 @@ class EyeExaminationPatientSection extends ConsumerWidget {
 
               return Column(
                 children: exams
-                    .map((exam) => _buildExaminationCard(context, ref, exam, isAdmin))
+                    .map((exam) =>
+                        _buildExaminationCard(context, ref, exam, isAdmin))
                     .toList(),
               );
             },
@@ -268,14 +272,18 @@ class EyeExaminationPatientSection extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        color:
+                            AppColors.primaryContainer.withValues(alpha: 0.2),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusSm),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.event, size: 14, color: AppColors.primary),
+                          const Icon(Icons.event,
+                              size: 14, color: AppColors.primary),
                           const SizedBox(width: 4),
                           Text(
                             exam.formattedDate,
@@ -347,12 +355,16 @@ class EyeExaminationPatientSection extends ConsumerWidget {
             if (exam.appointmentDate != null) ...[
               Row(
                 children: [
-                  const Icon(Icons.link, size: 14, color: AppColors.onSurfaceVariant),
+                  const Icon(Icons.link,
+                      size: 14, color: AppColors.onSurfaceVariant),
                   const SizedBox(width: 4),
-                  Text(
-                    'Appointment: ${DateFormat('dd MMM yyyy').format(exam.appointmentDate!)}${exam.appointmentTime != null ? " at ${exam.appointmentTime}" : ""}',
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.onSurfaceVariant,
+                  Expanded(
+                    child: Text(
+                      'Appointment: ${DateFormat('dd MMM yyyy').format(exam.appointmentDate!)}${exam.appointmentTime != null ? " at ${exam.appointmentTime}" : ""}',
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -361,10 +373,12 @@ class EyeExaminationPatientSection extends ConsumerWidget {
             ],
 
             // Diagnosis
-            if (exam.diagnosis != null && exam.diagnosis!.trim().isNotEmpty) ...[
+            if (exam.diagnosis != null &&
+                exam.diagnosis!.trim().isNotEmpty) ...[
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppColors.secondaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -402,8 +416,10 @@ class EyeExaminationPatientSection extends ConsumerWidget {
                     icon: Icons.remove_red_eye_outlined,
                     label: 'VA',
                     value: [
-                      if (exam.visualAcuityOd != null) 'OD: ${exam.visualAcuityOd}',
-                      if (exam.visualAcuityOs != null) 'OS: ${exam.visualAcuityOs}',
+                      if (exam.visualAcuityOd != null)
+                        'OD: ${exam.visualAcuityOd}',
+                      if (exam.visualAcuityOs != null)
+                        'OS: ${exam.visualAcuityOs}',
                       if (exam.visualAcuity != null) exam.visualAcuity!,
                     ].join(' | '),
                   ),
@@ -503,7 +519,8 @@ class EyeExaminationPatientSection extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceVariant,
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+        border:
+            Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -568,7 +585,8 @@ class EyeExaminationPatientSection extends ConsumerWidget {
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
               ),
               onPressed: () async {
                 await showDialog(
@@ -609,7 +627,8 @@ class EyeExaminationPatientSection extends ConsumerWidget {
               children: items.map((u) {
                 return Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceContainerLowest,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),

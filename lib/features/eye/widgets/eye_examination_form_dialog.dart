@@ -80,12 +80,9 @@ class _EyeExaminationFormDialogState
 
     _selectedAppointmentId = init?.appointmentId ?? widget.initialAppointmentId;
 
-    _vaOdController =
-        TextEditingController(text: init?.visualAcuityOd ?? '');
-    _vaOsController =
-        TextEditingController(text: init?.visualAcuityOs ?? '');
-    _vaNotesController =
-        TextEditingController(text: init?.visualAcuity ?? '');
+    _vaOdController = TextEditingController(text: init?.visualAcuityOd ?? '');
+    _vaOsController = TextEditingController(text: init?.visualAcuityOs ?? '');
+    _vaNotesController = TextEditingController(text: init?.visualAcuity ?? '');
 
     _iopOdController =
         TextEditingController(text: init?.intraocularPressureOd ?? '');
@@ -96,8 +93,7 @@ class _EyeExaminationFormDialogState
 
     _slitLampController =
         TextEditingController(text: init?.slitLampExamination ?? '');
-    _diagnosisController =
-        TextEditingController(text: init?.diagnosis ?? '');
+    _diagnosisController = TextEditingController(text: init?.diagnosis ?? '');
     _clinicalNotesController =
         TextEditingController(text: init?.clinicalNotes ?? '');
 
@@ -303,8 +299,10 @@ class _EyeExaminationFormDialogState
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        color:
+                            AppColors.primaryContainer.withValues(alpha: 0.2),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusMd),
                       ),
                       child: const Icon(
                         Icons.visibility_outlined,
@@ -356,7 +354,8 @@ class _EyeExaminationFormDialogState
                     decoration: BoxDecoration(
                       color: AppColors.errorContainer.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+                      border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       children: [
@@ -418,7 +417,8 @@ class _EyeExaminationFormDialogState
                 const SizedBox(height: AppSpacing.md),
 
                 // Related Appointment Dropdown
-                if (!_isLoadingAppointments || _selectedAppointmentId != null) ...[
+                if (!_isLoadingAppointments ||
+                    _selectedAppointmentId != null) ...[
                   DropdownButtonFormField<String?>(
                     initialValue: _selectedAppointmentId,
                     isExpanded: true,
@@ -433,14 +433,16 @@ class _EyeExaminationFormDialogState
                         child: Text('None / Unlinked Examination'),
                       ),
                       if (_selectedAppointmentId != null &&
-                          !_patientAppointments.any((apt) => apt.id == _selectedAppointmentId))
+                          !_patientAppointments
+                              .any((apt) => apt.id == _selectedAppointmentId))
                         DropdownMenuItem<String?>(
                           value: _selectedAppointmentId,
-                          child: Text('Visit / Appointment ID: $_selectedAppointmentId'),
-                      ),
+                          child: Text(
+                              'Visit / Appointment ID: $_selectedAppointmentId'),
+                        ),
                       ..._patientAppointments.map((apt) {
-                        final formattedDate =
-                            DateFormat('dd MMM yyyy').format(apt.appointmentDate);
+                        final formattedDate = DateFormat('dd MMM yyyy')
+                            .format(apt.appointmentDate);
                         return DropdownMenuItem<String?>(
                           value: apt.id,
                           child: Text(
@@ -450,7 +452,8 @@ class _EyeExaminationFormDialogState
                         );
                       }),
                     ],
-                    onChanged: (val) => setState(() => _selectedAppointmentId = val),
+                    onChanged: (val) =>
+                        setState(() => _selectedAppointmentId = val),
                   ),
                   const SizedBox(height: AppSpacing.md),
                 ],
@@ -461,14 +464,16 @@ class _EyeExaminationFormDialogState
                   decoration: const InputDecoration(
                     labelText: 'Clinical Diagnosis',
                     border: OutlineInputBorder(),
-                    hintText: 'e.g. Cataract, Primary Open-Angle Glaucoma, Refractive Error',
+                    hintText:
+                        'e.g. Cataract, Primary Open-Angle Glaucoma, Refractive Error',
                     prefixIcon: Icon(Icons.healing_outlined),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
 
                 // Visual Acuity Section
-                _buildSectionHeader('Visual Acuity (VA)', Icons.remove_red_eye_outlined),
+                _buildSectionHeader(
+                    'Visual Acuity (VA)', Icons.remove_red_eye_outlined),
                 const SizedBox(height: AppSpacing.xs),
                 ResponsiveFormRow(
                   breakpoint: 440,
@@ -497,13 +502,15 @@ class _EyeExaminationFormDialogState
                   decoration: const InputDecoration(
                     labelText: 'VA Remarks / Refraction Notes',
                     border: OutlineInputBorder(),
-                    hintText: 'e.g. With pinhole 6/6, near vision N6 with +2.00D',
+                    hintText:
+                        'e.g. With pinhole 6/6, near vision N6 with +2.00D',
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
 
                 // Intraocular Pressure (IOP) Section
-                _buildSectionHeader('Intraocular Pressure (IOP)', Icons.speed_outlined),
+                _buildSectionHeader(
+                    'Intraocular Pressure (IOP)', Icons.speed_outlined),
                 const SizedBox(height: AppSpacing.xs),
                 ResponsiveFormRow(
                   breakpoint: 440,
@@ -532,13 +539,15 @@ class _EyeExaminationFormDialogState
                   decoration: const InputDecoration(
                     labelText: 'Tonometry Method / Remarks',
                     border: OutlineInputBorder(),
-                    hintText: 'e.g. Goldmann Applanation, Non-Contact Tonometry',
+                    hintText:
+                        'e.g. Goldmann Applanation, Non-Contact Tonometry',
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
 
                 // Slit Lamp Examination Section
-                _buildSectionHeader('Slit-Lamp Examination Notes', Icons.biotech_outlined),
+                _buildSectionHeader(
+                    'Slit-Lamp Examination Notes', Icons.biotech_outlined),
                 const SizedBox(height: AppSpacing.xs),
                 TextFormField(
                   controller: _slitLampController,
@@ -552,7 +561,8 @@ class _EyeExaminationFormDialogState
                 const SizedBox(height: AppSpacing.md),
 
                 // Clinical Notes & Management Plan
-                _buildSectionHeader('Clinical Notes & Management Plan', Icons.assignment_outlined),
+                _buildSectionHeader('Clinical Notes & Management Plan',
+                    Icons.assignment_outlined),
                 const SizedBox(height: AppSpacing.xs),
                 TextFormField(
                   controller: _clinicalNotesController,
@@ -566,14 +576,17 @@ class _EyeExaminationFormDialogState
                 const SizedBox(height: AppSpacing.lg),
 
                 // Actions
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
                   children: [
                     TextButton(
-                      onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+                      onPressed:
+                          _isSaving ? null : () => Navigator.of(context).pop(),
                       child: const Text('Cancel'),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
                     FilledButton.icon(
                       onPressed: _isSaving ? null : _save,
                       icon: _isSaving
@@ -586,7 +599,9 @@ class _EyeExaminationFormDialogState
                               ),
                             )
                           : const Icon(Icons.check),
-                      label: Text(_isSaving ? 'Saving...' : (isEdit ? 'Update Record' : 'Save Examination')),
+                      label: Text(_isSaving
+                          ? 'Saving...'
+                          : (isEdit ? 'Update Record' : 'Save Examination')),
                     ),
                   ],
                 ),
@@ -603,11 +618,14 @@ class _EyeExaminationFormDialogState
       children: [
         Icon(icon, size: 18, color: AppColors.primary),
         const SizedBox(width: AppSpacing.xs),
-        Text(
-          title,
-          style: AppTypography.bodyMd.copyWith(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            style: AppTypography.bodyMd.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

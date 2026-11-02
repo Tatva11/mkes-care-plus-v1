@@ -31,22 +31,37 @@ void main() {
   // A. Assigned Staff
   // ================================================================
 
-  test('Admin accounts never appear in staff candidates, active staff appear', () {
+  test('Admin accounts never appear in staff candidates, active staff appear',
+      () {
     final candidates = uniqueEyeSurgeryStaffCandidates(const [
-      EyeSurgeryStaffCandidate(id: 'adm-1', fullName: 'Admin User', role: 'admin', isActive: true),
-      EyeSurgeryStaffCandidate(id: 'adm-2', fullName: 'Super Admin', role: 'Admin', isActive: true),
-      EyeSurgeryStaffCandidate(id: 'staff-inact', fullName: 'Inactive Staff', role: 'staff', isActive: false),
-      EyeSurgeryStaffCandidate(id: 'staff-1', fullName: 'Staff One', role: 'staff', isActive: true),
-      EyeSurgeryStaffCandidate(id: 'STAFF-1', fullName: 'Staff One Duplicate', role: 'staff', isActive: true),
-      EyeSurgeryStaffCandidate(id: '', fullName: 'Invalid Profile', role: 'staff', isActive: true),
-      EyeSurgeryStaffCandidate(id: 'staff-2', fullName: 'Staff Two', role: 'staff', isActive: true),
+      EyeSurgeryStaffCandidate(
+          id: 'adm-1', fullName: 'Admin User', role: 'admin', isActive: true),
+      EyeSurgeryStaffCandidate(
+          id: 'adm-2', fullName: 'Super Admin', role: 'Admin', isActive: true),
+      EyeSurgeryStaffCandidate(
+          id: 'staff-inact',
+          fullName: 'Inactive Staff',
+          role: 'staff',
+          isActive: false),
+      EyeSurgeryStaffCandidate(
+          id: 'staff-1', fullName: 'Staff One', role: 'staff', isActive: true),
+      EyeSurgeryStaffCandidate(
+          id: 'STAFF-1',
+          fullName: 'Staff One Duplicate',
+          role: 'staff',
+          isActive: true),
+      EyeSurgeryStaffCandidate(
+          id: '', fullName: 'Invalid Profile', role: 'staff', isActive: true),
+      EyeSurgeryStaffCandidate(
+          id: 'staff-2', fullName: 'Staff Two', role: 'staff', isActive: true),
     ]);
 
     expect(candidates.map((item) => item.id).toList(), ['staff-1', 'staff-2']);
     expect(candidates.first.fullName, 'Staff One');
   });
 
-  testWidgets('Staff users cannot assign or change Assigned Staff; field is read-only',
+  testWidgets(
+      'Staff users cannot assign or change Assigned Staff; field is read-only',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(600, 900);
@@ -55,8 +70,10 @@ void main() {
 
     final repository = _FakeEyeSurgeryRepository(items: [_sampleSurgery()]);
     repository.staffCandidates = const [
-      EyeSurgeryStaffCandidate(id: 'staff-1', fullName: 'Dr. Rao', role: 'staff'),
-      EyeSurgeryStaffCandidate(id: 'staff-2', fullName: 'Dr. Mehta', role: 'staff'),
+      EyeSurgeryStaffCandidate(
+          id: 'staff-1', fullName: 'Dr. Rao', role: 'staff'),
+      EyeSurgeryStaffCandidate(
+          id: 'staff-2', fullName: 'Dr. Mehta', role: 'staff'),
     ];
 
     final container = ProviderContainer(overrides: [
@@ -91,8 +108,7 @@ void main() {
 
   test('assigned_staff_id updates correctly and survives save/reload',
       () async {
-    final repository =
-        _FakeEyeSurgeryRepository(items: [_sampleSurgery()]);
+    final repository = _FakeEyeSurgeryRepository(items: [_sampleSurgery()]);
     final container = ProviderContainer(overrides: [
       eyeSurgeryRepositoryProvider.overrideWithValue(repository),
     ]);
@@ -113,7 +129,8 @@ void main() {
     expect(reloaded?.assignedStaffId, 'staff-3');
   });
 
-  testWidgets('assigned staff dropdown renders candidates and selects by profile UUID',
+  testWidgets(
+      'assigned staff dropdown renders candidates and selects by profile UUID',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(600, 900);
@@ -129,7 +146,8 @@ void main() {
     final container = ProviderContainer(overrides: [
       eyeSurgeryRepositoryProvider.overrideWithValue(repository),
       currentUserRoleProvider.overrideWith((ref) async => 'admin'),
-      eyeSurgeryStaffCandidatesProvider.overrideWith((ref) async => repository.staffCandidates),
+      eyeSurgeryStaffCandidatesProvider
+          .overrideWith((ref) async => repository.staffCandidates),
       eyeSurgeryItemTemplatesProvider('Cataract Surgery')
           .overrideWith((ref) async => const <EyeSurgeryItemTemplateModel>[]),
     ]);
@@ -219,19 +237,22 @@ void main() {
 
   test('EyeSurgeryModel pre-op checklist has exactly 8 required items', () {
     expect(EyeSurgeryModel.checklistItems.length, 8);
-    expect(EyeSurgeryModel.checklistItems.keys, containsAll([
-      'identity_verified',
-      'consent_confirmed',
-      'correct_eye_confirmed',
-      'pre_op_exam_completed',
-      'investigations_reviewed',
-      'allergies_checked',
-      'assigned_staff_confirmed',
-      'procedure_confirmed',
-    ]));
+    expect(
+        EyeSurgeryModel.checklistItems.keys,
+        containsAll([
+          'identity_verified',
+          'consent_confirmed',
+          'correct_eye_confirmed',
+          'pre_op_exam_completed',
+          'investigations_reviewed',
+          'allergies_checked',
+          'assigned_staff_confirmed',
+          'procedure_confirmed',
+        ]));
   });
 
-  testWidgets('Checklist button opens dialog, shows all 8 items, check/uncheck updates count and persists',
+  testWidgets(
+      'Checklist button opens dialog, shows all 8 items, check/uncheck updates count and persists',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(800, 1000);
@@ -285,7 +306,8 @@ void main() {
     expect(updated.preOpChecklist['consent_confirmed'], isTrue);
   });
 
-  testWidgets('In Surgery transition is blocked when checklist incomplete and opens checklist with highlight',
+  testWidgets(
+      'In Surgery transition is blocked when checklist incomplete and opens checklist with highlight',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(800, 1000);
@@ -326,7 +348,8 @@ void main() {
   // C. Inventory Multi-Select & Navigation
   // ================================================================
 
-  testWidgets('EyeSurgeryInventoryPickerDialog opens, supports multi-select, and adds selected items',
+  testWidgets(
+      'EyeSurgeryInventoryPickerDialog opens, supports multi-select, and adds selected items',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(800, 1000);
@@ -414,7 +437,8 @@ void main() {
     expect(selectedResult!.map((i) => i.item.id).toList(), ['inv-1', 'inv-2']);
   });
 
-  testWidgets('Purchase Orders navigation works and back button returns correctly',
+  testWidgets(
+      'Purchase Orders navigation works and back button returns correctly',
       (tester) async {
     final observer = _RecordingNavigatorObserver();
     await tester.pumpWidget(MaterialApp(
@@ -488,7 +512,8 @@ void main() {
     }
   });
 
-  testWidgets('Follow-up appointment action appears after discharge and shows indicator when scheduled',
+  testWidgets(
+      'Follow-up appointment action appears after discharge and shows indicator when scheduled',
       (tester) async {
     final dischargedSurgery = _sampleSurgery(status: 'discharged');
     final container = ProviderContainer(overrides: [
@@ -539,7 +564,8 @@ void main() {
   // E. Missed Surgery & Reschedule
   // ================================================================
 
-  test('isMissed derives missed state only for past scheduled/pre_op surgeries', () {
+  test('isMissed derives missed state only for past scheduled/pre_op surgeries',
+      () {
     final pastDate = DateTime.now().subtract(const Duration(days: 2));
     final futureDate = DateTime.now().add(const Duration(days: 2));
 
@@ -563,7 +589,8 @@ void main() {
     }
   });
 
-  testWidgets('Missed surgery card shows MISSED badge and Admin can reschedule without duplicate',
+  testWidgets(
+      'Missed surgery card shows MISSED badge and Admin can reschedule without duplicate',
       (tester) async {
     final pastDate = DateTime.now().subtract(const Duration(days: 2));
     final missedSurgery =
@@ -606,8 +633,8 @@ void main() {
   testWidgets('Staff users see MISSED badge and can reschedule surgery',
       (tester) async {
     final pastDate = DateTime.now().subtract(const Duration(days: 2));
-    final missedSurgery =
-        _sampleSurgery(status: 'scheduled', surgeryDate: pastDate, surgeryTime: '08:00:00');
+    final missedSurgery = _sampleSurgery(
+        status: 'scheduled', surgeryDate: pastDate, surgeryTime: '08:00:00');
     final repository = _FakeEyeSurgeryRepository(items: [missedSurgery]);
 
     final container = ProviderContainer(overrides: [
@@ -681,8 +708,7 @@ void main() {
     expect(repository.templates.single.defaultQuantity, 1);
 
     await notifier.removeItem(item.id);
-    expect(
-        container.read(eyeSurgeryItemsProvider('s-1')).valueOrNull, isEmpty);
+    expect(container.read(eyeSurgeryItemsProvider('s-1')).valueOrNull, isEmpty);
     // Template still unchanged
     expect(repository.templates.single.defaultQuantity, 1);
   });
@@ -774,14 +800,14 @@ void main() {
     ]);
     addTearDown(container.dispose);
 
-    final items =
-        await container.read(eyeSurgeryItemsProvider('s-1').future);
+    final items = await container.read(eyeSurgeryItemsProvider('s-1').future);
     // Should show the existing saved item, not template default
     expect(items, hasLength(1));
     expect(items.first.plannedQuantity, 3); // not 1 from template
   });
 
-  testWidgets('EyeSurgeryFormDialog auto-prepopulates templates and updates when surgery type changes',
+  testWidgets(
+      'EyeSurgeryFormDialog auto-prepopulates templates and updates when surgery type changes',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(600, 900);
@@ -828,8 +854,8 @@ void main() {
       overrides: [
         currentUserRoleProvider.overrideWith((ref) async => 'admin'),
         eyeSurgeryStaffCandidatesProvider.overrideWith((ref) async => const [
-          EyeSurgeryStaffCandidate(id: 'staff-1', fullName: 'Dr. Rao'),
-        ]),
+              EyeSurgeryStaffCandidate(id: 'staff-1', fullName: 'Dr. Rao'),
+            ]),
         eyeSurgeryItemTemplatesProvider('Cataract Surgery')
             .overrideWith((ref) async => cataractTemplates),
         eyeSurgeryItemTemplatesProvider('Glaucoma Surgery')
@@ -1055,8 +1081,7 @@ void main() {
       expect(item.source, 'template');
     });
 
-    test(
-        'allows only forward transitions and cancellation from active states',
+    test('allows only forward transitions and cancellation from active states',
         () {
       expect(EyeSurgeryModel.canTransition('scheduled', 'pre_op'), isTrue);
       expect(EyeSurgeryModel.canTransition('pre_op', 'in_surgery'), isTrue);
@@ -1074,7 +1099,8 @@ void main() {
       expect(EyeSurgeryModel.canTransition('discharged', 'cancelled'), isFalse);
     });
 
-    test('Eye Surgery provider supports loading, empty, error, and refresh states',
+    test(
+        'Eye Surgery provider supports loading, empty, error, and refresh states',
         () async {
       final repository = _FakeEyeSurgeryRepository(items: [_sampleSurgery()]);
       final container = ProviderContainer(
@@ -1092,7 +1118,8 @@ void main() {
       expect(container.read(eyeSurgeryListProvider).valueOrNull, hasLength(1));
     });
 
-    test('Eye Surgery provider mutations keep create, edit, assigned staff, checklist, and IOL data current',
+    test(
+        'Eye Surgery provider mutations keep create, edit, assigned staff, checklist, and IOL data current',
         () async {
       final repository = _FakeEyeSurgeryRepository();
       final container = ProviderContainer(
@@ -1103,20 +1130,19 @@ void main() {
       addTearDown(container.dispose);
       await container.read(eyeSurgeryListProvider.future);
 
-      final created = await container
-          .read(eyeSurgeryListProvider.notifier)
-          .createSurgery(
-            patientId: 'p-1',
-            surgeryType: 'Cataract Surgery',
-            surgeryTypeCategory: 'Cataract Surgery',
-            eyeSide: 'left',
-            surgeryDate: DateTime(2026, 10, 12),
-            assignedStaffId: 'staff-1',
-            surgeryTime: '09:00:00',
-            preOpChecklist: {'identity_verified': true},
-            iolDetails: 'SN60WF +21.5D',
-            remarks: 'Smooth operation planned',
-          );
+      final created =
+          await container.read(eyeSurgeryListProvider.notifier).createSurgery(
+                patientId: 'p-1',
+                surgeryType: 'Cataract Surgery',
+                surgeryTypeCategory: 'Cataract Surgery',
+                eyeSide: 'left',
+                surgeryDate: DateTime(2026, 10, 12),
+                assignedStaffId: 'staff-1',
+                surgeryTime: '09:00:00',
+                preOpChecklist: {'identity_verified': true},
+                iolDetails: 'SN60WF +21.5D',
+                remarks: 'Smooth operation planned',
+              );
 
       expect(created.patientId, 'p-1');
       expect(created.iolDetails, 'SN60WF +21.5D');
@@ -1154,9 +1180,8 @@ void main() {
           currentUserRoleProvider.overrideWith((ref) async => 'admin'),
           eyeSurgeryStaffCandidatesProvider
               .overrideWith((ref) async => staffCandidates),
-          eyeSurgeryItemTemplatesProvider('Cataract Surgery')
-              .overrideWith((ref) async =>
-                  const <EyeSurgeryItemTemplateModel>[]),
+          eyeSurgeryItemTemplatesProvider('Cataract Surgery').overrideWith(
+              (ref) async => const <EyeSurgeryItemTemplateModel>[]),
         ],
       );
       addTearDown(container.dispose);
@@ -1211,23 +1236,33 @@ void main() {
   // ================================================================
 
   group('Sprint 5.2 Patch: Follow-up, Pre-op, Notifications, Shift Tasks', () {
-    test('AppointmentFormDialog normalizes appointment type aliases to canonical values', () {
-      expect(AppointmentFormDialog.normalizeAppointmentType('follow-up'), 'follow_up');
-      expect(AppointmentFormDialog.normalizeAppointmentType('follow_up'), 'follow_up');
-      expect(AppointmentFormDialog.normalizeAppointmentType('FOLLOWUP'), 'follow_up');
-      expect(AppointmentFormDialog.normalizeAppointmentType('walk-in'), 'walk_in');
-      expect(AppointmentFormDialog.normalizeAppointmentType('walk_in'), 'walk_in');
-      expect(AppointmentFormDialog.normalizeAppointmentType('regular'), 'regular');
+    test(
+        'AppointmentFormDialog normalizes appointment type aliases to canonical values',
+        () {
+      expect(AppointmentFormDialog.normalizeAppointmentType('follow-up'),
+          'follow_up');
+      expect(AppointmentFormDialog.normalizeAppointmentType('follow_up'),
+          'follow_up');
+      expect(AppointmentFormDialog.normalizeAppointmentType('FOLLOWUP'),
+          'follow_up');
+      expect(
+          AppointmentFormDialog.normalizeAppointmentType('walk-in'), 'walk_in');
+      expect(
+          AppointmentFormDialog.normalizeAppointmentType('walk_in'), 'walk_in');
+      expect(
+          AppointmentFormDialog.normalizeAppointmentType('regular'), 'regular');
       expect(AppointmentFormDialog.normalizeAppointmentType(null), 'regular');
       expect(AppointmentFormDialog.normalizeAppointmentType(''), 'regular');
 
       final types = AppointmentFormDialog.availableAppointmentTypes;
       final ids = types.map((t) => t.id).toSet();
-      expect(ids.length, types.length, reason: 'Appointment type IDs must be unique');
+      expect(ids.length, types.length,
+          reason: 'Appointment type IDs must be unique');
       expect(ids.contains('follow_up'), isTrue);
     });
 
-    testWidgets('AppointmentFormDialog renders follow-up without DropdownButton assertion',
+    testWidgets(
+        'AppointmentFormDialog renders follow-up without DropdownButton assertion',
         (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(600, 900);
@@ -1237,7 +1272,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            departmentsProvider.overrideWith((ref) => _TestDepartmentsNotifier()),
+            departmentsProvider
+                .overrideWith((ref) => _TestDepartmentsNotifier()),
             appointmentStaffCandidatesProvider('eye-dept')
                 .overrideWith((ref) async => []),
           ],
@@ -1258,7 +1294,8 @@ void main() {
       expect(find.text('Follow-up'), findsOneWidget);
     });
 
-    testWidgets('Follow-up appointment option appears ONLY after status is discharged',
+    testWidgets(
+        'Follow-up appointment option appears ONLY after status is discharged',
         (tester) async {
       final postOpSurgery = _sampleSurgery(status: 'post_op');
       final dischargedSurgery = _sampleSurgery(status: 'discharged');
@@ -1290,17 +1327,22 @@ void main() {
       expect(find.text('Schedule Follow-up Appointment'), findsOneWidget);
     });
 
-    test('Scheduled surgery without assigned staff blocks transition to pre_op', () {
-      final surgeryWithoutStaff = _sampleSurgery(status: 'scheduled', assignedStaffId: null);
+    test('Scheduled surgery without assigned staff blocks transition to pre_op',
+        () {
+      final surgeryWithoutStaff =
+          _sampleSurgery(status: 'scheduled', assignedStaffId: null);
       final error = EyeSurgeryModel.validateStatusTransition(
         surgery: surgeryWithoutStaff,
         nextStatus: 'pre_op',
       );
-      expect(error, 'An Admin must assign staff to this surgery before starting Pre-op.');
+      expect(error,
+          'An Admin must assign staff to this surgery before starting Pre-op.');
     });
 
-    test('Scheduled surgery with assigned staff allows transition to pre_op', () {
-      final surgeryWithStaff = _sampleSurgery(status: 'scheduled', assignedStaffId: 'staff-1');
+    test('Scheduled surgery with assigned staff allows transition to pre_op',
+        () {
+      final surgeryWithStaff =
+          _sampleSurgery(status: 'scheduled', assignedStaffId: 'staff-1');
       final error = EyeSurgeryModel.validateStatusTransition(
         surgery: surgeryWithStaff,
         nextStatus: 'pre_op',
@@ -1310,7 +1352,8 @@ void main() {
 
     testWidgets('EyeSurgeryScreen blocks Pre-op when no staff is assigned',
         (tester) async {
-      final surgery = _sampleSurgery(status: 'scheduled', assignedStaffId: null);
+      final surgery =
+          _sampleSurgery(status: 'scheduled', assignedStaffId: null);
       final repository = _FakeEyeSurgeryRepository(items: [surgery]);
 
       final container = ProviderContainer(overrides: [
@@ -1337,12 +1380,18 @@ void main() {
       await tester.tap(advanceItem);
       await tester.pumpAndSettle();
 
-      expect(find.text('An Admin must assign staff to this surgery before starting Pre-op.'), findsOneWidget);
+      expect(
+          find.text(
+              'An Admin must assign staff to this surgery before starting Pre-op.'),
+          findsOneWidget);
       expect(repository.items.first.status, 'scheduled');
     });
 
-    test('Assigning staff sends notification once; assigning same staff does not duplicate; reassigning notifies new staff', () async {
-      final surgery = _sampleSurgery(status: 'scheduled', assignedStaffId: null);
+    test(
+        'Assigning staff sends notification once; assigning same staff does not duplicate; reassigning notifies new staff',
+        () async {
+      final surgery =
+          _sampleSurgery(status: 'scheduled', assignedStaffId: null);
       final repository = _FakeEyeSurgeryRepository(items: [surgery]);
 
       // 1. Assign Staff 1 -> 1 notification to staff-1
@@ -1361,8 +1410,11 @@ void main() {
       expect(repository.notifications.last.userId, 'staff-2');
     });
 
-    test('Surgery assignment creates linked pending shift task, remains pending until discharged', () async {
-      final surgery = _sampleSurgery(status: 'scheduled', assignedStaffId: null);
+    test(
+        'Surgery assignment creates linked pending shift task, remains pending until discharged',
+        () async {
+      final surgery =
+          _sampleSurgery(status: 'scheduled', assignedStaffId: null);
       final repository = _FakeEyeSurgeryRepository(items: [surgery]);
 
       // Assign staff
@@ -1406,7 +1458,8 @@ void main() {
     });
 
     test('Cancelling surgery sets linked shift task to cancelled', () async {
-      final surgery = _sampleSurgery(status: 'scheduled', assignedStaffId: null);
+      final surgery =
+          _sampleSurgery(status: 'scheduled', assignedStaffId: null);
       final repository = _FakeEyeSurgeryRepository(items: [surgery]);
       await repository.assignStaff(surgery.id, 'staff-1');
       expect(repository.tasks.first.status, 'pending');
@@ -1415,7 +1468,8 @@ void main() {
       expect(repository.tasks.first.status, 'cancelled');
     });
 
-    testWidgets('StaffTasksScreen disables manual completion for surgery tasks while keeping normal tasks interactive',
+    testWidgets(
+        'StaffTasksScreen disables manual completion for surgery tasks while keeping normal tasks interactive',
         (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(1200, 900);
@@ -1458,8 +1512,8 @@ void main() {
           ),
         ),
         currentUserRoleProvider.overrideWith((ref) async => 'staff'),
-        staffTasksProvider('staff-1')
-            .overrideWith((ref) => _FixedStaffTasksNotifier([surgeryTask, normalTask])),
+        staffTasksProvider('staff-1').overrideWith(
+            (ref) => _FixedStaffTasksNotifier([surgeryTask, normalTask])),
       ]);
       addTearDown(container.dispose);
 
@@ -1477,13 +1531,16 @@ void main() {
 
       // Surgery task shows badge and read-only pending note, no Checkbox
       expect(find.text('EYE SURGERY'), findsOneWidget);
-      expect(find.textContaining('completes automatically on surgery discharge'), findsOneWidget);
+      expect(
+          find.textContaining('completes automatically on surgery discharge'),
+          findsOneWidget);
 
       // Only ONE Checkbox (for the normal task)
       expect(find.byType(Checkbox), findsOneWidget);
     });
 
-    testWidgets('StaffTasksScreen dynamic date filtering shows tasks only on scheduled shift date',
+    testWidgets(
+        'StaffTasksScreen dynamic date filtering shows tasks only on scheduled shift date',
         (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(1200, 900);
@@ -1530,12 +1587,17 @@ void main() {
 
       // targetShiftDate is 10 days in future -> surgery task should not be shown on today's shift
       expect(find.text('Eye Surgery — Rahul'), findsNothing);
-      expect(find.text('No tasks assigned for this shift date.'), findsOneWidget);
+      expect(
+          find.text('No tasks assigned for this shift date.'), findsOneWidget);
     });
   });
 
-  group('Sprint 5.2 Bug Fix: Null-safe Eye Surgery time handling and regression tests', () {
-    test('Save surgery with surgery_time == null produces null in write payload, never ""', () {
+  group(
+      'Sprint 5.2 Bug Fix: Null-safe Eye Surgery time handling and regression tests',
+      () {
+    test(
+        'Save surgery with surgery_time == null produces null in write payload, never ""',
+        () {
       final surgery = _sampleSurgery(surgeryTime: null);
       final json = surgery.toJson();
       final insertJson = surgery.toInsertJson();
@@ -1547,7 +1609,9 @@ void main() {
       expect(insertJson['surgery_time'], isNot(''));
     });
 
-    test('Save surgery with empty or whitespace time input maps to null in write payload, never ""', () {
+    test(
+        'Save surgery with empty or whitespace time input maps to null in write payload, never ""',
+        () {
       final emptySurgery = _sampleSurgery(surgeryTime: '');
       final whitespaceSurgery = _sampleSurgery(surgeryTime: '   \t\n  ');
 
@@ -1570,7 +1634,9 @@ void main() {
       expect(parsedFromEmpty.toJson()['surgery_time'], isNull);
     });
 
-    test('Save surgery with valid time preserves formatted TIME string in payload', () {
+    test(
+        'Save surgery with valid time preserves formatted TIME string in payload',
+        () {
       final validSurgery = _sampleSurgery(surgeryTime: '14:30:00');
       final validSurgery2 = _sampleSurgery(surgeryTime: ' 09:15 ');
 
@@ -1590,7 +1656,9 @@ void main() {
       expect(parsed.toJson()['surgery_time'], '11:45:00');
     });
 
-    test('Model fromMap parses null, empty, and whitespace as null; parses valid time normally', () {
+    test(
+        'Model fromMap parses null, empty, and whitespace as null; parses valid time normally',
+        () {
       final baseMap = {
         'id': 's-test',
         'patient_id': 'p-1',
@@ -1599,17 +1667,36 @@ void main() {
         'surgery_date': '2026-10-12',
         'status': 'scheduled',
       };
-      expect(EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': null}).surgeryTime, isNull);
-      expect(EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': ''}).surgeryTime, isNull);
-      expect(EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': '   \t  '}).surgeryTime, isNull);
-      expect(EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': '10:30:00'}).surgeryTime, '10:30:00');
+      expect(
+          EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': null})
+              .surgeryTime,
+          isNull);
+      expect(
+          EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': ''}).surgeryTime,
+          isNull);
+      expect(
+          EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': '   \t  '})
+              .surgeryTime,
+          isNull);
+      expect(
+          EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': '10:30:00'})
+              .surgeryTime,
+          '10:30:00');
 
       // toMap() converts null or empty strings to null in repository payload, never ""
-      expect(EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': ''}).toMap()['surgery_time'], isNull);
-      expect(EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': ''}).toMap()['surgery_time'], isNot(''));
+      expect(
+          EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': ''})
+              .toMap()['surgery_time'],
+          isNull);
+      expect(
+          EyeSurgeryModel.fromMap({...baseMap, 'surgery_time': ''})
+              .toMap()['surgery_time'],
+          isNot(''));
     });
 
-    test('Missed surgery logic with null surgery_time is not incorrectly marked missed', () {
+    test(
+        'Missed surgery logic with null surgery_time is not incorrectly marked missed',
+        () {
       final pastDate = DateTime.now().subtract(const Duration(days: 5));
 
       final pastNullTimeScheduled = _sampleSurgery(
@@ -1636,10 +1723,20 @@ void main() {
       expect(pastWithTime.isMissed, isTrue);
     });
 
-    test('Notification omits Time line when surgery_time is null, includes Time line when present', () async {
+    test(
+        'Notification omits Time line when surgery_time is null, includes Time line when present',
+        () async {
       final repo = _FakeEyeSurgeryRepository(items: [
-        _sampleSurgery(id: 's-null-time', surgeryDate: DateTime(2026, 10, 12), surgeryTime: null, assignedStaffId: null),
-        _sampleSurgery(id: 's-with-time', surgeryDate: DateTime(2026, 10, 12), surgeryTime: '10:30:00', assignedStaffId: null),
+        _sampleSurgery(
+            id: 's-null-time',
+            surgeryDate: DateTime(2026, 10, 12),
+            surgeryTime: null,
+            assignedStaffId: null),
+        _sampleSurgery(
+            id: 's-with-time',
+            surgeryDate: DateTime(2026, 10, 12),
+            surgeryTime: '10:30:00',
+            assignedStaffId: null),
       ]);
 
       // Assign staff to surgery with null time
@@ -1660,9 +1757,15 @@ void main() {
       expect(notifWithTime.message, contains('Time: 10:30:00'));
     });
 
-    test('Shift task description and due date format without time when surgery_time is null', () async {
+    test(
+        'Shift task description and due date format without time when surgery_time is null',
+        () async {
       final repo = _FakeEyeSurgeryRepository(items: [
-        _sampleSurgery(id: 's-null-time', surgeryDate: DateTime(2026, 10, 12), surgeryTime: null, assignedStaffId: null),
+        _sampleSurgery(
+            id: 's-null-time',
+            surgeryDate: DateTime(2026, 10, 12),
+            surgeryTime: null,
+            assignedStaffId: null),
       ]);
 
       await repo.assignStaff('s-null-time', 'staff-1');
@@ -1675,9 +1778,15 @@ void main() {
       expect(task.dueDate, DateTime(2026, 10, 12));
     });
 
-    test('Shift task description includes time prefix when surgery_time is present', () async {
+    test(
+        'Shift task description includes time prefix when surgery_time is present',
+        () async {
       final repo = _FakeEyeSurgeryRepository(items: [
-        _sampleSurgery(id: 's-with-time', surgeryDate: DateTime(2026, 10, 12), surgeryTime: '10:30:00', assignedStaffId: null),
+        _sampleSurgery(
+            id: 's-with-time',
+            surgeryDate: DateTime(2026, 10, 12),
+            surgeryTime: '10:30:00',
+            assignedStaffId: null),
       ]);
 
       await repo.assignStaff('s-with-time', 'staff-1');
@@ -1704,7 +1813,8 @@ void main() {
         surgeryTime: '14:00:00',
       );
       final rescheduledTask = repo.tasks.first;
-      expect(rescheduledTask.description, '14:00:00 · Cataract Surgery — left Eye');
+      expect(rescheduledTask.description,
+          '14:00:00 · Cataract Surgery — left Eye');
       expect(rescheduledTask.dueDate, DateTime(2026, 10, 15));
     });
 
@@ -1725,7 +1835,8 @@ void main() {
         expect(
           payload['surgery_time'],
           isNull,
-          reason: 'Input "$input" must serialize to null, never an empty string',
+          reason:
+              'Input "$input" must serialize to null, never an empty string',
         );
         expect(
           payload['surgery_time'],
@@ -1739,7 +1850,8 @@ void main() {
       }
     });
 
-    testWidgets('EyeSurgeryFormDialog surgery time picker is optional and saves without time',
+    testWidgets(
+        'EyeSurgeryFormDialog surgery time picker is optional and saves without time',
         (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(800, 1000);
@@ -1752,8 +1864,8 @@ void main() {
           eyeSurgeryRepositoryProvider.overrideWithValue(fakeRepo),
           currentUserRoleProvider.overrideWith((ref) async => 'admin'),
           eyeSurgeryStaffCandidatesProvider.overrideWith((ref) async => const [
-            EyeSurgeryStaffCandidate(id: 'staff-1', fullName: 'Dr. Rao'),
-          ]),
+                EyeSurgeryStaffCandidate(id: 'staff-1', fullName: 'Dr. Rao'),
+              ]),
           eyeSurgeryItemTemplatesProvider('Cataract Surgery')
               .overrideWith((ref) async => const []),
         ],
@@ -1798,7 +1910,9 @@ void main() {
     });
   });
 
-  group('Sprint 5.2 Patch: Final UX, Visibility Rules, and 25-Point Verification', () {
+  group(
+      'Sprint 5.2 Patch: Final UX, Visibility Rules, and 25-Point Verification',
+      () {
     // 1. Schedule form does NOT show Pre-op Date.
     testWidgets('1. Schedule form does NOT show Pre-op Date', (tester) async {
       final fakeRepo = _FakeEyeSurgeryRepository();
@@ -1806,7 +1920,8 @@ void main() {
         eyeSurgeryRepositoryProvider.overrideWithValue(fakeRepo),
         currentUserRoleProvider.overrideWith((ref) async => 'admin'),
         eyeSurgeryStaffCandidatesProvider.overrideWith((ref) async => const []),
-        eyeSurgeryItemTemplatesProvider('Cataract Surgery').overrideWith((ref) async => const []),
+        eyeSurgeryItemTemplatesProvider('Cataract Surgery')
+            .overrideWith((ref) async => const []),
       ]);
       addTearDown(container.dispose);
 
@@ -1927,13 +2042,16 @@ void main() {
     testWidgets('6. Staff cannot assign surgery staff', (tester) async {
       final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery()]);
       fakeRepo.staffCandidates = const [
-        EyeSurgeryStaffCandidate(id: 'staff-1', fullName: 'Dr. Rao', role: 'staff'),
+        EyeSurgeryStaffCandidate(
+            id: 'staff-1', fullName: 'Dr. Rao', role: 'staff'),
       ];
       final container = ProviderContainer(overrides: [
         eyeSurgeryRepositoryProvider.overrideWithValue(fakeRepo),
         currentUserRoleProvider.overrideWith((ref) async => 'staff'),
-        eyeSurgeryStaffCandidatesProvider.overrideWith((ref) async => fakeRepo.staffCandidates),
-        eyeSurgeryItemTemplatesProvider('Cataract Surgery').overrideWith((ref) async => const []),
+        eyeSurgeryStaffCandidatesProvider
+            .overrideWith((ref) async => fakeRepo.staffCandidates),
+        eyeSurgeryItemTemplatesProvider('Cataract Surgery')
+            .overrideWith((ref) async => const []),
       ]);
       addTearDown(container.dispose);
 
@@ -1949,7 +2067,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Assigned Staff is read-only (Admin assignment required)'), findsOneWidget);
+      expect(
+          find.text('Assigned Staff is read-only (Admin assignment required)'),
+          findsOneWidget);
       expect(find.byType(DropdownButtonFormField<String?>), findsNothing);
     });
 
@@ -1984,7 +2104,8 @@ void main() {
 
     // 8. Rescheduling updates the same surgery ID.
     test('8. Rescheduling updates the same surgery ID', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(id: 'surgery-xyz')]);
+      final fakeRepo =
+          _FakeEyeSurgeryRepository(items: [_sampleSurgery(id: 'surgery-xyz')]);
       final futureDate = DateTime.now().add(const Duration(days: 3));
       final updated = await fakeRepo.rescheduleSurgery(
         id: 'surgery-xyz',
@@ -1998,7 +2119,8 @@ void main() {
 
     // 9. Rescheduling does not create duplicate surgery.
     test('9. Rescheduling does not create duplicate surgery', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(id: 's-single')]);
+      final fakeRepo =
+          _FakeEyeSurgeryRepository(items: [_sampleSurgery(id: 's-single')]);
       expect(fakeRepo.items.length, 1);
 
       await fakeRepo.rescheduleSurgery(
@@ -2012,7 +2134,8 @@ void main() {
 
     // 10. Rescheduling does not deduct inventory.
     test('10. Rescheduling does not deduct inventory', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(id: 's-inv')]);
+      final fakeRepo =
+          _FakeEyeSurgeryRepository(items: [_sampleSurgery(id: 's-inv')]);
       expect(fakeRepo.inventoryConsumptions, 0);
 
       await fakeRepo.rescheduleSurgery(
@@ -2025,9 +2148,18 @@ void main() {
 
     // 11. Scheduled surgeries sort ascending by date.
     test('11. Scheduled surgeries sort ascending by date', () {
-      final s1 = _sampleSurgery(id: 's-oct5', surgeryDate: DateTime(2026, 10, 5), surgeryTime: '10:00:00');
-      final s2 = _sampleSurgery(id: 's-oct3', surgeryDate: DateTime(2026, 10, 3), surgeryTime: '10:00:00');
-      final s3 = _sampleSurgery(id: 's-oct4', surgeryDate: DateTime(2026, 10, 4), surgeryTime: '10:00:00');
+      final s1 = _sampleSurgery(
+          id: 's-oct5',
+          surgeryDate: DateTime(2026, 10, 5),
+          surgeryTime: '10:00:00');
+      final s2 = _sampleSurgery(
+          id: 's-oct3',
+          surgeryDate: DateTime(2026, 10, 3),
+          surgeryTime: '10:00:00');
+      final s3 = _sampleSurgery(
+          id: 's-oct4',
+          surgeryDate: DateTime(2026, 10, 4),
+          surgeryTime: '10:00:00');
 
       final list = [s1, s2, s3];
       list.sort((a, b) {
@@ -2042,9 +2174,12 @@ void main() {
     // 12. Same-date surgeries sort ascending by time.
     test('12. Same-date surgeries sort ascending by time', () {
       final sameDate = DateTime(2026, 10, 3);
-      final sLate = _sampleSurgery(id: 's-1400', surgeryDate: sameDate, surgeryTime: '14:00:00');
-      final sEarly = _sampleSurgery(id: 's-0900', surgeryDate: sameDate, surgeryTime: '09:00:00');
-      final sMid = _sampleSurgery(id: 's-1100', surgeryDate: sameDate, surgeryTime: '11:00:00');
+      final sLate = _sampleSurgery(
+          id: 's-1400', surgeryDate: sameDate, surgeryTime: '14:00:00');
+      final sEarly = _sampleSurgery(
+          id: 's-0900', surgeryDate: sameDate, surgeryTime: '09:00:00');
+      final sMid = _sampleSurgery(
+          id: 's-1100', surgeryDate: sameDate, surgeryTime: '11:00:00');
 
       final list = [sLate, sEarly, sMid];
       list.sort((a, b) {
@@ -2104,8 +2239,16 @@ void main() {
     });
 
     // 16. Follow-up option is hidden before discharge.
-    testWidgets('16. Follow-up option is hidden before discharge', (tester) async {
-      for (final nonDischargedStatus in ['scheduled', 'pre_op', 'in_surgery', 'post_op', 'billing', 'cancelled']) {
+    testWidgets('16. Follow-up option is hidden before discharge',
+        (tester) async {
+      for (final nonDischargedStatus in [
+        'scheduled',
+        'pre_op',
+        'in_surgery',
+        'post_op',
+        'billing',
+        'cancelled'
+      ]) {
         final surgery = _sampleSurgery(status: nonDischargedStatus);
         final fakeRepo = _FakeEyeSurgeryRepository(items: [surgery]);
         final container = ProviderContainer(overrides: [
@@ -2153,26 +2296,34 @@ void main() {
 
     // 18. Follow-up dropdown accepts canonical follow_up.
     test('18. Follow-up dropdown accepts canonical follow_up', () {
-      final canonical = AppointmentFormDialog.normalizeAppointmentType('follow_up');
+      final canonical =
+          AppointmentFormDialog.normalizeAppointmentType('follow_up');
       expect(canonical, 'follow_up');
       expect(
-        AppointmentFormDialog.availableAppointmentTypes.any((t) => t.id == canonical),
+        AppointmentFormDialog.availableAppointmentTypes
+            .any((t) => t.id == canonical),
         isTrue,
       );
     });
 
     // 19. follow-up, follow_up, and followup normalize safely.
     test('19. follow-up, follow_up, and followup normalize safely', () {
-      expect(AppointmentFormDialog.normalizeAppointmentType('follow-up'), 'follow_up');
-      expect(AppointmentFormDialog.normalizeAppointmentType('follow_up'), 'follow_up');
-      expect(AppointmentFormDialog.normalizeAppointmentType('followup'), 'follow_up');
-      expect(AppointmentFormDialog.normalizeAppointmentType('FOLLOW-UP'), 'follow_up');
-      expect(AppointmentFormDialog.normalizeAppointmentType('  Follow_Up  '), 'follow_up');
+      expect(AppointmentFormDialog.normalizeAppointmentType('follow-up'),
+          'follow_up');
+      expect(AppointmentFormDialog.normalizeAppointmentType('follow_up'),
+          'follow_up');
+      expect(AppointmentFormDialog.normalizeAppointmentType('followup'),
+          'follow_up');
+      expect(AppointmentFormDialog.normalizeAppointmentType('FOLLOW-UP'),
+          'follow_up');
+      expect(AppointmentFormDialog.normalizeAppointmentType('  Follow_Up  '),
+          'follow_up');
     });
 
     // 20. Assigned staff notification still works.
     test('20. Assigned staff notification still works', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(assignedStaffId: null)]);
+      final fakeRepo = _FakeEyeSurgeryRepository(
+          items: [_sampleSurgery(assignedStaffId: null)]);
       await fakeRepo.assignStaff('s-1', 'staff-target');
 
       expect(
@@ -2186,10 +2337,12 @@ void main() {
 
     // 21. Dynamic shift task still works.
     test('21. Dynamic shift task still works', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(assignedStaffId: null)]);
+      final fakeRepo = _FakeEyeSurgeryRepository(
+          items: [_sampleSurgery(assignedStaffId: null)]);
       await fakeRepo.assignStaff('s-1', 'staff-shift');
 
-      final task = fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1');
+      final task =
+          fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1');
       expect(task.assignedTo, 'staff-shift');
       expect(task.status, 'pending');
       expect(task.priority, 'high');
@@ -2198,7 +2351,8 @@ void main() {
 
     // 22. Rescheduling moves the shift task to the new date.
     test('22. Rescheduling moves the shift task to the new date', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(assignedStaffId: null)]);
+      final fakeRepo = _FakeEyeSurgeryRepository(
+          items: [_sampleSurgery(assignedStaffId: null)]);
       await fakeRepo.assignStaff('s-1', 'staff-shift');
 
       final newDate = DateTime(2026, 11, 20);
@@ -2208,18 +2362,22 @@ void main() {
         surgeryTime: '15:00:00',
       );
 
-      final task = fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1');
+      final task =
+          fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1');
       expect(task.dueDate, newDate);
       expect(task.description, contains('15:00:00'));
     });
 
     // 23. Surgery task remains pending until discharge.
     test('23. Surgery task remains pending until discharge', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(assignedStaffId: null)]);
+      final fakeRepo = _FakeEyeSurgeryRepository(
+          items: [_sampleSurgery(assignedStaffId: null)]);
       await fakeRepo.assignStaff('s-1', 'staff-pending');
 
       await fakeRepo.updateStatus('s-1', 'pre_op');
-      expect(fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1').status, 'pending');
+      expect(
+          fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1').status,
+          'pending');
 
       final completeChecklist = {
         for (final key in EyeSurgeryModel.checklistItems.keys) key: true,
@@ -2227,15 +2385,21 @@ void main() {
       await fakeRepo.updatePreOpChecklist('s-1', completeChecklist);
 
       await fakeRepo.startSurgery('s-1');
-      expect(fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1').status, 'pending');
+      expect(
+          fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1').status,
+          'pending');
 
       await fakeRepo.updateStatus('s-1', 'post_op');
-      expect(fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1').status, 'pending');
+      expect(
+          fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1').status,
+          'pending');
     });
 
     // 24. Surgery task automatically becomes completed after discharge.
-    test('24. Surgery task automatically becomes completed after discharge', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(status: 'post_op')]);
+    test('24. Surgery task automatically becomes completed after discharge',
+        () async {
+      final fakeRepo =
+          _FakeEyeSurgeryRepository(items: [_sampleSurgery(status: 'post_op')]);
       fakeRepo.tasks.add(TaskItem(
         id: 'task-complete-check',
         title: 'Eye Surgery',
@@ -2249,19 +2413,25 @@ void main() {
       ));
 
       await fakeRepo.updateStatus('s-1', 'discharged');
-      final task = fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1');
+      final task =
+          fakeRepo.tasks.firstWhere((t) => t.relatedSurgeryId == 's-1');
       expect(task.status, 'completed');
       expect(task.completedAt, isNotNull);
     });
 
     // 25. No duplicate surgery task is created.
     test('25. No duplicate surgery task is created', () async {
-      final fakeRepo = _FakeEyeSurgeryRepository(items: [_sampleSurgery(assignedStaffId: null)]);
+      final fakeRepo = _FakeEyeSurgeryRepository(
+          items: [_sampleSurgery(assignedStaffId: null)]);
       await fakeRepo.assignStaff('s-1', 'staff-1');
       await fakeRepo.assignStaff('s-1', 'staff-2');
-      await fakeRepo.rescheduleSurgery(id: 's-1', surgeryDate: DateTime(2026, 12, 1), surgeryTime: '10:00:00');
+      await fakeRepo.rescheduleSurgery(
+          id: 's-1',
+          surgeryDate: DateTime(2026, 12, 1),
+          surgeryTime: '10:00:00');
 
-      final matchingTasks = fakeRepo.tasks.where((t) => t.relatedSurgeryId == 's-1').toList();
+      final matchingTasks =
+          fakeRepo.tasks.where((t) => t.relatedSurgeryId == 's-1').toList();
       expect(matchingTasks.length, 1);
     });
 
@@ -2269,9 +2439,12 @@ void main() {
     // Regression Tests: Bug 1 & Bug 2
     // =========================================================================
     group('Regression Tests: Bug 1 & Bug 2 (Notifications & Rescheduling)', () {
-      test('valid surgery assignment notification has type eye_surgery_assigned', () async {
+      test(
+          'valid surgery assignment notification has type eye_surgery_assigned',
+          () async {
         final fakeRepo = _FakeEyeSurgeryRepository(items: [
-          _sampleSurgery(id: 's-assign-1', assignedStaffId: null, surgeryTime: '10:00:00'),
+          _sampleSurgery(
+              id: 's-assign-1', assignedStaffId: null, surgeryTime: '10:00:00'),
         ]);
 
         final updated = await fakeRepo.assignStaff('s-assign-1', 'staff-1');
@@ -2286,7 +2459,9 @@ void main() {
         expect(notif.message, contains('Time: 10:00:00'));
       });
 
-      test('invalid notification type / trigger failure cannot break surgery save', () async {
+      test(
+          'invalid notification type / trigger failure cannot break surgery save',
+          () async {
         final fakeRepo = _FakeEyeSurgeryRepository(items: [
           _sampleSurgery(id: 's-assign-2', assignedStaffId: null),
         ]);
@@ -2298,7 +2473,9 @@ void main() {
         expect(fakeRepo.items.first.assignedStaffId, 'staff-1');
       });
 
-      testWidgets('missed surgery rescheduled to future date disappears from MISSED immediately', (tester) async {
+      testWidgets(
+          'missed surgery rescheduled to future date disappears from MISSED immediately',
+          (tester) async {
         final pastDate = DateTime.now().subtract(const Duration(days: 2));
         final missedSurgery = _sampleSurgery(
           id: 's-missed-1',
@@ -2315,7 +2492,8 @@ void main() {
         addTearDown(container.dispose);
 
         // Initially filter by 'missed'
-        container.read(eyeSurgeryStatusFilterProvider.notifier).state = 'missed';
+        container.read(eyeSurgeryStatusFilterProvider.notifier).state =
+            'missed';
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
@@ -2349,7 +2527,9 @@ void main() {
         expect(find.text('MISSED'), findsNothing);
       });
 
-      test('rescheduled surgery appears under the new date and same surgery ID is retained', () async {
+      test(
+          'rescheduled surgery appears under the new date and same surgery ID is retained',
+          () async {
         final pastDate = DateTime.now().subtract(const Duration(days: 3));
         final missedSurgery = _sampleSurgery(
           id: 's-same-id',
@@ -2371,11 +2551,13 @@ void main() {
         expect(container.read(filteredEyeSurgeriesProvider), hasLength(1));
 
         final futureDate = DateTime.now().add(const Duration(days: 4));
-        final rescheduled = await container.read(eyeSurgeryListProvider.notifier).rescheduleSurgery(
-          id: 's-same-id',
-          surgeryDate: futureDate,
-          surgeryTime: '14:00:00',
-        );
+        final rescheduled = await container
+            .read(eyeSurgeryListProvider.notifier)
+            .rescheduleSurgery(
+              id: 's-same-id',
+              surgeryDate: futureDate,
+              surgeryTime: '14:00:00',
+            );
 
         // Same ID and data retained
         expect(rescheduled.id, 's-same-id');
@@ -2390,14 +2572,16 @@ void main() {
         expect(container.read(filteredEyeSurgeriesProvider), isEmpty);
 
         // Switch to the future date: it appears under the new date
-        container.read(eyeSurgerySelectedDateProvider.notifier).state = futureDate;
+        container.read(eyeSurgerySelectedDateProvider.notifier).state =
+            futureDate;
         final currentList = container.read(filteredEyeSurgeriesProvider);
         expect(currentList, hasLength(1));
         expect(currentList.first.surgeryDate, futureDate);
         expect(currentList.first.surgeryTime, '14:00:00');
       });
 
-      test('no duplicate surgery, task, or notification on reschedule', () async {
+      test('no duplicate surgery, task, or notification on reschedule',
+          () async {
         final pastDate = DateTime.now().subtract(const Duration(days: 1));
         final missedSurgery = _sampleSurgery(
           id: 's-no-dup',
@@ -2451,7 +2635,9 @@ void main() {
         expect(fakeRepo.tasks.first.dueDate, futureDate);
 
         // No duplicate staff assignment notification created
-        final assignmentNotifications = fakeRepo.notifications.where((n) => n.type == 'eye_surgery_assigned').toList();
+        final assignmentNotifications = fakeRepo.notifications
+            .where((n) => n.type == 'eye_surgery_assigned')
+            .toList();
         expect(assignmentNotifications, hasLength(1));
       });
 
@@ -2464,7 +2650,7 @@ void main() {
           surgeryTime: '08:00:00',
         );
         final fakeRepo = _FakeEyeSurgeryRepository(items: [missedSurgery]);
-        
+
         final pastDate2 = DateTime.now().subtract(const Duration(days: 2));
         final stillMissed = await fakeRepo.rescheduleSurgery(
           id: 's-past-resched',
@@ -2480,7 +2666,8 @@ void main() {
     // G. Admin-Only Surgery Deletion
     // ================================================================
     group('G. Admin-Only Surgery Deletion', () {
-      testWidgets('1. Admin sees the Delete action in popup menu', (tester) async {
+      testWidgets('1. Admin sees the Delete action in popup menu',
+          (tester) async {
         final surgery = _sampleSurgery(id: 's-del-1');
         final fakeRepo = _FakeEyeSurgeryRepository(items: [surgery]);
         final container = ProviderContainer(overrides: [
@@ -2530,7 +2717,9 @@ void main() {
         expect(find.text('Delete surgery'), findsNothing);
       });
 
-      testWidgets('3. Admin can delete a surgery successfully after confirmation', (tester) async {
+      testWidgets(
+          '3. Admin can delete a surgery successfully after confirmation',
+          (tester) async {
         final surgery = _sampleSurgery(id: 's-to-delete');
         final fakeRepo = _FakeEyeSurgeryRepository(items: [surgery]);
         final container = ProviderContainer(overrides: [
@@ -2557,8 +2746,12 @@ void main() {
 
         // Confirmation dialog shown with details and permanent warning
         expect(find.text('Delete Eye Surgery?'), findsOneWidget);
-        expect(find.textContaining('This action is permanent and cannot be undone.'), findsOneWidget);
-        expect(find.textContaining('Procedure: Cataract Surgery'), findsOneWidget);
+        expect(
+            find.textContaining(
+                'This action is permanent and cannot be undone.'),
+            findsOneWidget);
+        expect(
+            find.textContaining('Procedure: Cataract Surgery'), findsOneWidget);
         expect(find.text('Delete Permanently'), findsOneWidget);
 
         await tester.tap(find.text('Delete Permanently'));
@@ -2567,10 +2760,12 @@ void main() {
         // Removed from repo and UI
         expect(fakeRepo.items.any((s) => s.id == 's-to-delete'), isFalse);
         expect(find.text('Aisha Kumar'), findsNothing);
-        expect(find.text('Surgery record deleted successfully.'), findsOneWidget);
+        expect(
+            find.text('Surgery record deleted successfully.'), findsOneWidget);
       });
 
-      testWidgets('4. Confirmation cancellation leaves the surgery unchanged', (tester) async {
+      testWidgets('4. Confirmation cancellation leaves the surgery unchanged',
+          (tester) async {
         final surgery = _sampleSurgery(id: 's-keep');
         final fakeRepo = _FakeEyeSurgeryRepository(items: [surgery]);
         final container = ProviderContainer(overrides: [
@@ -2607,11 +2802,13 @@ void main() {
         final mockRepo = _ThrowingEyeSurgeryRepository();
         expect(
           () => mockRepo.deleteSurgery('any-id'),
-          throwsA(isA<StateError>().having((e) => e.message, 'message', contains('permission denied'))),
+          throwsA(isA<StateError>().having(
+              (e) => e.message, 'message', contains('permission denied'))),
         );
       });
 
-      test('6. Existing Staff read/create/update permissions remain unchanged', () async {
+      test('6. Existing Staff read/create/update permissions remain unchanged',
+          () async {
         final surgery = _sampleSurgery(id: 's-staff-ops');
         final fakeRepo = _FakeEyeSurgeryRepository(items: [surgery]);
 
@@ -2634,10 +2831,11 @@ void main() {
         expect(updatedDetails.remarks, 'Pre-op complete');
       });
 
-      test('7. Deleting a surgery does not erase inventory transaction history', () async {
+      test('7. Deleting a surgery does not erase inventory transaction history',
+          () async {
         final surgery = _sampleSurgery(id: 's-inv-audit');
         final fakeRepo = _FakeEyeSurgeryRepository(items: [surgery]);
-        
+
         // Simulate inventory transactions that were recorded
         final recordedTransactions = <Map<String, dynamic>>[
           {
@@ -2655,7 +2853,8 @@ void main() {
 
         // Transactions table is separate and unaffected
         expect(recordedTransactions, hasLength(1));
-        expect(recordedTransactions.first['remarks'], contains('Eye Surgery s-inv-audit'));
+        expect(recordedTransactions.first['remarks'],
+            contains('Eye Surgery s-inv-audit'));
       });
     });
 
@@ -2674,16 +2873,26 @@ void main() {
         expect(selected.day, now.day);
       });
 
-      testWidgets('2. Selecting a date shows only surgeries scheduled on that date', (tester) async {
+      testWidgets(
+          '2. Selecting a date shows only surgeries scheduled on that date',
+          (tester) async {
         final today = DateTime.now();
         final yesterday = today.subtract(const Duration(days: 1));
         final tomorrow = today.add(const Duration(days: 1));
 
-        final sYesterday = _sampleSurgery(id: 's-yest', patientName: 'Yesterday Patient', surgeryDate: yesterday);
-        final sToday = _sampleSurgery(id: 's-today', patientName: 'Today Patient', surgeryDate: today);
-        final sTomorrow = _sampleSurgery(id: 's-tom', patientName: 'Tomorrow Patient', surgeryDate: tomorrow);
+        final sYesterday = _sampleSurgery(
+            id: 's-yest',
+            patientName: 'Yesterday Patient',
+            surgeryDate: yesterday);
+        final sToday = _sampleSurgery(
+            id: 's-today', patientName: 'Today Patient', surgeryDate: today);
+        final sTomorrow = _sampleSurgery(
+            id: 's-tom',
+            patientName: 'Tomorrow Patient',
+            surgeryDate: tomorrow);
 
-        final fakeRepo = _FakeEyeSurgeryRepository(items: [sYesterday, sToday, sTomorrow]);
+        final fakeRepo =
+            _FakeEyeSurgeryRepository(items: [sYesterday, sToday, sTomorrow]);
         final container = ProviderContainer(overrides: [
           eyeSurgeryRepositoryProvider.overrideWithValue(fakeRepo),
           currentUserRoleProvider.overrideWith((ref) async => 'admin'),
@@ -2726,7 +2935,9 @@ void main() {
         expect(find.text('Today Patient'), findsNothing);
       });
 
-      test('3. Surgeries on multiple dates never leak into the selected date list', () async {
+      test(
+          '3. Surgeries on multiple dates never leak into the selected date list',
+          () async {
         final day1 = DateTime(2026, 10, 4);
         final day2 = DateTime(2026, 10, 5);
 
@@ -2745,12 +2956,18 @@ void main() {
         expect(list.map((s) => s.id).toList(), ['s1']);
       });
 
-      test('4. Multiple surgeries on the same date appear in ascending time order', () async {
+      test(
+          '4. Multiple surgeries on the same date appear in ascending time order',
+          () async {
         final date = DateTime(2026, 10, 4);
-        final s1 = _sampleSurgery(id: 's-02pm', surgeryDate: date, surgeryTime: '02:00 PM');
-        final s2 = _sampleSurgery(id: 's-09am', surgeryDate: date, surgeryTime: '09:00 AM');
-        final s3 = _sampleSurgery(id: 's-0430pm', surgeryDate: date, surgeryTime: '04:30 PM');
-        final s4 = _sampleSurgery(id: 's-1130am', surgeryDate: date, surgeryTime: '11:30 AM');
+        final s1 = _sampleSurgery(
+            id: 's-02pm', surgeryDate: date, surgeryTime: '02:00 PM');
+        final s2 = _sampleSurgery(
+            id: 's-09am', surgeryDate: date, surgeryTime: '09:00 AM');
+        final s3 = _sampleSurgery(
+            id: 's-0430pm', surgeryDate: date, surgeryTime: '04:30 PM');
+        final s4 = _sampleSurgery(
+            id: 's-1130am', surgeryDate: date, surgeryTime: '11:30 AM');
 
         final fakeRepo = _FakeEyeSurgeryRepository(items: [s1, s2, s3, s4]);
         final container = ProviderContainer(overrides: [
@@ -2767,7 +2984,9 @@ void main() {
         );
       });
 
-      test('5. Equal-time surgeries use a deterministic secondary order (createdAt, then id)', () async {
+      test(
+          '5. Equal-time surgeries use a deterministic secondary order (createdAt, then id)',
+          () async {
         final date = DateTime(2026, 10, 4);
         final now = DateTime.now();
 
@@ -2797,7 +3016,8 @@ void main() {
           updatedAt: now,
         );
 
-        final fakeRepo = _FakeEyeSurgeryRepository(items: [sLaterCreated, sEarlierCreated]);
+        final fakeRepo =
+            _FakeEyeSurgeryRepository(items: [sLaterCreated, sEarlierCreated]);
         final container = ProviderContainer(overrides: [
           eyeSurgeryRepositoryProvider.overrideWithValue(fakeRepo),
           eyeSurgerySelectedDateProvider.overrideWith((ref) => date),
@@ -2810,11 +3030,14 @@ void main() {
         expect(list.last.id, 's-a');
       });
 
-      test('6. Rescheduling moves the same record from old date to new date without duplication', () async {
+      test(
+          '6. Rescheduling moves the same record from old date to new date without duplication',
+          () async {
         final date1 = DateTime(2026, 10, 4);
         final date2 = DateTime(2026, 10, 7);
 
-        final surgery = _sampleSurgery(id: 's-resched', surgeryDate: date1, surgeryTime: '10:00:00');
+        final surgery = _sampleSurgery(
+            id: 's-resched', surgeryDate: date1, surgeryTime: '10:00:00');
         final fakeRepo = _FakeEyeSurgeryRepository(items: [surgery]);
         final container = ProviderContainer(overrides: [
           eyeSurgeryRepositoryProvider.overrideWithValue(fakeRepo),
@@ -2828,10 +3051,10 @@ void main() {
 
         // Reschedule to date2
         await container.read(eyeSurgeryListProvider.notifier).rescheduleSurgery(
-          id: 's-resched',
-          surgeryDate: date2,
-          surgeryTime: '14:00:00',
-        );
+              id: 's-resched',
+              surgeryDate: date2,
+              surgeryTime: '14:00:00',
+            );
 
         // No longer visible on date1
         expect(container.read(filteredEyeSurgeriesProvider), isEmpty);
@@ -2849,11 +3072,17 @@ void main() {
 
       test('7. Status filters combine correctly with date selection', () async {
         final date = DateTime(2026, 10, 4);
-        final sSched = _sampleSurgery(id: 's-sched', status: 'scheduled', surgeryDate: date);
-        final sPreOp = _sampleSurgery(id: 's-preop', status: 'pre_op', surgeryDate: date);
-        final sOtherDate = _sampleSurgery(id: 's-other', status: 'scheduled', surgeryDate: date.add(const Duration(days: 1)));
+        final sSched = _sampleSurgery(
+            id: 's-sched', status: 'scheduled', surgeryDate: date);
+        final sPreOp =
+            _sampleSurgery(id: 's-preop', status: 'pre_op', surgeryDate: date);
+        final sOtherDate = _sampleSurgery(
+            id: 's-other',
+            status: 'scheduled',
+            surgeryDate: date.add(const Duration(days: 1)));
 
-        final fakeRepo = _FakeEyeSurgeryRepository(items: [sSched, sPreOp, sOtherDate]);
+        final fakeRepo =
+            _FakeEyeSurgeryRepository(items: [sSched, sPreOp, sOtherDate]);
         final container = ProviderContainer(overrides: [
           eyeSurgeryRepositoryProvider.overrideWithValue(fakeRepo),
           eyeSurgerySelectedDateProvider.overrideWith((ref) => date),
@@ -2865,12 +3094,15 @@ void main() {
         expect(container.read(filteredEyeSurgeriesProvider), hasLength(2));
 
         // Filter by 'scheduled' for date
-        container.read(eyeSurgeryStatusFilterProvider.notifier).state = 'scheduled';
+        container.read(eyeSurgeryStatusFilterProvider.notifier).state =
+            'scheduled';
         final filteredSched = container.read(filteredEyeSurgeriesProvider);
         expect(filteredSched.map((s) => s.id).toList(), ['s-sched']);
       });
 
-      testWidgets('8. Empty dates display the correct empty state with Return to Today', (tester) async {
+      testWidgets(
+          '8. Empty dates display the correct empty state with Return to Today',
+          (tester) async {
         tester.view.physicalSize = const Size(1200, 1200);
         tester.view.devicePixelRatio = 1.0;
         addTearDown(() => tester.view.resetPhysicalSize());
@@ -2894,7 +3126,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('No surgeries scheduled for this date'), findsOneWidget);
+        expect(
+            find.text('No surgeries scheduled for this date'), findsOneWidget);
         expect(find.text('Return to Today'), findsOneWidget);
         expect(find.text('Select another date'), findsOneWidget);
 
@@ -2910,7 +3143,9 @@ void main() {
         expect(selected.day, today.day);
       });
 
-      test('9. Date filtering remains correct across time zones and local midnight boundaries', () {
+      test(
+          '9. Date filtering remains correct across time zones and local midnight boundaries',
+          () {
         final d1 = DateTime(2026, 10, 4, 0, 0, 0); // midnight
         final d2 = DateTime(2026, 10, 4, 23, 59, 59); // end of day
         final d3 = DateTime(2026, 10, 5, 0, 0, 0); // next day midnight
@@ -2921,23 +3156,52 @@ void main() {
     });
 
     group('I. Date-Wise Eye Surgery Summary Cards', () {
-      test('1. Calculates all four counts (Total, Scheduled, In Progress, Discharged) date-wise', () async {
+      test(
+          '1. Calculates all four counts (Total, Scheduled, In Progress, Discharged) date-wise',
+          () async {
         final oct4 = DateTime(2026, 10, 4);
         final oct5 = DateTime(2026, 10, 5);
 
         // October 4 has 5 surgeries
-        final s1 = _sampleSurgery(id: 's1', surgeryDate: oct4, status: 'scheduled', surgeryTime: null);
-        final s2 = _sampleSurgery(id: 's2', surgeryDate: oct4, status: 'pre_op', surgeryTime: null);
-        final s3 = _sampleSurgery(id: 's3', surgeryDate: oct4, status: 'in_surgery', surgeryTime: null);
-        final s4 = _sampleSurgery(id: 's4', surgeryDate: oct4, status: 'post_op', surgeryTime: null);
-        final s5 = _sampleSurgery(id: 's5', surgeryDate: oct4, status: 'discharged', surgeryTime: null);
+        final s1 = _sampleSurgery(
+            id: 's1',
+            surgeryDate: oct4,
+            status: 'scheduled',
+            surgeryTime: null);
+        final s2 = _sampleSurgery(
+            id: 's2', surgeryDate: oct4, status: 'pre_op', surgeryTime: null);
+        final s3 = _sampleSurgery(
+            id: 's3',
+            surgeryDate: oct4,
+            status: 'in_surgery',
+            surgeryTime: null);
+        final s4 = _sampleSurgery(
+            id: 's4', surgeryDate: oct4, status: 'post_op', surgeryTime: null);
+        final s5 = _sampleSurgery(
+            id: 's5',
+            surgeryDate: oct4,
+            status: 'discharged',
+            surgeryTime: null);
 
         // October 5 has 3 surgeries
-        final s6 = _sampleSurgery(id: 's6', surgeryDate: oct5, status: 'scheduled', surgeryTime: null);
-        final s7 = _sampleSurgery(id: 's7', surgeryDate: oct5, status: 'scheduled', surgeryTime: null);
-        final s8 = _sampleSurgery(id: 's8', surgeryDate: oct5, status: 'discharged', surgeryTime: null);
+        final s6 = _sampleSurgery(
+            id: 's6',
+            surgeryDate: oct5,
+            status: 'scheduled',
+            surgeryTime: null);
+        final s7 = _sampleSurgery(
+            id: 's7',
+            surgeryDate: oct5,
+            status: 'scheduled',
+            surgeryTime: null);
+        final s8 = _sampleSurgery(
+            id: 's8',
+            surgeryDate: oct5,
+            status: 'discharged',
+            surgeryTime: null);
 
-        final repo = _FakeEyeSurgeryRepository(items: [s1, s2, s3, s4, s5, s6, s7, s8]);
+        final repo =
+            _FakeEyeSurgeryRepository(items: [s1, s2, s3, s4, s5, s6, s7, s8]);
         final container = ProviderContainer(overrides: [
           eyeSurgeryRepositoryProvider.overrideWithValue(repo),
           eyeSurgerySelectedDateProvider.overrideWith((ref) => oct4),
@@ -2967,8 +3231,16 @@ void main() {
         final today = DateTime(now.year, now.month, now.day);
         final tomorrow = today.add(const Duration(days: 1));
 
-        final sToday = _sampleSurgery(id: 's-today', surgeryDate: today, status: 'scheduled', surgeryTime: null);
-        final sTomorrow = _sampleSurgery(id: 's-tomorrow', surgeryDate: tomorrow, status: 'scheduled', surgeryTime: null);
+        final sToday = _sampleSurgery(
+            id: 's-today',
+            surgeryDate: today,
+            status: 'scheduled',
+            surgeryTime: null);
+        final sTomorrow = _sampleSurgery(
+            id: 's-tomorrow',
+            surgeryDate: tomorrow,
+            status: 'scheduled',
+            surgeryTime: null);
 
         final repo = _FakeEyeSurgeryRepository(items: [sToday, sTomorrow]);
         final container = ProviderContainer(overrides: [
@@ -2990,19 +3262,38 @@ void main() {
         expect(stats.discharged, equals(0));
       });
 
-      test('3. Dynamic Missed detection excludes past scheduled and pre_op from Scheduled and In Progress counts', () async {
+      test(
+          '3. Dynamic Missed detection excludes past scheduled and pre_op from Scheduled and In Progress counts',
+          () async {
         final pastDate = DateTime.now().subtract(const Duration(days: 2));
 
         // Past scheduled without time is missed
-        final sMissedSched = _sampleSurgery(id: 's-m1', surgeryDate: pastDate, status: 'scheduled', surgeryTime: '09:00:00');
+        final sMissedSched = _sampleSurgery(
+            id: 's-m1',
+            surgeryDate: pastDate,
+            status: 'scheduled',
+            surgeryTime: '09:00:00');
         // Past pre_op with time passed is missed
-        final sMissedPreOp = _sampleSurgery(id: 's-m2', surgeryDate: pastDate, status: 'pre_op', surgeryTime: '09:00:00');
+        final sMissedPreOp = _sampleSurgery(
+            id: 's-m2',
+            surgeryDate: pastDate,
+            status: 'pre_op',
+            surgeryTime: '09:00:00');
         // Past in_surgery is NOT missed (in progress)
-        final sInSurgery = _sampleSurgery(id: 's-in', surgeryDate: pastDate, status: 'in_surgery', surgeryTime: '09:00:00');
+        final sInSurgery = _sampleSurgery(
+            id: 's-in',
+            surgeryDate: pastDate,
+            status: 'in_surgery',
+            surgeryTime: '09:00:00');
         // Past discharged is discharged
-        final sDischarged = _sampleSurgery(id: 's-dis', surgeryDate: pastDate, status: 'discharged', surgeryTime: '09:00:00');
+        final sDischarged = _sampleSurgery(
+            id: 's-dis',
+            surgeryDate: pastDate,
+            status: 'discharged',
+            surgeryTime: '09:00:00');
 
-        final repo = _FakeEyeSurgeryRepository(items: [sMissedSched, sMissedPreOp, sInSurgery, sDischarged]);
+        final repo = _FakeEyeSurgeryRepository(
+            items: [sMissedSched, sMissedPreOp, sInSurgery, sDischarged]);
         final container = ProviderContainer(overrides: [
           eyeSurgeryRepositoryProvider.overrideWithValue(repo),
           eyeSurgerySelectedDateProvider.overrideWith((ref) => pastDate),
@@ -3013,16 +3304,30 @@ void main() {
 
         final stats = container.read(eyeSurgeryStatsProvider);
         expect(stats.total, equals(4)); // all 4 belong to that date
-        expect(stats.scheduled, equals(0)); // missed scheduled is not counted as scheduled
-        expect(stats.inProgress, equals(1)); // only sInSurgery is in progress (sMissedPreOp is missed)
+        expect(stats.scheduled,
+            equals(0)); // missed scheduled is not counted as scheduled
+        expect(
+            stats.inProgress,
+            equals(
+                1)); // only sInSurgery is in progress (sMissedPreOp is missed)
         expect(stats.discharged, equals(1));
       });
 
-      test('4. Cancelled surgery is counted in Total Surgeries but not in Scheduled, In Progress, or Discharged', () async {
+      test(
+          '4. Cancelled surgery is counted in Total Surgeries but not in Scheduled, In Progress, or Discharged',
+          () async {
         final targetDate = DateTime(2026, 10, 4);
 
-        final sCancelled = _sampleSurgery(id: 's-canc', surgeryDate: targetDate, status: 'cancelled', surgeryTime: null);
-        final sScheduled = _sampleSurgery(id: 's-sched', surgeryDate: targetDate, status: 'scheduled', surgeryTime: null);
+        final sCancelled = _sampleSurgery(
+            id: 's-canc',
+            surgeryDate: targetDate,
+            status: 'cancelled',
+            surgeryTime: null);
+        final sScheduled = _sampleSurgery(
+            id: 's-sched',
+            surgeryDate: targetDate,
+            status: 'scheduled',
+            surgeryTime: null);
 
         final repo = _FakeEyeSurgeryRepository(items: [sCancelled, sScheduled]);
         final container = ProviderContainer(overrides: [
@@ -3040,13 +3345,27 @@ void main() {
         expect(stats.discharged, equals(0));
       });
 
-      testWidgets('5. Renders exactly 4 summary cards at top matching Dental Lab design and updates on date change', (tester) async {
+      testWidgets(
+          '5. Renders exactly 4 summary cards at top matching Dental Lab design and updates on date change',
+          (tester) async {
         final oct4 = DateTime(2026, 10, 4);
         final oct5 = DateTime(2026, 10, 5);
 
-        final s1 = _sampleSurgery(id: 's1', surgeryDate: oct4, status: 'scheduled', surgeryTime: null);
-        final s2 = _sampleSurgery(id: 's2', surgeryDate: oct4, status: 'in_surgery', surgeryTime: null);
-        final s3 = _sampleSurgery(id: 's3', surgeryDate: oct5, status: 'discharged', surgeryTime: null);
+        final s1 = _sampleSurgery(
+            id: 's1',
+            surgeryDate: oct4,
+            status: 'scheduled',
+            surgeryTime: null);
+        final s2 = _sampleSurgery(
+            id: 's2',
+            surgeryDate: oct4,
+            status: 'in_surgery',
+            surgeryTime: null);
+        final s3 = _sampleSurgery(
+            id: 's3',
+            surgeryDate: oct5,
+            status: 'discharged',
+            surgeryTime: null);
 
         final repo = _FakeEyeSurgeryRepository(items: [s1, s2, s3]);
         final container = ProviderContainer(overrides: [
@@ -3072,7 +3391,8 @@ void main() {
 
         // Oct 4 counts: Total = 2, Scheduled = 1, In Progress = 1, Discharged = 0
         expect(find.text('2'), findsOneWidget); // Total Surgeries
-        expect(find.text('1'), findsNWidgets(2)); // Scheduled: 1, In Progress: 1
+        expect(
+            find.text('1'), findsNWidgets(2)); // Scheduled: 1, In Progress: 1
         expect(find.text('0'), findsOneWidget); // Discharged: 0
 
         // Tap Next Day to go to Oct 5
@@ -3086,17 +3406,35 @@ void main() {
         expect(find.text('Discharged'), findsOneWidget);
       });
 
-      testWidgets('6. Tapping summary card filters list to matching status', (tester) async {
+      testWidgets('6. Tapping summary card filters list to matching status',
+          (tester) async {
         final today = DateTime.now();
-        final sSched = _sampleSurgery(id: 's-sc', surgeryDate: today, status: 'scheduled', surgeryTime: null, patientName: 'Scheduled Patient');
-        final sInProg = _sampleSurgery(id: 's-ip', surgeryDate: today, status: 'in_surgery', surgeryTime: null, patientName: 'InProg Patient');
-        final sDisch = _sampleSurgery(id: 's-dc', surgeryDate: today, status: 'discharged', surgeryTime: null, patientName: 'Discharged Patient');
+        final sSched = _sampleSurgery(
+            id: 's-sc',
+            surgeryDate: today,
+            status: 'scheduled',
+            surgeryTime: null,
+            patientName: 'Scheduled Patient');
+        final sInProg = _sampleSurgery(
+            id: 's-ip',
+            surgeryDate: today,
+            status: 'in_surgery',
+            surgeryTime: null,
+            patientName: 'InProg Patient');
+        final sDisch = _sampleSurgery(
+            id: 's-dc',
+            surgeryDate: today,
+            status: 'discharged',
+            surgeryTime: null,
+            patientName: 'Discharged Patient');
 
-        final repo = _FakeEyeSurgeryRepository(items: [sSched, sInProg, sDisch]);
+        final repo =
+            _FakeEyeSurgeryRepository(items: [sSched, sInProg, sDisch]);
         final container = ProviderContainer(overrides: [
           eyeSurgeryRepositoryProvider.overrideWithValue(repo),
           currentUserRoleProvider.overrideWith((ref) async => 'admin'),
-          eyeSurgerySelectedDateProvider.overrideWith((ref) => DateTime(today.year, today.month, today.day)),
+          eyeSurgerySelectedDateProvider.overrideWith(
+              (ref) => DateTime(today.year, today.month, today.day)),
         ]);
         addTearDown(container.dispose);
 
@@ -3155,7 +3493,6 @@ class _ThrowingEyeSurgeryRepository extends _FakeEyeSurgeryRepository {
     throw StateError('Eye surgery could not be deleted or permission denied.');
   }
 }
-
 
 class _FixedEyeSurgeryListNotifier extends EyeSurgeryListNotifier {
   _FixedEyeSurgeryListNotifier(this.surgeries);
@@ -3301,7 +3638,8 @@ class _FakeEyeSurgeryRepository extends EyeSurgeryRepository {
     Map<String, bool> preOpChecklist = const {},
     String? iolDetails,
     String? remarks,
-    List<({String inventoryItemId, double plannedQuantity, String source})>? initialItems,
+    List<({String inventoryItemId, double plannedQuantity, String source})>?
+        initialItems,
   }) async {
     final effectiveDate = surgeryDate ?? DateTime(2026, 10, 12);
     final sanitizedTime = (surgeryTime == null || surgeryTime.trim().isEmpty)
@@ -3356,7 +3694,8 @@ class _FakeEyeSurgeryRepository extends EyeSurgeryRepository {
       nextStatus: newStatus,
     );
     if (error != null) throw StateError(error);
-    final updated = _save(_find(id, (item) => _copySurgery(item, status: newStatus)));
+    final updated =
+        _save(_find(id, (item) => _copySurgery(item, status: newStatus)));
     final taskIdx = tasks.indexWhere((t) => t.relatedSurgeryId == id);
     if (taskIdx != -1) {
       if (newStatus == 'discharged') {
@@ -3475,7 +3814,8 @@ class _FakeEyeSurgeryRepository extends EyeSurgeryRepository {
 
     if (assignedStaffId != null && assignedStaffId.trim().isNotEmpty) {
       final taskTitle = 'Eye Surgery — ${updated.patientName ?? "Patient"}';
-      final hasTime = updated.surgeryTime != null && updated.surgeryTime!.trim().isNotEmpty;
+      final hasTime =
+          updated.surgeryTime != null && updated.surgeryTime!.trim().isNotEmpty;
       final taskDesc = hasTime
           ? '${updated.surgeryTime!.trim()} · ${updated.displaySurgeryType} — ${updated.eyeSide} Eye'
           : '${updated.displaySurgeryType} — ${updated.eyeSide} Eye';
@@ -3509,7 +3849,8 @@ class _FakeEyeSurgeryRepository extends EyeSurgeryRepository {
             ..writeln('Patient: ${updated.patientName ?? "Patient"}')
             ..writeln('Surgery: ${updated.surgeryType}')
             ..writeln('Eye: ${updated.eyeSide}')
-            ..write('Date: ${updated.surgeryDate.year.toString().padLeft(4, '0')}-${updated.surgeryDate.month.toString().padLeft(2, '0')}-${updated.surgeryDate.day.toString().padLeft(2, '0')}');
+            ..write(
+                'Date: ${updated.surgeryDate.year.toString().padLeft(4, '0')}-${updated.surgeryDate.month.toString().padLeft(2, '0')}-${updated.surgeryDate.day.toString().padLeft(2, '0')}');
           if (hasTime) {
             notifMessage.write('\nTime: ${updated.surgeryTime!.trim()}');
           }
@@ -3577,29 +3918,31 @@ EyeSurgeryModel _sampleSurgery({
   final defaultDate = DateTime(now.year, now.month, now.day);
   final effectiveDate = surgeryDate ?? defaultDate;
   return EyeSurgeryModel(
-      id: id,
-      patientId: patientId,
-      surgeryType: surgeryType,
-      surgeryTypeCategory: surgeryTypeCategory,
-      eyeSide: eyeSide,
-      assignedStaffId: assignedStaffId,
-      assignedStaffName: assignedStaffName ?? (assignedStaffId != null ? 'Dr. Rao' : null),
-      preOpDate: effectiveDate,
-      surgeryDate: effectiveDate,
-      surgeryTime: identical(surgeryTime, _kNoValue)
-          ? '10:30:00'
-          : (surgeryTime as String?),
-      status: status,
-      preOpChecklist: const {'identity_verified': true},
-      iolDetails: iolDetails,
-      remarks: remarks,
-      followUpAppointmentId: followUpAppointmentId,
-      dischargedAt: dischargedAt ?? (status == 'discharged' ? DateTime.now() : null),
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      updatedAt: DateTime.now(),
-      patientName: patientName ?? 'Aisha Kumar',
-      patientNumber: patientNumber ?? 'E102',
-    );
+    id: id,
+    patientId: patientId,
+    surgeryType: surgeryType,
+    surgeryTypeCategory: surgeryTypeCategory,
+    eyeSide: eyeSide,
+    assignedStaffId: assignedStaffId,
+    assignedStaffName:
+        assignedStaffName ?? (assignedStaffId != null ? 'Dr. Rao' : null),
+    preOpDate: effectiveDate,
+    surgeryDate: effectiveDate,
+    surgeryTime: identical(surgeryTime, _kNoValue)
+        ? '10:30:00'
+        : (surgeryTime as String?),
+    status: status,
+    preOpChecklist: const {'identity_verified': true},
+    iolDetails: iolDetails,
+    remarks: remarks,
+    followUpAppointmentId: followUpAppointmentId,
+    dischargedAt:
+        dischargedAt ?? (status == 'discharged' ? DateTime.now() : null),
+    createdAt: DateTime.now().subtract(const Duration(days: 2)),
+    updatedAt: DateTime.now(),
+    patientName: patientName ?? 'Aisha Kumar',
+    patientNumber: patientNumber ?? 'E102',
+  );
 }
 
 EyeSurgeryModel _copySurgery(
@@ -3713,8 +4056,7 @@ class _FixedStaffTasksNotifier extends StaffTasksNotifier {
   Future<void> fetchTasks({bool silent = false}) async {}
 
   @override
-  Future<void> updateStatus(
-      String taskId, String newStatus, String oldStatus,
+  Future<void> updateStatus(String taskId, String newStatus, String oldStatus,
       {String? note}) async {
     final list = state.valueOrNull ?? [];
     state = AsyncData(list
@@ -3738,7 +4080,15 @@ class _TestDepartmentRepository implements DepartmentRepository {
       ];
 
   @override
-  Future<void> createDepartment({required String name, String? description}) async {}
+  Future<Department> createDepartment(
+      {required String name, String? description}) async {
+    return Department(
+      id: 'dep-new',
+      name: name,
+      description: description,
+      isActive: true,
+    );
+  }
 
   @override
   Future<void> updateDepartment({
@@ -3751,4 +4101,3 @@ class _TestDepartmentRepository implements DepartmentRepository {
   @override
   Future<void> deleteDepartment(String id) async {}
 }
-

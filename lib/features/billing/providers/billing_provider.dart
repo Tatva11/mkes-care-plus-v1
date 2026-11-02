@@ -525,7 +525,8 @@ class TodayRevenueMetrics {
   final double? growthPercentage;
   final int todayTransactionsCount;
   final List<double> intradayHourlyBuckets; // 6 legacy buckets
-  final List<HourlyRevenueSlot> hourlySlots; // 11 hourly slots for clinic operating hours
+  final List<HourlyRevenueSlot>
+      hourlySlots; // 11 hourly slots for clinic operating hours
   final Map<String, double> paymentModeAmounts;
 
   const TodayRevenueMetrics({
@@ -552,7 +553,7 @@ class TodayRevenueMetrics {
         slotIndex: i,
         label: DateBoundaries.hourlySlotLabels[i],
         fullLabel: DateBoundaries.hourlySlotFullLabels[i],
-        amount: i < intradayHourlyBuckets.length ? intradayHourlyBuckets[i] : 0.0,
+        amount: 0.0,
       ),
     );
   }
@@ -564,7 +565,8 @@ final selectedRevenueDateProvider =
 
 /// Family provider calculating hourly-slot revenue metrics for any given [targetDate].
 final dateRevenueMetricsProvider =
-    FutureProvider.family<TodayRevenueMetrics, DateTime>((ref, targetDate) async {
+    FutureProvider.family<TodayRevenueMetrics, DateTime>(
+        (ref, targetDate) async {
   final repo = ref.watch(billingRepositoryProvider);
   final normalizedTarget = DateBoundaries.startOfDay(targetDate);
   final startPrevious = DateBoundaries.startOfYesterday(normalizedTarget);
@@ -580,7 +582,8 @@ final dateRevenueMetricsProvider =
   double prevRev = 0.0;
   int targetCount = 0;
   final legacyBuckets = List<double>.filled(6, 0.0);
-  final hourlyAmounts = List<double>.filled(DateBoundaries.hourlySlotCount, 0.0);
+  final hourlyAmounts =
+      List<double>.filled(DateBoundaries.hourlySlotCount, 0.0);
   final hourlyCounts = List<int>.filled(DateBoundaries.hourlySlotCount, 0);
 
   final Map<String, double> modes = {
@@ -595,7 +598,8 @@ final dateRevenueMetricsProvider =
 
     if (inv.payments.isNotEmpty) {
       for (final p in inv.payments) {
-        final paymentDate = (p.paidAt ?? p.createdAt ?? inv.createdAt).toLocal();
+        final paymentDate =
+            (p.paidAt ?? p.createdAt ?? inv.createdAt).toLocal();
         if (DateBoundaries.isSameDay(paymentDate, normalizedTarget)) {
           targetRev += p.amount;
           targetCount++;

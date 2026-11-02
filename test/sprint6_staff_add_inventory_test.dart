@@ -27,7 +27,8 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
-  FakeInventoryRepositoryWithSKU([List<InventoryItem>? initial, this.callerRole])
+  FakeInventoryRepositoryWithSKU(
+      [List<InventoryItem>? initial, this.callerRole])
       : items = initial != null ? List.from(initial) : [];
 
   @override
@@ -46,7 +47,8 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
     }
     if (department != null && department.isNotEmpty && department != 'All') {
       result = result
-          .where((i) => (i.department?.toLowerCase() ?? '') == department.toLowerCase())
+          .where((i) =>
+              (i.department?.toLowerCase() ?? '') == department.toLowerCase())
           .toList();
     }
     if (activeOnly == true) {
@@ -77,23 +79,24 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
 
     // Supabase RLS simulation: only admin and staff can insert
     if (callerRole != null && callerRole != 'admin' && callerRole != 'staff') {
-      throw Exception('new row violates row-level security policy for table "inventory"');
+      throw Exception(
+          'new row violates row-level security policy for table "inventory"');
     }
 
     // SKU duplicate check
     if (item.sku != null && item.sku!.trim().isNotEmpty) {
       final duplicate = items.any(
-        (i) => i.sku?.toLowerCase() == item.sku!.toLowerCase() && i.id != item.id,
+        (i) =>
+            i.sku?.toLowerCase() == item.sku!.toLowerCase() && i.id != item.id,
       );
       if (duplicate) {
-        throw Exception('duplicate key value violates unique constraint "inventory_sku_key"');
+        throw Exception(
+            'duplicate key value violates unique constraint "inventory_sku_key"');
       }
     }
 
     final created = item.copyWith(
       id: item.id.isNotEmpty ? item.id : 'gen-item-${items.length + 1}',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
     );
     items.add(created);
     return created;
@@ -105,7 +108,8 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
 
     // Supabase RLS simulation: only admin can update
     if (callerRole != null && callerRole != 'admin' && callerRole != 'staff') {
-      throw Exception('row-level security policy blocks update for role $callerRole');
+      throw Exception(
+          'row-level security policy blocks update for role $callerRole');
     }
 
     final index = items.indexWhere((i) => i.id == item.id);
@@ -124,7 +128,8 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
 
     // Supabase RLS simulation: only admin and staff can delete
     if (callerRole != null && callerRole != 'admin' && callerRole != 'staff') {
-      throw Exception('row-level security policy blocks delete for role $callerRole');
+      throw Exception(
+          'row-level security policy blocks delete for role $callerRole');
     }
 
     items.removeWhere((i) => i.id == id);
@@ -188,8 +193,11 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
     String inventoryItemId, {
     String? transactionType,
   }) async {
-    var result = transactions.where((t) => t.inventoryItemId == inventoryItemId);
-    if (transactionType != null && transactionType.isNotEmpty && transactionType != 'All') {
+    var result =
+        transactions.where((t) => t.inventoryItemId == inventoryItemId);
+    if (transactionType != null &&
+        transactionType.isNotEmpty &&
+        transactionType != 'All') {
       result = result.where((t) => t.transactionType == transactionType);
     }
     return result.toList();
@@ -201,17 +209,22 @@ class FakeInventoryRepositoryWithSKU implements InventoryRepository {
     int limit = 100,
   }) async {
     var result = List<InventoryTransaction>.from(transactions);
-    if (transactionType != null && transactionType.isNotEmpty && transactionType != 'All') {
-      result = result.where((t) => t.transactionType == transactionType).toList();
+    if (transactionType != null &&
+        transactionType.isNotEmpty &&
+        transactionType != 'All') {
+      result =
+          result.where((t) => t.transactionType == transactionType).toList();
     }
     return result.take(limit).toList();
   }
 
   @override
-  Future<List<InventoryBatch>> getInventoryBatches(String inventoryId) async => [];
+  Future<List<InventoryBatch>> getInventoryBatches(String inventoryId) async =>
+      [];
 
   @override
-  Future<List<InventoryBatch>> getBatchesForPO(String purchaseOrderId) async => [];
+  Future<List<InventoryBatch>> getBatchesForPO(String purchaseOrderId) async =>
+      [];
 }
 
 /// In-memory FakeDepartmentRepository for department operations.
@@ -221,16 +234,20 @@ class FakeDepartmentRepository implements DepartmentRepository {
       : departments = initial != null ? List.from(initial) : [];
 
   @override
-  Future<List<Department>> fetchDepartments() async => List.unmodifiable(departments);
+  Future<List<Department>> fetchDepartments() async =>
+      List.unmodifiable(departments);
 
   @override
-  Future<void> createDepartment({required String name, String? description}) async {
-    departments.add(Department(
-      id: 'dept-${departments.length + 1}',
+  Future<Department> createDepartment(
+      {required String name, String? description}) async {
+    final dept = Department(
+      id: 'dept-',
       name: name,
       description: description,
       isActive: true,
-    ));
+    );
+    departments.add(dept);
+    return dept;
   }
 
   @override
@@ -264,7 +281,8 @@ class FakeVendorRepository implements VendorRepository {
       : vendors = initial != null ? List.from(initial) : [];
 
   @override
-  Future<List<Vendor>> getVendors({String? searchQuery, bool? activeOnly}) async {
+  Future<List<Vendor>> getVendors(
+      {String? searchQuery, bool? activeOnly}) async {
     var result = List<Vendor>.from(vendors);
     if (activeOnly == true) {
       result = result.where((v) => v.isActive).toList();
@@ -273,7 +291,8 @@ class FakeVendorRepository implements VendorRepository {
   }
 
   @override
-  Future<Vendor> getVendor(String id) async => vendors.firstWhere((v) => v.id == id);
+  Future<Vendor> getVendor(String id) async =>
+      vendors.firstWhere((v) => v.id == id);
 
   @override
   Future<Vendor> createVendor(Vendor vendor) async {
@@ -289,7 +308,8 @@ class FakeVendorRepository implements VendorRepository {
   }
 
   @override
-  Future<void> deleteVendor(String id) async => vendors.removeWhere((v) => v.id == id);
+  Future<void> deleteVendor(String id) async =>
+      vendors.removeWhere((v) => v.id == id);
 
   @override
   Future<Vendor> toggleVendorStatus(String id, bool isActive) async {
@@ -322,7 +342,8 @@ void main() {
     // ----------------------------------------------------
     // 1. Staff can open Inventory from Staff Tasks navigation
     // ----------------------------------------------------
-    testWidgets('1. Staff can open Inventory from Staff Tasks section', (tester) async {
+    testWidgets('1. Staff can open Inventory from Staff Tasks section',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -333,7 +354,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
             currentUserProvider.overrideWithValue(mockStaffUser),
           ],
           child: const MaterialApp(
@@ -356,7 +378,8 @@ void main() {
     // ----------------------------------------------------
     // 2. Staff can see the Add Inventory action
     // ----------------------------------------------------
-    testWidgets('2. Staff can see Add Item action in header and empty state', (tester) async {
+    testWidgets('2. Staff can see Add Item action in header and empty state',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -367,7 +390,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -388,7 +412,8 @@ void main() {
     // ----------------------------------------------------
     // 3. Staff can open the Inventory form
     // ----------------------------------------------------
-    testWidgets('3. Staff can tap Add Item to open the Inventory form dialog', (tester) async {
+    testWidgets('3. Staff can tap Add Item to open the Inventory form dialog',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -399,7 +424,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -424,7 +450,8 @@ void main() {
     // ----------------------------------------------------
     // 4, 5, 6, 7, 8, 9. Staff enters valid info, selects vendor, submits, item appears in list
     // ----------------------------------------------------
-    testWidgets('4-9. Staff can enter product info with brand, expiry, vendor and submit',
+    testWidgets(
+        '4-9. Staff can enter product info with brand, expiry, vendor and submit',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -438,7 +465,8 @@ void main() {
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
             vendorRepositoryProvider.overrideWithValue(fakeVendorRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -456,7 +484,8 @@ void main() {
 
       // Enter item name
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'e.g. Amoxicillin 500mg, Titanium Frame, Latex Gloves'),
+        find.widgetWithText(TextFormField,
+            'e.g. Amoxicillin 500mg, Titanium Frame, Latex Gloves'),
         'Azithromycin 500mg',
       );
 
@@ -520,7 +549,8 @@ void main() {
     // ----------------------------------------------------
     // 10. Required field validation still works
     // ----------------------------------------------------
-    testWidgets('10. Required field validation: empty name blocks submission', (tester) async {
+    testWidgets('10. Required field validation: empty name blocks submission',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -531,7 +561,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -554,7 +585,8 @@ void main() {
     // ----------------------------------------------------
     // 11. Invalid quantity is rejected
     // ----------------------------------------------------
-    testWidgets('11. Validation: negative or empty stock is rejected', (tester) async {
+    testWidgets('11. Validation: negative or empty stock is rejected',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -565,7 +597,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -579,7 +612,8 @@ void main() {
 
       // Enter valid name
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'e.g. Amoxicillin 500mg, Titanium Frame, Latex Gloves'),
+        find.widgetWithText(TextFormField,
+            'e.g. Amoxicillin 500mg, Titanium Frame, Latex Gloves'),
         'Test Item',
       );
 
@@ -597,7 +631,8 @@ void main() {
     // ----------------------------------------------------
     // 12. Invalid minimum stock is rejected
     // ----------------------------------------------------
-    testWidgets('12. Validation: negative minimum stock is rejected', (tester) async {
+    testWidgets('12. Validation: negative minimum stock is rejected',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -608,7 +643,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -622,7 +658,8 @@ void main() {
 
       // Enter valid name
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'e.g. Amoxicillin 500mg, Titanium Frame, Latex Gloves'),
+        find.widgetWithText(TextFormField,
+            'e.g. Amoxicillin 500mg, Titanium Frame, Latex Gloves'),
         'Test Item Min Stock',
       );
 
@@ -631,7 +668,8 @@ void main() {
       await tester.enterText(minStockField, '-5');
       await tester.pumpAndSettle();
 
-      final enteredText = tester.widget<TextFormField>(minStockField).controller?.text ?? '';
+      final enteredText =
+          tester.widget<TextFormField>(minStockField).controller?.text ?? '';
       expect(enteredText.contains('-'), isFalse);
       expect(enteredText, isEmpty);
     });
@@ -639,7 +677,8 @@ void main() {
     // ----------------------------------------------------
     // 13. Duplicate SKU behavior remains handled cleanly
     // ----------------------------------------------------
-    testWidgets('13. Duplicate SKU is safely caught and displays error banner', (tester) async {
+    testWidgets('13. Duplicate SKU is safely caught and displays error banner',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -659,7 +698,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -673,7 +713,8 @@ void main() {
 
       // Enter product with duplicate SKU
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'e.g. Amoxicillin 500mg, Titanium Frame, Latex Gloves'),
+        find.widgetWithText(TextFormField,
+            'e.g. Amoxicillin 500mg, Titanium Frame, Latex Gloves'),
         'Duplicate Gloves',
       );
       await tester.enterText(
@@ -685,13 +726,16 @@ void main() {
       await tester.pumpAndSettle();
 
       // Error message is displayed in dialog error banner
-      expect(find.textContaining('duplicate key value violates unique constraint'), findsOneWidget);
+      expect(
+          find.textContaining('duplicate key value violates unique constraint'),
+          findsOneWidget);
     });
 
     // ----------------------------------------------------
     // 14. Staff INSERT access works with Supabase RLS simulation
     // ----------------------------------------------------
-    testWidgets('14. Staff INSERT succeeds in repository matching RLS policy', (tester) async {
+    testWidgets('14. Staff INSERT succeeds in repository matching RLS policy',
+        (tester) async {
       final fakeRepo = FakeInventoryRepositoryWithSKU([], 'staff');
 
       const newItem = InventoryItem(
@@ -711,7 +755,9 @@ void main() {
     // ----------------------------------------------------
     // 15. Staff has full parity with Admin on Inventory actions & CRUD
     // ----------------------------------------------------
-    testWidgets('15. Staff has full parity: CAN see Edit, Delete, and Departments actions', (tester) async {
+    testWidgets(
+        '15. Staff has full parity: CAN see Edit, Delete, and Departments actions',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -730,7 +776,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -751,7 +798,8 @@ void main() {
       expect(find.byIcon(Icons.delete_outline), findsOneWidget);
 
       // Database-level: staff can update and delete
-      final updated = await fakeRepo.updateInventoryItem(item.copyWith(name: 'Updated by Staff'));
+      final updated = await fakeRepo
+          .updateInventoryItem(item.copyWith(name: 'Updated by Staff'));
       expect(updated.name, 'Updated by Staff');
       await fakeRepo.deleteInventoryItem(item.id);
       expect(fakeRepo.items.isEmpty, isTrue);
@@ -759,7 +807,8 @@ void main() {
       // Database-level: unauthorized role is blocked by RLS simulation
       final doctorRepo = FakeInventoryRepositoryWithSKU([item], 'doctor');
       expect(
-        () => doctorRepo.updateInventoryItem(item.copyWith(name: 'Hacked Item')),
+        () =>
+            doctorRepo.updateInventoryItem(item.copyWith(name: 'Hacked Item')),
         throwsA(isA<Exception>()),
       );
       expect(
@@ -768,7 +817,9 @@ void main() {
       );
     });
 
-    testWidgets('15b. Staff can open Edit dialog, modify fields, and save changes', (tester) async {
+    testWidgets(
+        '15b. Staff can open Edit dialog, modify fields, and save changes',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -788,7 +839,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -809,7 +861,8 @@ void main() {
       expect(find.text('Save Changes'), findsOneWidget);
 
       // Edit the item name
-      final nameField = find.widgetWithText(TextFormField, 'Latex Gloves Medium');
+      final nameField =
+          find.widgetWithText(TextFormField, 'Latex Gloves Medium');
       await tester.enterText(nameField, 'Nitrile Gloves Medium');
       await tester.pumpAndSettle();
 
@@ -822,7 +875,8 @@ void main() {
       expect(find.text('Nitrile Gloves Medium'), findsOneWidget);
     });
 
-    testWidgets('15c. Staff can open Delete dialog and delete inventory item', (tester) async {
+    testWidgets('15c. Staff can open Delete dialog and delete inventory item',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -841,7 +895,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -859,7 +914,8 @@ void main() {
 
       // Confirmation dialog appears
       expect(find.text('Delete Inventory Item'), findsOneWidget);
-      expect(find.textContaining('Are you sure you want to delete'), findsOneWidget);
+      expect(find.textContaining('Are you sure you want to delete'),
+          findsOneWidget);
 
       // Confirm delete
       final confirmDeleteBtn = find.widgetWithText(FilledButton, 'Delete');
@@ -870,7 +926,8 @@ void main() {
       expect(fakeRepo.items.isEmpty, isTrue);
     });
 
-    testWidgets('15d. Staff can access Department Management and perform CRUD', (tester) async {
+    testWidgets('15d. Staff can access Department Management and perform CRUD',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -888,7 +945,8 @@ void main() {
         ProviderScope(
           overrides: [
             departmentRepositoryProvider.overrideWithValue(fakeDeptRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: DepartmentManagementScreen(),
@@ -951,7 +1009,9 @@ void main() {
       expect(fakeDeptRepo.departments.length, 1);
     });
 
-    testWidgets('15e. Staff can open Inventory Details dialog and see Edit and Delete action buttons', (tester) async {
+    testWidgets(
+        '15e. Staff can open Inventory Details dialog and see Edit and Delete action buttons',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -973,7 +1033,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -1004,7 +1065,8 @@ void main() {
     // ----------------------------------------------------
     // 16. Admin Inventory CRUD continues working
     // ----------------------------------------------------
-    testWidgets('16. Admin user retains full CRUD and configuration controls', (tester) async {
+    testWidgets('16. Admin user retains full CRUD and configuration controls',
+        (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -1023,7 +1085,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('admin')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('admin')),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -1042,7 +1105,8 @@ void main() {
       expect(find.byIcon(Icons.delete_outline), findsOneWidget);
 
       // Admin can update in repository
-      final updated = await fakeRepo.updateInventoryItem(item.copyWith(currentStock: 3.0));
+      final updated =
+          await fakeRepo.updateInventoryItem(item.copyWith(currentStock: 3.0));
       expect(updated.currentStock, 3.0);
 
       // Admin can delete in repository
@@ -1053,7 +1117,8 @@ void main() {
     // ----------------------------------------------------
     // 17-20. Regression: Search, Filter, Stock In/Out, Vendor Integration
     // ----------------------------------------------------
-    testWidgets('17-20. Staff can search, filter, perform stock operations and view details',
+    testWidgets(
+        '17-20. Staff can search, filter, perform stock operations and view details',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -1087,7 +1152,8 @@ void main() {
         ProviderScope(
           overrides: [
             inventoryRepositoryProvider.overrideWithValue(fakeRepo),
-            currentUserRoleProvider.overrideWith((ref) => Future.value('staff')),
+            currentUserRoleProvider
+                .overrideWith((ref) => Future.value('staff')),
           ],
           child: const MaterialApp(
             home: Scaffold(

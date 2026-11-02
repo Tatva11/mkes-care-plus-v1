@@ -88,9 +88,7 @@ class _StaffProfileDetailScreenState
 
     if (confirmed == true) {
       try {
-        await ref
-            .read(usersProvider.notifier)
-            .toggleStatus(user.id, newStatus);
+        await ref.read(usersProvider.notifier).toggleStatus(user.id, newStatus);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Staff member ${action}d successfully.')),
@@ -148,7 +146,8 @@ class _StaffProfileDetailScreenState
                     DropdownMenuItem(value: 'low', child: Text('Low')),
                     DropdownMenuItem(value: 'medium', child: Text('Medium')),
                     DropdownMenuItem(value: 'high', child: Text('High')),
-                    DropdownMenuItem(value: 'critical', child: Text('Critical')),
+                    DropdownMenuItem(
+                        value: 'critical', child: Text('Critical')),
                   ],
                   onChanged: (val) {
                     if (val != null) setModalState(() => priority = val);
@@ -199,9 +198,7 @@ class _StaffProfileDetailScreenState
                         priority: priority,
                       );
                   // Refresh staff tasks notifier too
-                  ref
-                      .read(staffTasksProvider(user.id).notifier)
-                      .fetchTasks();
+                  ref.read(staffTasksProvider(user.id).notifier).fetchTasks();
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 } catch (e) {
                   if (ctx.mounted) {
@@ -304,8 +301,7 @@ class _StaffProfileDetailScreenState
           ),
           actions: [
             TextButton(
-              onPressed:
-                  isSubmitting ? null : () => Navigator.of(ctx).pop(),
+              onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
               child: const Text('Cancel'),
             ),
             FilledButton.icon(
@@ -323,9 +319,7 @@ class _StaffProfileDetailScreenState
                         _isBypassLoading = true;
                       });
                       try {
-                        await ref
-                            .read(usersProvider.notifier)
-                            .grantGpsBypass(
+                        await ref.read(usersProvider.notifier).grantGpsBypass(
                               staffId: user.id,
                               durationHours: selectedDuration,
                               reason: reasonCtrl.text.trim().isNotEmpty
@@ -371,8 +365,7 @@ class _StaffProfileDetailScreenState
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : const Icon(Icons.check, size: 18),
@@ -420,8 +413,7 @@ class _StaffProfileDetailScreenState
           ),
           actions: [
             TextButton(
-              onPressed:
-                  isSubmitting ? null : () => Navigator.of(ctx).pop(),
+              onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
               child: const Text('Cancel'),
             ),
             FilledButton.icon(
@@ -439,9 +431,7 @@ class _StaffProfileDetailScreenState
                         _isBypassLoading = true;
                       });
                       try {
-                        await ref
-                            .read(usersProvider.notifier)
-                            .revokeGpsBypass(
+                        await ref.read(usersProvider.notifier).revokeGpsBypass(
                               staffId: user.id,
                               reason: 'Revoked by administrator',
                             );
@@ -484,8 +474,7 @@ class _StaffProfileDetailScreenState
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : const Icon(Icons.lock, size: 18),
@@ -508,9 +497,8 @@ class _StaffProfileDetailScreenState
       final remaining = bypassUntil.difference(DateTime.now());
       final hours = remaining.inHours;
       final mins = remaining.inMinutes % 60;
-      final remainingStr = hours > 0
-          ? '${hours}h ${mins}m remaining'
-          : '${mins}m remaining';
+      final remainingStr =
+          hours > 0 ? '${hours}h ${mins}m remaining' : '${mins}m remaining';
       final formattedTime =
           DateFormat('MMM d, yyyy • h:mm a').format(bypassUntil);
       expiryText = '$formattedTime ($remainingStr)';
@@ -681,17 +669,15 @@ class _StaffProfileDetailScreenState
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : const Icon(Icons.lock_rounded, size: 18),
               label: Text(_isBypassLoading
                   ? 'Processing...'
                   : 'Enable GPS Restriction'),
-              onPressed: _isBypassLoading
-                  ? null
-                  : () => _showRevokeBypassDialog(user),
+              onPressed:
+                  _isBypassLoading ? null : () => _showRevokeBypassDialog(user),
             ),
           ] else ...[
             Text(
@@ -722,9 +708,8 @@ class _StaffProfileDetailScreenState
               label: Text(_isBypassLoading
                   ? 'Processing...'
                   : 'Temporarily Disable GPS Restriction'),
-              onPressed: _isBypassLoading
-                  ? null
-                  : () => _showGrantBypassDialog(user),
+              onPressed:
+                  _isBypassLoading ? null : () => _showGrantBypassDialog(user),
             ),
           ],
         ],
@@ -922,9 +907,8 @@ class _StaffProfileDetailScreenState
                   _InfoCard(
                     icon: Icons.business_outlined,
                     label: 'Department',
-                    value: user.departmentName ??
-                        user.department ??
-                        'Unassigned',
+                    value:
+                        user.departmentName ?? user.department ?? 'Unassigned',
                   ),
                   _InfoCard(
                     icon: Icons.badge_outlined,
@@ -957,8 +941,8 @@ class _StaffProfileDetailScreenState
                         .map(
                           (item) => Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.0),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4.0),
                               child: item,
                             ),
                           ),
@@ -1001,7 +985,9 @@ class _StaffProfileDetailScreenState
                 tabs: const [
                   Tab(icon: Icon(Icons.assignment_outlined), text: 'Tasks'),
                   Tab(icon: Icon(Icons.history_outlined), text: 'Attendance'),
-                  Tab(icon: Icon(Icons.beach_access_outlined), text: 'Leave History'),
+                  Tab(
+                      icon: Icon(Icons.beach_access_outlined),
+                      text: 'Leave History'),
                 ],
               ),
             ),
@@ -1123,8 +1109,11 @@ class _StaffTasksTab extends ConsumerWidget {
 
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
           children: [
             Text('Assigned Tasks', style: AppTypography.headlineMd),
             FilledButton.icon(
@@ -1169,8 +1158,10 @@ class _StaffTasksTab extends ConsumerWidget {
 
               return Column(
                 children: [
-                  // Task counters
-                  Row(
+                  // Task counters (Responsive Wrap)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       _StatChip(label: 'Total', count: tasks.length),
                       _StatChip(
@@ -1288,8 +1279,9 @@ class _TaskTile extends StatelessWidget {
                   task.title,
                   style: AppTypography.bodyMd.copyWith(
                     fontWeight: FontWeight.w600,
-                    decoration:
-                        isDone ? TextDecoration.lineThrough : TextDecoration.none,
+                    decoration: isDone
+                        ? TextDecoration.lineThrough
+                        : TextDecoration.none,
                   ),
                 ),
                 if (task.description != null &&
@@ -1305,7 +1297,10 @@ class _TaskTile extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 4),
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1323,7 +1318,6 @@ class _TaskTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     if (task.dueDate != null)
                       Text(
                         'Due: ${DateFormat('MMM d, yyyy').format(task.dueDate!)}',
@@ -1433,25 +1427,48 @@ class _StaffAttendanceTab extends ConsumerWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              DateFormat('EEEE, MMM d, yyyy')
-                                  .format(rec.recordDate),
-                              style: AppTypography.bodyMd.copyWith(
-                                fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                DateFormat('EEEE, MMM d, yyyy')
+                                    .format(rec.recordDate),
+                                style: AppTypography.bodyMd.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'In: $checkInStr  •  Out: $checkOutStr  •  Hours: ${rec.workingHours != null ? "${rec.workingHours!.toStringAsFixed(1)} hrs" : "—"}',
-                              style: AppTypography.bodySm.copyWith(
-                                color: AppColors.onSurfaceVariant,
+                              const SizedBox(height: 2),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 2,
+                                children: [
+                                  Text(
+                                    'In: $checkInStr',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  Text(
+                                    '•  Out: $checkOutStr',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  Text(
+                                    '•  ${rec.workingHours != null ? "${rec.workingHours!.toStringAsFixed(1)} hrs" : "—"}',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: AppSpacing.xs),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -1518,8 +1535,11 @@ class _StaffLeaveTab extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
+          runSpacing: 4,
           children: [
             Text('Leave History & Deductions', style: AppTypography.headlineMd),
             if (deductionConfig.dailyRate > 0)
@@ -1579,12 +1599,16 @@ class _StaffLeaveTab extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              '${DateFormat('MMM d, yyyy').format(req.startDate)} - ${DateFormat('MMM d, yyyy').format(req.endDate)}',
-                              style: AppTypography.bodyMd.copyWith(
-                                fontWeight: FontWeight.w700,
+                            Expanded(
+                              child: Text(
+                                '${DateFormat('MMM d, yyyy').format(req.startDate)} - ${DateFormat('MMM d, yyyy').format(req.endDate)}',
+                                style: AppTypography.bodyMd.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: AppSpacing.xs),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,

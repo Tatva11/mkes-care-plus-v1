@@ -42,11 +42,13 @@ class PatientDetailsScreen extends ConsumerStatefulWidget {
     required this.patientId,
     this.pendingAppointment,
     this.showMandatoryExamBanner = true,
+    this.autoOpenExam = false,
   });
 
   final String patientId;
   final AppointmentModel? pendingAppointment;
   final bool showMandatoryExamBanner;
+  final bool autoOpenExam;
 
   static String normalizePhoneNumber(String raw) =>
       _PatientDetailsScreenState.normalizePhoneNumber(raw);
@@ -60,6 +62,7 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
   String get patientId => widget.patientId;
   AppointmentModel? _activeAppointment;
   bool _isNavigatingToBilling = false;
+  bool _hasAutoOpenedExam = false;
 
   @override
   void initState() {
@@ -202,64 +205,79 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
             ],
           ),
         ),
-        data: (patient) => RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(patientDetailsProvider(patientId));
-            ref.invalidate(patientAttendanceHistoryProvider(patientId));
-            ref.invalidate(dentalLabListProvider);
-            ref.invalidate(eyeSurgeriesForPatientProvider(patientId));
-            ref.invalidate(eyeExaminationsForPatientProvider(patientId));
-            ref.invalidate(dentalTreatmentsForPatientProvider(patientId));
-          },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_activeAppointment != null && widget.showMandatoryExamBanner)
-                  _buildActiveVisitBanner(context, patient, _activeAppointment!),
-                _buildHeaderCard(context, ref, patient),
-                const SizedBox(height: AppSpacing.md),
-                _buildInfoCard(context, ref, patient),
-                const SizedBox(height: AppSpacing.lg),
-                if (patient.department == 'dental' ||
-                    ref
-                        .watch(patientDentalLabCasesProvider(patient.id))
-                        .isNotEmpty) ...[
-                  DentalTreatmentPatientSection(
-                    patient: patient,
-                    pendingAppointment: _activeAppointment,
-                    onRecordSaved: (treatment) =>
-                        _handleExamCompleted(patient, treatment.id),
-                  ),
+        data: (patient) {
+          if (widget.autoOpenExam &&
+              !_hasAutoOpenedExam &&
+              _activeAppointment != null) {
+            _hasAutoOpenedExam = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _openExamDialogForVisit(patient, _activeAppointment!);
+              }
+            });
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(patientDetailsProvider(patientId));
+              ref.invalidate(patientAttendanceHistoryProvider(patientId));
+              ref.invalidate(dentalLabListProvider);
+              ref.invalidate(eyeSurgeriesForPatientProvider(patientId));
+              ref.invalidate(eyeExaminationsForPatientProvider(patientId));
+              ref.invalidate(dentalTreatmentsForPatientProvider(patientId));
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_activeAppointment != null &&
+                      widget.showMandatoryExamBanner)
+                    _buildActiveVisitBanner(
+                        context, patient, _activeAppointment!),
+                  _buildHeaderCard(context, ref, patient),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildInfoCard(context, ref, patient),
                   const SizedBox(height: AppSpacing.lg),
-                  _buildDentalLabSection(context, ref, patient),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
-                if (patient.department == 'eye' ||
-                    ref
-                            .watch(eyeSurgeriesForPatientProvider(patient.id))
-                            .valueOrNull
-                            ?.isNotEmpty ==
-                        true) ...[
-                  if (patient.department == 'eye') ...[
-                    EyeExaminationPatientSection(
+                  if (patient.department == 'dental' ||
+                      ref
+                          .watch(patientDentalLabCasesProvider(patient.id))
+                          .isNotEmpty) ...[
+                    DentalTreatmentPatientSection(
                       patient: patient,
                       pendingAppointment: _activeAppointment,
-                      onRecordSaved: (exam) =>
-                          _handleExamCompleted(patient, exam.id),
+                      onRecordSaved: (treatment) =>
+                          _handleExamCompleted(patient, treatment.id),
                     ),
                     const SizedBox(height: AppSpacing.lg),
+                    _buildDentalLabSection(context, ref, patient),
+                    const SizedBox(height: AppSpacing.lg),
                   ],
-                  EyeSurgeryPatientSection(patientId: patient.id),
-                  const SizedBox(height: AppSpacing.lg),
+                  if (patient.department == 'eye' ||
+                      ref
+                              .watch(eyeSurgeriesForPatientProvider(patient.id))
+                              .valueOrNull
+                              ?.isNotEmpty ==
+                          true) ...[
+                    if (patient.department == 'eye') ...[
+                      EyeExaminationPatientSection(
+                        patient: patient,
+                        pendingAppointment: _activeAppointment,
+                        onRecordSaved: (exam) =>
+                            _handleExamCompleted(patient, exam.id),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                    EyeSurgeryPatientSection(patientId: patient.id),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+                  _buildAttendanceHistorySection(ref, historyAsync),
                 ],
-                _buildAttendanceHistorySection(ref, historyAsync),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -375,7 +393,8 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
                     children: [
                       Expanded(
                         child: FilledButton.tonalIcon(
-                          onPressed: () => _makePhoneCall(context, patient.mobile!),
+                          onPressed: () =>
+                              _makePhoneCall(context, patient.mobile!),
                           icon: const Icon(Icons.phone, size: 16),
                           label: const Text('Call'),
                           style: FilledButton.styleFrom(
@@ -533,7 +552,8 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, WidgetRef ref, PatientModel patient) {
+  Widget _buildInfoCard(
+      BuildContext context, WidgetRef ref, PatientModel patient) {
     final ageLabel = patient.dob != null
         ? '${DateTime.now().year - patient.dob!.year} yrs'
         : null;
@@ -1132,18 +1152,14 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
         patient.department?.toLowerCase() == 'dental';
     final hasExam = appointment.hasClinicalExam;
 
-    final bannerBg = hasExam
-        ? const Color(0xFFE8F5E9)
-        : const Color(0xFFFFF3E0);
-    final borderColor = hasExam
-        ? const Color(0xFF81C784)
-        : const Color(0xFFFFB74D);
-    final titleColor = hasExam
-        ? const Color(0xFF1B5E20)
-        : const Color(0xFFE65100);
-    final bodyColor = hasExam
-        ? const Color(0xFF2E7D32)
-        : const Color(0xFFBF360C);
+    final bannerBg =
+        hasExam ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0);
+    final borderColor =
+        hasExam ? const Color(0xFF81C784) : const Color(0xFFFFB74D);
+    final titleColor =
+        hasExam ? const Color(0xFF1B5E20) : const Color(0xFFE65100);
+    final bodyColor =
+        hasExam ? const Color(0xFF2E7D32) : const Color(0xFFBF360C);
 
     final formattedDate =
         DateFormat('dd MMM yyyy').format(appointment.appointmentDate);
@@ -1166,7 +1182,9 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
               Row(
                 children: [
                   Icon(
-                    hasExam ? Icons.check_circle : Icons.assignment_late_outlined,
+                    hasExam
+                        ? Icons.check_circle
+                        : Icons.assignment_late_outlined,
                     color: titleColor,
                     size: 20,
                   ),
@@ -1214,9 +1232,11 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                   ),
-                  onPressed: () => _openExamDialogForVisit(patient, appointment),
+                  onPressed: () =>
+                      _openExamDialogForVisit(patient, appointment),
                   icon: const Icon(Icons.edit_note, size: 16),
-                  label: Text(isDental ? 'Record Treatment' : 'Record Vitals & Exam'),
+                  label: Text(
+                      isDental ? 'Record Treatment' : 'Record Vitals & Exam'),
                 );
 
           if (isNarrow) {

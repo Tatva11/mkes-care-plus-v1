@@ -117,7 +117,8 @@ class _PurchaseOrderManagementContentState
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Cancel Purchase Order'),
-        content: Text('Are you sure you want to cancel PO #${po.purchaseOrderNumber}?'),
+        content: Text(
+            'Are you sure you want to cancel PO #${po.purchaseOrderNumber}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(false),
@@ -346,11 +347,16 @@ class _PurchaseOrderManagementContentState
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
           children: [
-            _buildStatCard('Total POs', allOrders.length.toString(), Icons.receipt_long, Colors.blueGrey, cardWidth),
-            _buildStatCard('Drafts', draftCount.toString(), Icons.edit_note, Colors.grey, cardWidth),
-            _buildStatCard('Ordered', orderedCount.toString(), Icons.send, const Color(0xFF1976D2), cardWidth),
-            _buildStatCard('Partially Received', partialCount.toString(), Icons.hourglass_top, const Color(0xFFE65100), cardWidth),
-            _buildStatCard('Received in Full', receivedCount.toString(), Icons.check_circle, const Color(0xFF2E7D32), cardWidth),
+            _buildStatCard('Total POs', allOrders.length.toString(),
+                Icons.receipt_long, Colors.blueGrey, cardWidth),
+            _buildStatCard('Drafts', draftCount.toString(), Icons.edit_note,
+                Colors.grey, cardWidth),
+            _buildStatCard('Ordered', orderedCount.toString(), Icons.send,
+                const Color(0xFF1976D2), cardWidth),
+            _buildStatCard('Partially Received', partialCount.toString(),
+                Icons.hourglass_top, const Color(0xFFE65100), cardWidth),
+            _buildStatCard('Received in Full', receivedCount.toString(),
+                Icons.check_circle, const Color(0xFF2E7D32), cardWidth),
           ],
         );
       },
@@ -486,7 +492,8 @@ class _PurchaseOrderManagementContentState
                             onPressed: () {
                               _searchController.clear();
                               ref
-                                  .read(purchaseOrderSearchQueryProvider.notifier)
+                                  .read(
+                                      purchaseOrderSearchQueryProvider.notifier)
                                   .state = '';
                             },
                           )
@@ -494,7 +501,8 @@ class _PurchaseOrderManagementContentState
                     fillColor: AppColors.surfaceContainerLow,
                   ),
                   onChanged: (val) {
-                    ref.read(purchaseOrderSearchQueryProvider.notifier).state = val;
+                    ref.read(purchaseOrderSearchQueryProvider.notifier).state =
+                        val;
                   },
                 ),
               ),
@@ -505,9 +513,11 @@ class _PurchaseOrderManagementContentState
                   isExpanded: true,
                   initialValue: selectedVendorId,
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.local_shipping_outlined, size: 20),
+                    prefixIcon:
+                        const Icon(Icons.local_shipping_outlined, size: 20),
                     fillColor: AppColors.surfaceContainerLow,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   ),
                   hint: const Text('All Vendors'),
                   items: [
@@ -523,7 +533,8 @@ class _PurchaseOrderManagementContentState
                     }),
                   ],
                   onChanged: (val) {
-                    ref.read(purchaseOrderVendorFilterProvider.notifier).state = val;
+                    ref.read(purchaseOrderVendorFilterProvider.notifier).state =
+                        val;
                   },
                 ),
               ),
@@ -626,7 +637,8 @@ class _PurchaseOrderManagementContentState
                 children: [
                   // PO Number
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -649,7 +661,8 @@ class _PurchaseOrderManagementContentState
 
                   // Vendor
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     child: Text(
                       po.vendorName ?? '—',
                       style: AppTypography.bodyMd.copyWith(
@@ -660,7 +673,8 @@ class _PurchaseOrderManagementContentState
 
                   // Order Date
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     child: Text(
                       dateFormat.format(po.orderDate),
                       style: AppTypography.bodySm,
@@ -669,7 +683,8 @@ class _PurchaseOrderManagementContentState
 
                   // Expected Delivery
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     child: Text(
                       po.expectedDeliveryDate != null
                           ? dateFormat.format(po.expectedDeliveryDate!)
@@ -682,7 +697,8 @@ class _PurchaseOrderManagementContentState
 
                   // Total Amount
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     child: Text(
                       po.formattedTotal,
                       style: AppTypography.bodyMd.copyWith(
@@ -694,11 +710,13 @@ class _PurchaseOrderManagementContentState
 
                   // Status Badge
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: po.status.color.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
@@ -718,7 +736,8 @@ class _PurchaseOrderManagementContentState
 
                   // Actions
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -733,7 +752,8 @@ class _PurchaseOrderManagementContentState
                         if (po.canReceive)
                           IconButton(
                             tooltip: 'Receive Items',
-                            icon: const Icon(Icons.inventory, size: 20, color: Colors.green),
+                            icon: const Icon(Icons.inventory,
+                                size: 20, color: Colors.green),
                             onPressed: () => _openReceiveDialog(po),
                           ),
 
@@ -749,7 +769,8 @@ class _PurchaseOrderManagementContentState
                         if (po.canCancel)
                           IconButton(
                             tooltip: 'Cancel PO',
-                            icon: const Icon(Icons.cancel_outlined, size: 20, color: AppColors.error),
+                            icon: const Icon(Icons.cancel_outlined,
+                                size: 20, color: AppColors.error),
                             onPressed: () => _cancelOrder(po),
                           ),
                       ],
@@ -788,15 +809,21 @@ class _PurchaseOrderManagementContentState
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      po.purchaseOrderNumber,
-                      style: AppTypography.headlineMd.copyWith(
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        po.purchaseOrderNumber,
+                        style: AppTypography.headlineMd.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.xs),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: po.status.color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
@@ -816,15 +843,22 @@ class _PurchaseOrderManagementContentState
                 const SizedBox(height: 4),
                 Text(
                   po.vendorName ?? 'Vendor',
-                  style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600),
+                  style: AppTypography.bodyMd
+                      .copyWith(fontWeight: FontWeight.w600),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.sm,
+                  runSpacing: 2,
                   children: [
                     Text(
                       'Order: ${dateFormat.format(po.orderDate)}',
-                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                      style: AppTypography.bodySm
+                          .copyWith(color: AppColors.onSurfaceVariant),
                     ),
                     Text(
                       po.formattedTotal,
@@ -835,6 +869,52 @@ class _PurchaseOrderManagementContentState
                     ),
                   ],
                 ),
+                if (po.status == PurchaseOrderStatus.ordered ||
+                    po.status == PurchaseOrderStatus.partiallyReceived) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: po.status == PurchaseOrderStatus.partiallyReceived
+                          ? const Color(0xFFE65100).withValues(alpha: 0.1)
+                          : Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          po.status == PurchaseOrderStatus.partiallyReceived
+                              ? Icons.hourglass_top
+                              : Icons.schedule,
+                          size: 13,
+                          color:
+                              po.status == PurchaseOrderStatus.partiallyReceived
+                                  ? const Color(0xFFE65100)
+                                  : Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            po.status == PurchaseOrderStatus.partiallyReceived
+                                ? 'Partially Received • Awaiting Remaining Items'
+                                : 'Yet to be Received • Awaiting Delivery',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: po.status ==
+                                      PurchaseOrderStatus.partiallyReceived
+                                  ? const Color(0xFFE65100)
+                                  : Colors.blue.shade700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const Divider(height: 16),
                 Wrap(
                   alignment: WrapAlignment.end,
@@ -851,7 +931,7 @@ class _PurchaseOrderManagementContentState
                       FilledButton.icon(
                         onPressed: () => _openReceiveDialog(po),
                         icon: const Icon(Icons.inventory, size: 16),
-                        label: const Text('Receive'),
+                        label: const Text('Receive Items'),
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.green.shade700,
                         ),
@@ -863,7 +943,8 @@ class _PurchaseOrderManagementContentState
                       ),
                     if (po.canCancel)
                       IconButton(
-                        icon: const Icon(Icons.cancel_outlined, size: 18, color: AppColors.error),
+                        icon: const Icon(Icons.cancel_outlined,
+                            size: 18, color: AppColors.error),
                         onPressed: () => _cancelOrder(po),
                       ),
                   ],
@@ -897,16 +978,19 @@ class _PurchaseOrderManagementContentState
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           children: [
-            const Icon(Icons.receipt_long_outlined, size: 56, color: AppColors.outline),
+            const Icon(Icons.receipt_long_outlined,
+                size: 56, color: AppColors.outline),
             const SizedBox(height: AppSpacing.md),
             Text(
               'No Purchase Orders Yet',
-              style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.w700),
+              style: AppTypography.headlineMd
+                  .copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               'Create a purchase order to request products from your suppliers and track delivery.',
-              style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodyMd
+                  .copyWith(color: AppColors.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -927,7 +1011,8 @@ class _PurchaseOrderManagementContentState
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           children: [
-            const Icon(Icons.search_off_outlined, size: 48, color: AppColors.outline),
+            const Icon(Icons.search_off_outlined,
+                size: 48, color: AppColors.outline),
             const SizedBox(height: AppSpacing.md),
             Text(
               'No Purchase Orders Found',
@@ -936,7 +1021,8 @@ class _PurchaseOrderManagementContentState
             const SizedBox(height: AppSpacing.xs),
             Text(
               'No purchase orders match your search and filter criteria.',
-              style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodySm
+                  .copyWith(color: AppColors.onSurfaceVariant),
             ),
           ],
         ),

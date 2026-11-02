@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mkes_care/features/appointments/repositories/appointment_repository.dart';
-import 'package:mkes_care/features/department/models/department.dart';
 import 'package:mkes_care/features/department/repositories/department_repository.dart';
 
 void main() {
