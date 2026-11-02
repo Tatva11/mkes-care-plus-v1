@@ -308,6 +308,9 @@ class BillingRepository {
           'p_patient_id': invoice.patientId,
           'p_department': invoice.department.toLowerCase(),
           'p_message_text': messageText,
+          'p_media_url': 'invoice://${invoice.id}',
+          'p_template_key': 'invoice_${invoice.id}',
+          'p_message_type': 'payment_receipt',
         });
       }
     } catch (_) {

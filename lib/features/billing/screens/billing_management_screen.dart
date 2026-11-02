@@ -14,6 +14,7 @@ import '../services/billing_pdf_service.dart';
 import '../widgets/billing_summary_cards.dart';
 import '../widgets/record_payment_dialog.dart';
 import '../../reports/screens/admin_reports_screen.dart';
+import '../../whatsapp/screens/whatsapp_inbox_screen.dart';
 import 'billing_reports_screen.dart';
 import 'create_invoice_screen.dart';
 import '../../staff/widgets/clock_in_required_dialog.dart';
@@ -1869,6 +1870,22 @@ class _InvoiceDetailsDialogState extends ConsumerState<_InvoiceDetailsDialog> {
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Edit Invoice'),
                   ),
+                  if (invoice.patientMobile != null && invoice.patientMobile!.trim().isNotEmpty)
+                    OutlinedButton.icon(
+                      key: const Key('invoice_whatsapp_chat_button'),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => WhatsAppInboxScreen(
+                              initialPhoneNumber: invoice.patientMobile,
+                              initialInvoice: invoice,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.chat_outlined, size: 16, color: Color(0xFF25D366)),
+                      label: const Text('WhatsApp Chat'),
+                    ),
                   if (invoice.remainingAmount > 0.001 && !invoice.isCancelled)
                     FilledButton.icon(
                       onPressed: () => _openRecordPayment(context, invoice),

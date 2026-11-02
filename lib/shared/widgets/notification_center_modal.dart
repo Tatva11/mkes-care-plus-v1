@@ -14,6 +14,7 @@ import '../../features/staff_portal/screens/staff_tasks_screen.dart';
 import '../../features/staff_portal/screens/staff_schedule_screen.dart';
 import '../../features/staff_portal/screens/staff_leave_screen.dart';
 import '../../features/staff_portal/screens/staff_attendance_screen.dart';
+import '../../features/patients/providers/patients_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Legacy helper class kept for API compatibility.
@@ -520,9 +521,27 @@ class _NotificationTile extends ConsumerWidget {
 
           // Intelligent navigation routing
           if (item.type == 'whatsapp_reply') {
+            final phoneMatch = RegExp(r'\b([6-9]\d{9})\b').firstMatch(item.title) ??
+                RegExp(r'\b([6-9]\d{9})\b').firstMatch(item.message);
+            String? targetPhone = phoneMatch?.group(1);
+
+            if (targetPhone == null && item.relatedId != null) {
+              try {
+                final patients = ref.read(patientsProvider).valueOrNull;
+                final patient = patients?.firstWhere((p) => p.id == item.relatedId);
+                final mobile = patient?.mobile;
+                if (mobile != null && mobile.isNotEmpty) {
+                  final digits = mobile.replaceAll(RegExp(r'[^0-9]'), '');
+                  targetPhone = digits.length >= 10 ? digits.substring(digits.length - 10) : digits;
+                }
+              } catch (_) {}
+            }
+
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => const WhatsAppInboxScreen(),
+                builder: (_) => WhatsAppInboxScreen(
+                  initialPhoneNumber: targetPhone,
+                ),
               ),
             );
           } else if (item.type == 'lab_ready' || item.type == 'eye_lab_ready') {

@@ -36,12 +36,14 @@ import '../../patients/screens/patient_details_screen.dart';
 import '../../department/providers/departments_provider.dart';
 
 import '../../staff/models/shift_configuration.dart';
-import '../../whatsapp/providers/whatsapp_appointment_provider.dart';
-import '../../whatsapp/widgets/whatsapp_requests_view.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../patients/providers/patient_attendance_provider.dart';
 import '../../patients/repositories/patient_attendance_repository.dart';
 import '../../patients/providers/patients_provider.dart';
+import '../../whatsapp/providers/whatsapp_appointment_provider.dart';
+import '../../whatsapp/providers/whatsapp_inbox_provider.dart';
+import '../../whatsapp/screens/whatsapp_inbox_screen.dart';
+import '../../whatsapp/widgets/whatsapp_requests_view.dart';
 
 class StaffScheduleScreen extends ConsumerStatefulWidget {
   const StaffScheduleScreen({super.key});
@@ -522,6 +524,15 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
     );
   }
 
+  void _openWhatsAppInbox() {
+    ref.read(whatsappConversationsProvider.notifier).refresh();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const WhatsAppInboxScreen(),
+      ),
+    );
+  }
+
   void _promptScheduleNextAppointment(
       AppointmentModel appointment, String triggerReason) {
     showModalBottomSheet(
@@ -971,6 +982,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                     _buildDateSelector(),
                     const SizedBox(width: AppSpacing.sm),
                     OutlinedButton.icon(
+                      key: const Key('staff_schedule_whatsapp_requests_button'),
                       onPressed: _openWhatsAppRequestsSheet,
                       icon: const Icon(Icons.chat_bubble_outline,
                           size: 18, color: Color(0xFF25D366)),
@@ -1005,6 +1017,26 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                         },
                       ),
                       style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusMd),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    OutlinedButton.icon(
+                      key: const Key('staff_schedule_whatsapp_inbox_button'),
+                      onPressed: _openWhatsAppInbox,
+                      icon: const Icon(Icons.mark_chat_unread_outlined,
+                          size: 18, color: Color(0xFF25D366)),
+                      label: const Text('WhatsApp Inbox'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF128C7E),
+                        side: const BorderSide(color: Color(0xFF25D366)),
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.md,
                           vertical: AppSpacing.sm,
@@ -1108,7 +1140,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            isNarrow ? 'WhatsApp' : 'WhatsApp Requests',
+                            isNarrow ? 'Requests' : 'WhatsApp Requests',
                             overflow: TextOverflow.ellipsis,
                           ),
                           if (pendingCount > 0) ...[
@@ -1145,6 +1177,26 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                   ),
                 );
 
+                final whatsAppInboxBtn = OutlinedButton.icon(
+                  key: const Key('staff_schedule_mobile_whatsapp_inbox_button'),
+                  onPressed: _openWhatsAppInbox,
+                  icon: const Icon(Icons.mark_chat_unread_outlined,
+                      size: 18, color: Color(0xFF25D366)),
+                  label: const Text('WhatsApp Inbox'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF128C7E),
+                    side: const BorderSide(color: Color(0xFF25D366)),
+                    minimumSize: isNarrow ? const Size(double.infinity, 42) : const Size(160, 42),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                  ),
+                );
+
                 if (isNarrow) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1158,6 +1210,8 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                           whatsAppBtn,
                         ],
                       ),
+                      const SizedBox(height: AppSpacing.xs + 2),
+                      whatsAppInboxBtn,
                       const SizedBox(height: AppSpacing.xs + 2),
                       badge,
                     ],
@@ -1174,6 +1228,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                           _buildDateSelector(),
                           bookBtn,
                           whatsAppBtn,
+                          whatsAppInboxBtn,
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
