@@ -75,7 +75,7 @@ class ReportsMetricCard extends StatelessWidget {
                 if (trailing != null) trailing!,
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

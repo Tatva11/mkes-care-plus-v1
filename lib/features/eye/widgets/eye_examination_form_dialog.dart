@@ -9,7 +9,10 @@ import '../../appointments/models/appointment_model.dart';
 import '../../appointments/repositories/appointment_repository.dart';
 import '../../patients/models/patient_model.dart';
 import '../models/eye_examination_model.dart';
+import '../../staff/widgets/clock_in_required_dialog.dart';
+import '../../staff/providers/attendance_provider.dart';
 import '../providers/eye_examination_provider.dart';
+import '../../../shared/widgets/responsive_form_row.dart';
 
 /// Modal dialog for recording or editing an eye clinical examination.
 class EyeExaminationFormDialog extends ConsumerStatefulWidget {
@@ -17,10 +20,12 @@ class EyeExaminationFormDialog extends ConsumerStatefulWidget {
     super.key,
     required this.patient,
     this.initialRecord,
+    this.initialAppointmentId,
   });
 
   final PatientModel patient;
   final EyeExaminationModel? initialRecord;
+  final String? initialAppointmentId;
 
   @override
   ConsumerState<EyeExaminationFormDialog> createState() =>
@@ -73,7 +78,7 @@ class _EyeExaminationFormDialogState
       _examinationTime = TimeOfDay.now();
     }
 
-    _selectedAppointmentId = init?.appointmentId;
+    _selectedAppointmentId = init?.appointmentId ?? widget.initialAppointmentId;
 
     _vaOdController =
         TextEditingController(text: init?.visualAcuityOd ?? '');
@@ -163,6 +168,12 @@ class _EyeExaminationFormDialogState
   }
 
   Future<void> _save() async {
+    final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+    if (!isClockedIn) {
+      if (mounted) showClockInRequiredDialog(context, ref);
+      return;
+    }
+
     if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
 
@@ -301,18 +312,22 @@ class _EyeExaminationFormDialogState
                         size: 24,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            isEdit
-                                ? 'Edit Eye Clinical Examination'
-                                : 'Record Eye Clinical Examination',
-                            style: AppTypography.headlineMd.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              isEdit
+                                  ? 'Edit Eye Clinical Examination'
+                                  : 'Record Eye Clinical Examination',
+                              style: AppTypography.headlineMd.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -321,6 +336,7 @@ class _EyeExaminationFormDialogState
                             style: AppTypography.bodySm.copyWith(
                               color: AppColors.onSurfaceVariant,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -362,42 +378,38 @@ class _EyeExaminationFormDialogState
                 ],
 
                 // Date & Time row
-                Row(
+                ResponsiveFormRow(
+                  breakpoint: 440,
                   children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: _selectDate,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Examination Date *',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today_outlined),
-                          ),
-                          child: Text(
-                            DateFormat('dd MMM yyyy').format(_examinationDate),
-                            style: AppTypography.bodyMd,
-                          ),
+                    InkWell(
+                      onTap: _selectDate,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Examination Date *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_today_outlined),
+                        ),
+                        child: Text(
+                          DateFormat('dd MMM yyyy').format(_examinationDate),
+                          style: AppTypography.bodyMd,
                         ),
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: InkWell(
-                        onTap: _selectTime,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Examination Time',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.access_time_outlined),
-                          ),
-                          child: Text(
-                            _examinationTime != null
-                                ? _examinationTime!.format(context)
-                                : 'Select Time',
-                            style: AppTypography.bodyMd,
-                          ),
+                    InkWell(
+                      onTap: _selectTime,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Examination Time',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.access_time_outlined),
+                        ),
+                        child: Text(
+                          _examinationTime != null
+                              ? _examinationTime!.format(context)
+                              : 'Select Time',
+                          style: AppTypography.bodyMd,
                         ),
                       ),
                     ),
@@ -406,7 +418,7 @@ class _EyeExaminationFormDialogState
                 const SizedBox(height: AppSpacing.md),
 
                 // Related Appointment Dropdown
-                if (!_isLoadingAppointments && _patientAppointments.isNotEmpty) ...[
+                if (!_isLoadingAppointments || _selectedAppointmentId != null) ...[
                   DropdownButtonFormField<String?>(
                     initialValue: _selectedAppointmentId,
                     isExpanded: true,
@@ -419,6 +431,12 @@ class _EyeExaminationFormDialogState
                       const DropdownMenuItem<String?>(
                         value: null,
                         child: Text('None / Unlinked Examination'),
+                      ),
+                      if (_selectedAppointmentId != null &&
+                          !_patientAppointments.any((apt) => apt.id == _selectedAppointmentId))
+                        DropdownMenuItem<String?>(
+                          value: _selectedAppointmentId,
+                          child: Text('Visit / Appointment ID: $_selectedAppointmentId'),
                       ),
                       ..._patientAppointments.map((apt) {
                         final formattedDate =
@@ -452,27 +470,23 @@ class _EyeExaminationFormDialogState
                 // Visual Acuity Section
                 _buildSectionHeader('Visual Acuity (VA)', Icons.remove_red_eye_outlined),
                 const SizedBox(height: AppSpacing.xs),
-                Row(
+                ResponsiveFormRow(
+                  breakpoint: 440,
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _vaOdController,
-                        decoration: const InputDecoration(
-                          labelText: 'Right Eye (OD)',
-                          border: OutlineInputBorder(),
-                          hintText: 'e.g. 6/6, 20/20',
-                        ),
+                    TextFormField(
+                      controller: _vaOdController,
+                      decoration: const InputDecoration(
+                        labelText: 'Right Eye (OD)',
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g. 6/6, 20/20',
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _vaOsController,
-                        decoration: const InputDecoration(
-                          labelText: 'Left Eye (OS)',
-                          border: OutlineInputBorder(),
-                          hintText: 'e.g. 6/9, 20/30',
-                        ),
+                    TextFormField(
+                      controller: _vaOsController,
+                      decoration: const InputDecoration(
+                        labelText: 'Left Eye (OS)',
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g. 6/9, 20/30',
                       ),
                     ),
                   ],
@@ -491,27 +505,23 @@ class _EyeExaminationFormDialogState
                 // Intraocular Pressure (IOP) Section
                 _buildSectionHeader('Intraocular Pressure (IOP)', Icons.speed_outlined),
                 const SizedBox(height: AppSpacing.xs),
-                Row(
+                ResponsiveFormRow(
+                  breakpoint: 440,
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _iopOdController,
-                        decoration: const InputDecoration(
-                          labelText: 'OD IOP (mmHg)',
-                          border: OutlineInputBorder(),
-                          hintText: 'e.g. 14',
-                        ),
+                    TextFormField(
+                      controller: _iopOdController,
+                      decoration: const InputDecoration(
+                        labelText: 'OD IOP (mmHg)',
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g. 14',
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _iopOsController,
-                        decoration: const InputDecoration(
-                          labelText: 'OS IOP (mmHg)',
-                          border: OutlineInputBorder(),
-                          hintText: 'e.g. 16',
-                        ),
+                    TextFormField(
+                      controller: _iopOsController,
+                      decoration: const InputDecoration(
+                        labelText: 'OS IOP (mmHg)',
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g. 16',
                       ),
                     ),
                   ],

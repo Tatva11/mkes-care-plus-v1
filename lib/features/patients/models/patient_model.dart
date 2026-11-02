@@ -8,6 +8,7 @@ class PatientModel {
   final String? department;
   final String? reference;
   final DateTime? visitDate;
+  final DateTime? registrationDate;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool whatsappOptOut;
@@ -22,6 +23,7 @@ class PatientModel {
     this.department,
     this.reference,
     this.visitDate,
+    this.registrationDate,
     required this.createdAt,
     required this.updatedAt,
     this.whatsappOptOut = false,
@@ -40,9 +42,12 @@ class PatientModel {
       visitDate: json['visit_date'] != null
           ? DateTime.tryParse(json['visit_date'] as String)
           : null,
+      registrationDate: json['registration_date'] != null
+          ? DateTime.tryParse(json['registration_date'] as String)
+          : null,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : DateTime.now(),
+          ? (DateTime.tryParse(json['created_at'] as String) ?? (json['registration_date'] != null ? DateTime.tryParse(json['registration_date'] as String) : null) ?? DateTime.fromMillisecondsSinceEpoch(0))
+          : (json['registration_date'] != null ? DateTime.tryParse(json['registration_date'] as String) ?? DateTime.fromMillisecondsSinceEpoch(0) : DateTime.fromMillisecondsSinceEpoch(0)),
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
           : DateTime.now(),
@@ -61,6 +66,7 @@ class PatientModel {
       'department': department,
       'reference': reference,
       'visit_date': visitDate?.toIso8601String().split('T').first,
+      'registration_date': registrationDate?.toIso8601String().split('T').first,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'whatsapp_opt_out': whatsappOptOut,
@@ -98,6 +104,7 @@ class PatientModel {
     String? department,
     String? reference,
     DateTime? visitDate,
+    DateTime? registrationDate,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? whatsappOptOut,
@@ -112,6 +119,7 @@ class PatientModel {
       department: department ?? this.department,
       reference: reference ?? this.reference,
       visitDate: visitDate ?? this.visitDate,
+      registrationDate: registrationDate ?? this.registrationDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       whatsappOptOut: whatsappOptOut ?? this.whatsappOptOut,

@@ -31,3 +31,7 @@ flutter:
   assets:
     - api.env
     - assets/images/
+    - assets/images/qr.jpeg
+    - assets/images/qr.png
+    - assets/images/mkes_logo.png
+    - qr.jpeg

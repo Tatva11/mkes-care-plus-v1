@@ -26,12 +26,15 @@ class EyeSurgeryPatientSection extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'OPERATIONS / SURGERY HISTORY',
-              style: AppTypography.labelCaps.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.1,
+            Expanded(
+              child: Text(
+                'OPERATIONS / SURGERY HISTORY',
+                style: AppTypography.labelCaps.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             IconButton(

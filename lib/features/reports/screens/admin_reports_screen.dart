@@ -390,7 +390,7 @@ class _OverviewSectionView extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: constraints.maxWidth > 650 ? 1.6 : 2.2,
+                  childAspectRatio: constraints.maxWidth > 900 ? 1.6 : (constraints.maxWidth > 650 ? 1.5 : (constraints.maxWidth < 360 ? 1.55 : 1.7)),
                   children: [
                     ReportsMetricCard(
                       title: 'Total Patients',
@@ -461,8 +461,10 @@ class _OverviewSectionView extends ConsumerWidget {
                       dentalCount: data.dentalPatients,
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    Wrap(
+                      alignment: WrapAlignment.spaceAround,
+                      spacing: 16,
+                      runSpacing: 12,
                       children: [
                         _MiniSummary(
                           label: 'Eye Appointments',
@@ -487,8 +489,10 @@ class _OverviewSectionView extends ConsumerWidget {
                       ],
                     ),
                   ] else if (dept == 'eye') ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    Wrap(
+                      alignment: WrapAlignment.spaceAround,
+                      spacing: 16,
+                      runSpacing: 12,
                       children: [
                         _MiniSummary(
                           label: 'Eye Appointments',
@@ -513,8 +517,10 @@ class _OverviewSectionView extends ConsumerWidget {
                       ],
                     ),
                   ] else if (dept == 'dental') ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    Wrap(
+                      alignment: WrapAlignment.spaceAround,
+                      spacing: 16,
+                      runSpacing: 12,
                       children: [
                         _MiniSummary(
                           label: 'Dental Appointments',
@@ -618,7 +624,7 @@ class _PatientReportsView extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: constraints.maxWidth > 650 ? 1.6 : 2.2,
+                  childAspectRatio: constraints.maxWidth > 900 ? 1.6 : (constraints.maxWidth > 650 ? 1.5 : (constraints.maxWidth < 360 ? 1.55 : 1.7)),
                   children: [
                     ReportsMetricCard(
                       title: 'Total Patients',
@@ -723,8 +729,10 @@ class _PatientReportsView extends ConsumerWidget {
                 title: dept == 'eye'
                     ? 'Eye Clinic Patient Summary'
                     : 'Dental Care Patient Summary',
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceAround,
+                  spacing: 16,
+                  runSpacing: 12,
                   children: [
                     _MiniSummary(
                       label: dept == 'eye' ? 'Eye Patients' : 'Dental Patients',
@@ -838,7 +846,7 @@ class _AppointmentReportsView extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: constraints.maxWidth > 650 ? 1.6 : 2.2,
+                  childAspectRatio: constraints.maxWidth > 900 ? 1.6 : (constraints.maxWidth > 650 ? 1.5 : (constraints.maxWidth < 360 ? 1.55 : 1.7)),
                   children: [
                     ReportsMetricCard(
                       title: 'Total Appointments',
@@ -1043,7 +1051,7 @@ class _StaffReportsView extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: constraints.maxWidth > 650 ? 1.6 : 2.2,
+                  childAspectRatio: constraints.maxWidth > 900 ? 1.6 : (constraints.maxWidth > 650 ? 1.5 : (constraints.maxWidth < 360 ? 1.55 : 1.7)),
                   children: [
                     ReportsMetricCard(
                       title: 'Total Staff',
@@ -1319,7 +1327,7 @@ class _ClinicalReportsView extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: constraints.maxWidth > 650 ? 1.6 : 2.2,
+                  childAspectRatio: constraints.maxWidth > 900 ? 1.6 : (constraints.maxWidth > 650 ? 1.5 : (constraints.maxWidth < 360 ? 1.55 : 1.7)),
                   children: kpiCards,
                 );
               },
@@ -1476,7 +1484,7 @@ class _FinancialReportsView extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: constraints.maxWidth > 650 ? 1.6 : 2.2,
+                  childAspectRatio: constraints.maxWidth > 900 ? 1.6 : (constraints.maxWidth > 650 ? 1.5 : (constraints.maxWidth < 360 ? 1.55 : 1.7)),
                   children: [
                     ReportsMetricCard(
                       title: 'Total Invoiced Sales',
@@ -1745,7 +1753,7 @@ class _InventoryReportsView extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
-                  childAspectRatio: constraints.maxWidth > 650 ? 1.6 : 2.2,
+                  childAspectRatio: constraints.maxWidth > 900 ? 1.6 : (constraints.maxWidth > 650 ? 1.5 : (constraints.maxWidth < 360 ? 1.55 : 1.7)),
                   children: [
                     ReportsMetricCard(
                       title: 'Total Stock Valuation',
@@ -1910,20 +1918,20 @@ class _InventoryReportsView extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       _StatusChip(
                         label: 'Central Low: ${data.centralLowStockCount}',
                         color: AppColors.tertiary,
                         icon: Icons.warehouse_outlined,
                       ),
-                      const SizedBox(width: 8),
                       _StatusChip(
                         label: 'Dept Low: ${data.departmentLowStockCount}',
                         color: AppColors.secondary,
                         icon: Icons.storefront_outlined,
                       ),
-                      const SizedBox(width: 8),
                       _StatusChip(
                         label: 'Stock-Outs: ${data.stockOutCount}',
                         color: AppColors.error,
@@ -2214,69 +2222,84 @@ class _InventoryReportsView extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color:
-                                    AppColors.primary.withValues(alpha: 0.3)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Total Stock-In (Purchases/Returns)',
-                                  style: TextStyle(
-                                      fontSize: 12, color: AppColors.primary)),
-                              const SizedBox(height: 4),
-                              Text('${data.totalStockInUnits.toInt()} Units',
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary)),
-                              Text(
-                                  'Valuation: ${currency.format(data.totalStockInValue)}',
-                                  style: const TextStyle(
-                                      fontSize: 12, color: Colors.grey)),
-                            ],
-                          ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      final inCard = Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color:
+                                  AppColors.primary.withValues(alpha: 0.3)),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: AppColors.error.withValues(alpha: 0.3)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Total Stock-Out (Consumed/Dispensed)',
-                                  style: TextStyle(
-                                      fontSize: 12, color: AppColors.error)),
-                              const SizedBox(height: 4),
-                              Text('${data.totalStockOutUnits.toInt()} Units',
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.error)),
-                              Text(
-                                  'Valuation: ${currency.format(data.totalStockOutValue)}',
-                                  style: const TextStyle(
-                                      fontSize: 12, color: Colors.grey)),
-                            ],
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Total Stock-In (Purchases/Returns)',
+                                style: TextStyle(
+                                    fontSize: 12, color: AppColors.primary)),
+                            const SizedBox(height: 4),
+                            Text('${data.totalStockInUnits.toInt()} Units',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary)),
+                            Text(
+                                'Valuation: ${currency.format(data.totalStockInValue)}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey)),
+                          ],
                         ),
-                      ),
-                    ],
+                      );
+
+                      final outCard = Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: AppColors.error.withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Total Stock-Out (Consumed/Dispensed)',
+                                style: TextStyle(
+                                    fontSize: 12, color: AppColors.error)),
+                            const SizedBox(height: 4),
+                            Text('${data.totalStockOutUnits.toInt()} Units',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.error)),
+                            Text(
+                                'Valuation: ${currency.format(data.totalStockOutValue)}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      );
+
+                      if (isMobile) {
+                        return Column(
+                          children: [
+                            inCard,
+                            const SizedBox(height: 12),
+                            outCard,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: inCard),
+                          const SizedBox(width: 16),
+                          Expanded(child: outCard),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 20),
 
@@ -2782,7 +2805,7 @@ class _CardContainer extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 500 ? 12 : 20),
       decoration: BoxDecoration(
         color: isDark
             ? AppColors.surfaceContainerHigh

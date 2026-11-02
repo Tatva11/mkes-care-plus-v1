@@ -77,6 +77,8 @@ class AppointmentsNotifier
       }
     } catch (e) {
       debugPrint('Error syncing appointment status to Supabase: $e');
+      await loadAppointmentsForDate(_currentDate);
+      rethrow;
     }
   }
 
@@ -130,16 +132,15 @@ class AppointmentsNotifier
       return item;
     }).toList();
 
-    // If appointment moved to another date, remove from today's list
-    final now = DateTime.now();
-    final remainingForToday = updatedList.where((item) {
-      return item.appointmentDate.year == now.year &&
-          item.appointmentDate.month == now.month &&
-          item.appointmentDate.day == now.day;
+    // If appointment moved to another date, remove from currently viewed date's list
+    final remainingForCurrentDate = updatedList.where((item) {
+      return item.appointmentDate.year == _currentDate.year &&
+          item.appointmentDate.month == _currentDate.month &&
+          item.appointmentDate.day == _currentDate.day;
     }).toList();
 
-    remainingForToday.sort(AppointmentModel.compareAppointments);
-    state = AsyncValue.data(remainingForToday);
+    remainingForCurrentDate.sort(AppointmentModel.compareAppointments);
+    state = AsyncValue.data(remainingForCurrentDate);
 
     try {
       if (!appointmentId.startsWith('APT-')) {
@@ -147,6 +148,8 @@ class AppointmentsNotifier
       }
     } catch (e) {
       debugPrint('Error syncing appointment update to Supabase: $e');
+      await loadAppointmentsForDate(_currentDate);
+      rethrow;
     }
   }
 

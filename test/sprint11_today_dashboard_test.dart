@@ -530,7 +530,7 @@ void main() {
       // Verify that all 7 cards or their content are mounted cleanly
       expect(find.byType(RevenueGrowthCard), findsOneWidget);
       expect(find.byType(StaffAttendanceCard), findsOneWidget);
-      expect(find.text('Copilot Insights'), findsOneWidget);
+      expect(find.text('Copilot Insights'), findsNothing);
 
       expect(tester.takeException(), isNull);
     });

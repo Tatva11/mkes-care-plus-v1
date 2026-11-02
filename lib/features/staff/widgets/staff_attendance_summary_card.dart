@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../admin/providers/users_provider.dart';
-import '../models/shift_configuration.dart';
+import '../models/attendance_record.dart';
 import '../providers/attendance_provider.dart';
 
 class StaffAttendanceSummaryCard extends ConsumerWidget {
   const StaffAttendanceSummaryCard({super.key, this.targetDate});
 
   final DateTime? targetDate;
-
-  static const _secondaryFixed = Color(0xFFFFD8EB);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,117 +28,15 @@ class StaffAttendanceSummaryCard extends ConsumerWidget {
         ref.watch(adminAttendanceForDateProvider(todayDate)).valueOrNull ??
             const [];
 
-    final shiftConfigs = ref.watch(shiftConfigurationsProvider).valueOrNull ??
-        const [
-          ShiftConfiguration.defaultMorning,
-          ShiftConfiguration.defaultAfternoon,
-        ];
+    // Distinct checked-in staff records for today matching attendance records
+    final checkedInRecords = attendanceRecords
+        .where((r) => r.checkInTime != null)
+        .toList();
 
-    final morningConfig = shiftConfigs.firstWhere(
-      (c) => c.name.toLowerCase() == 'morning',
-      orElse: () => ShiftConfiguration.defaultMorning,
-    );
-    final eveningConfig = shiftConfigs.firstWhere(
-      (c) =>
-          c.name.toLowerCase() == 'afternoon' ||
-          c.name.toLowerCase() == 'evening' ||
-          c.name.toLowerCase() == 'night',
-      orElse: () => ShiftConfiguration.defaultAfternoon,
-    );
-
-    // Count staff assigned to each shift category respecting effective dates
-    final morningAssigned = users.where((u) {
-      final s = u.getShiftForDate(todayDate).toLowerCase().trim();
-      return s == 'morning' || s == 'both';
-    }).length;
-
-    final eveningAssigned = users.where((u) {
-      final s = u.getShiftForDate(todayDate).toLowerCase().trim();
-      return s == 'afternoon' || s == 'evening' || s == 'both';
-    }).length;
-
-    final nightAssigned = users.where((u) {
-      final s = u.getShiftForDate(todayDate).toLowerCase().trim();
-      return s == 'night';
-    }).length;
-
-    final onCallAssigned = users.where((u) {
-      final s = u.getShiftForDate(todayDate).toLowerCase().trim();
-      return s == 'on_call' || s == 'oncall' || s == 'emergency';
-    }).length;
-
-    // Distinct checked-in staff count to avoid duplicate staff counts
-    final morningPresent = attendanceRecords
-        .where((r) =>
-            r.shift.toLowerCase().trim() == 'morning' && r.checkInTime != null)
+    final checkedInStaffCount = checkedInRecords
         .map((r) => r.staffId)
         .toSet()
         .length;
-
-    final eveningPresent = attendanceRecords
-        .where((r) =>
-            (r.shift.toLowerCase().trim() == 'afternoon' ||
-                r.shift.toLowerCase().trim() == 'evening') &&
-            r.checkInTime != null)
-        .map((r) => r.staffId)
-        .toSet()
-        .length;
-
-    final nightPresent = attendanceRecords
-        .where((r) =>
-            r.shift.toLowerCase().trim() == 'night' && r.checkInTime != null)
-        .map((r) => r.staffId)
-        .toSet()
-        .length;
-
-    final onCallPresent = attendanceRecords
-        .where((r) =>
-            (r.shift.toLowerCase().trim() == 'on_call' ||
-                r.shift.toLowerCase().trim() == 'emergency') &&
-            r.checkInTime != null)
-        .map((r) => r.staffId)
-        .toSet()
-        .length;
-
-    // Shift 1: Morning
-    final morningShort =
-        morningAssigned > morningPresent ? morningAssigned - morningPresent : 0;
-    final morningStatus =
-        morningShort > 0 ? 'Short - $morningShort' : 'Optimal';
-    final morningDotColor =
-        morningShort > 0 ? AppColors.secondary : AppColors.primaryContainer;
-    final morningStatusColor =
-        morningShort > 0 ? AppColors.secondary : AppColors.primaryContainer;
-
-    // Shift 2: Evening
-    final eveningShort =
-        eveningAssigned > eveningPresent ? eveningAssigned - eveningPresent : 0;
-    final eveningStatus =
-        eveningShort > 0 ? 'Short - $eveningShort' : 'Optimal';
-    final eveningDotColor =
-        eveningShort > 0 ? AppColors.secondary : AppColors.primaryContainer;
-    final eveningStatusColor =
-        eveningShort > 0 ? AppColors.secondary : AppColors.primaryContainer;
-
-    // Shift 3: Night
-    final nightShort =
-        nightAssigned > nightPresent ? nightAssigned - nightPresent : 0;
-    final nightStatus = nightShort > 0 ? 'Short - $nightShort' : 'Optimal';
-    final nightDotColor =
-        nightShort > 0 ? AppColors.secondary : AppColors.primaryContainer;
-    final nightStatusColor =
-        nightShort > 0 ? AppColors.secondary : AppColors.primaryContainer;
-
-    // Shift 4: On-Call
-    final onCallShort =
-        onCallAssigned > onCallPresent ? onCallAssigned - onCallPresent : 0;
-    final onCallStatus = onCallAssigned > 0
-        ? (onCallShort > 0 ? 'Short - $onCallShort' : 'Optimal')
-        : 'On Standby';
-    final onCallDotColor =
-        onCallShort > 0 ? AppColors.secondary : AppColors.tertiary;
-    final onCallStatusColor =
-        onCallShort > 0 ? AppColors.secondary : AppColors.tertiary;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -159,7 +56,7 @@ class StaffAttendanceSummaryCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header
+            // Header: Staff Checked In Today
             DecoratedBox(
               decoration: const BoxDecoration(
                 border: Border(
@@ -175,14 +72,14 @@ class StaffAttendanceSummaryCard extends ConsumerWidget {
                       child: Row(
                         children: [
                           const Icon(
-                            Icons.groups_outlined,
-                            color: AppColors.onSurfaceVariant,
+                            Icons.how_to_reg_outlined,
+                            color: AppColors.primary,
                             size: 22,
                           ),
                           const SizedBox(width: AppSpacing.xs),
                           Flexible(
                             child: Text(
-                              'Shift & Attendance Summary',
+                              'Staff Checked In Today',
                               style: AppTypography.headlineMd,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -196,14 +93,25 @@ class StaffAttendanceSummaryCard extends ConsumerWidget {
                         vertical: AppSpacing.base,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerHigh,
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.radiusSm),
+                        color: checkedInStaffCount > 0
+                            ? Colors.green.shade50
+                            : AppColors.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        border: Border.all(
+                          color: checkedInStaffCount > 0
+                              ? Colors.green.shade300
+                              : Colors.transparent,
+                        ),
                       ),
                       child: Text(
-                        'Today',
+                        checkedInStaffCount == 1
+                            ? '1 Checked In'
+                            : '$checkedInStaffCount Checked In',
                         style: AppTypography.labelCaps.copyWith(
-                          color: AppColors.onSurface,
+                          color: checkedInStaffCount > 0
+                              ? Colors.green.shade800
+                              : AppColors.onSurface,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -212,96 +120,100 @@ class StaffAttendanceSummaryCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            // Table header
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Color(0xFFF0EDEC)),
-                  ),
+
+            if (checkedInRecords.isEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppSpacing.xl,
+                  horizontal: AppSpacing.md,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Shift Category',
-                          style: AppTypography.labelCaps.copyWith(
-                            color: AppColors.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.person_off_outlined,
+                      size: 36,
+                      color: AppColors.outlineVariant,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'No staff members have checked in yet today.',
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
                       ),
-                      Expanded(
-                        child: Text(
-                          'Staffed',
-                          textAlign: TextAlign.center,
-                          style: AppTypography.labelCaps.copyWith(
-                            color: AppColors.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // Table Header
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFF0EDEC)),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Staff Member',
+                            style: AppTypography.labelCaps.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Status',
-                          textAlign: TextAlign.right,
-                          style: AppTypography.labelCaps.copyWith(
-                            color: AppColors.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Check-In',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.labelCaps.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Status',
+                            textAlign: TextAlign.right,
+                            style: AppTypography.labelCaps.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            _DepartmentRow(
-              department:
-                  'Morning Shift (${morningConfig.startTime} - ${morningConfig.endTime})',
-              staffed: '$morningPresent/$morningAssigned',
-              status: morningStatus,
-              dotColor: morningDotColor,
-              statusColor: morningStatusColor,
-              highlighted: morningShort > 0,
-              highlightColor: _secondaryFixed.withValues(alpha: 0.3),
-            ),
-            _DepartmentRow(
-              department:
-                  'Evening Shift (${eveningConfig.startTime} - ${eveningConfig.endTime})',
-              staffed: '$eveningPresent/$eveningAssigned',
-              status: eveningStatus,
-              dotColor: eveningDotColor,
-              statusColor: eveningStatusColor,
-              highlighted: eveningShort > 0,
-              highlightColor: _secondaryFixed.withValues(alpha: 0.3),
-            ),
-            _DepartmentRow(
-              department: 'Night Shift (23:00 - 07:00)',
-              staffed: '$nightPresent/$nightAssigned',
-              status: nightStatus,
-              dotColor: nightDotColor,
-              statusColor: nightStatusColor,
-              highlighted: nightShort > 0,
-              highlightColor: _secondaryFixed.withValues(alpha: 0.3),
-            ),
-            _DepartmentRow(
-              department: 'On-Call Emergency Triage',
-              staffed: '$onCallPresent/$onCallAssigned',
-              status: onCallStatus,
-              dotColor: onCallDotColor,
-              statusColor: onCallStatusColor,
-              highlighted: onCallShort > 0,
-              highlightColor: _secondaryFixed.withValues(alpha: 0.3),
-              showBottomBorder: false,
-            ),
+
+              // Staff List
+              for (int i = 0; i < checkedInRecords.length; i++) ...[
+                _StaffCheckedInRow(
+                  record: checkedInRecords[i],
+                  staffUser: users
+                      .where((u) => u.id == checkedInRecords[i].staffId)
+                      .firstOrNull,
+                  showBottomBorder: i < checkedInRecords.length - 1,
+                ),
+              ],
+            ],
           ],
         ),
       ),
@@ -309,40 +221,37 @@ class StaffAttendanceSummaryCard extends ConsumerWidget {
   }
 }
 
-class _DepartmentRow extends StatelessWidget {
-  const _DepartmentRow({
-    required this.department,
-    required this.staffed,
-    required this.status,
-    required this.dotColor,
-    required this.statusColor,
-    this.highlighted = false,
-    this.highlightColor,
+class _StaffCheckedInRow extends StatelessWidget {
+  const _StaffCheckedInRow({
+    required this.record,
+    this.staffUser,
     this.showBottomBorder = true,
   });
 
-  final String department;
-  final String staffed;
-  final String status;
-  final Color dotColor;
-  final Color statusColor;
-  final bool highlighted;
-  final Color? highlightColor;
+  final AttendanceRecord record;
+  final dynamic staffUser;
   final bool showBottomBorder;
 
   @override
   Widget build(BuildContext context) {
+    final staffName = record.staffName ?? staffUser?.fullName ?? 'Staff Member';
+    final dept = staffUser?.departmentName ??
+        staffUser?.department?.toString().toUpperCase() ??
+        record.shift.toUpperCase();
+    final timeStr = record.checkInTime != null
+        ? DateFormat('h:mm a').format(record.checkInTime!.toLocal())
+        : '—';
+    final isLate = record.isLate;
+    final statusText = isLate ? 'Late (${record.lateMinutes}m)' : 'On Time';
+    final statusColor = isLate ? AppColors.secondary : Colors.green.shade700;
+
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.base,
-        vertical: AppSpacing.xs,
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: highlightColor,
         border: Border(
-          left: highlighted
-              ? const BorderSide(color: AppColors.secondary, width: 2)
-              : BorderSide.none,
           bottom: showBottomBorder
               ? const BorderSide(color: AppColors.surfaceContainerLow)
               : BorderSide.none,
@@ -350,47 +259,85 @@ class _DepartmentRow extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // Staff Member Info
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Row(
               children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: dotColor,
-                    shape: BoxShape.circle,
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: AppColors.primaryContainer.withValues(alpha: 0.2),
+                  child: Text(
+                    staffName.isNotEmpty ? staffName[0].toUpperCase() : 'S',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                Flexible(
-                  child: Text(
-                    department,
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.onSurface,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        staffName,
+                        style: AppTypography.bodySm.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        dept,
+                        style: AppTypography.labelCaps.copyWith(
+                          fontSize: 9,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+
+          // Check-In Time
           Expanded(
+            flex: 2,
             child: Text(
-              staffed,
+              timeStr,
               textAlign: TextAlign.center,
-              style: AppTypography.dataMono.copyWith(
-                color: AppColors.onSurface,
+              style: AppTypography.bodySm.copyWith(
+                fontWeight: FontWeight.w500,
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
+
+          // Status Badge
           Expanded(
-            child: Text(
-              status,
-              textAlign: TextAlign.right,
-              style: AppTypography.bodySm.copyWith(color: statusColor),
-              overflow: TextOverflow.ellipsis,
+            flex: 2,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
           ),
         ],

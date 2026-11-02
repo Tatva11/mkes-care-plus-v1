@@ -46,14 +46,7 @@ class DentalLabDashboardView extends ConsumerWidget {
                   subtitleColor: AppColors.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              const Expanded(
-                child: DepartmentCopilotInsightCard(
-                  insightText:
-                      'Dental lab tracking is synchronized with Supabase live queue.',
-                  highlightedText: 'synchronized',
-                ),
-              ),
+
             ],
           )
         else
@@ -76,12 +69,7 @@ class DentalLabDashboardView extends ConsumerWidget {
                 subtitle: '${stats.delivered} Delivered',
                 subtitleColor: AppColors.onSurfaceVariant,
               ),
-              const SizedBox(height: AppSpacing.md),
-              const DepartmentCopilotInsightCard(
-                insightText:
-                    'Dental lab tracking is synchronized with Supabase live queue.',
-                highlightedText: 'synchronized',
-              ),
+
             ],
           ),
 

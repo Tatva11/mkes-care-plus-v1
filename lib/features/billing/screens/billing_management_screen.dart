@@ -16,6 +16,8 @@ import '../widgets/record_payment_dialog.dart';
 import '../../reports/screens/admin_reports_screen.dart';
 import 'billing_reports_screen.dart';
 import 'create_invoice_screen.dart';
+import '../../staff/widgets/clock_in_required_dialog.dart';
+import '../../staff/providers/attendance_provider.dart';
 
 class BillingManagementScreen extends StatelessWidget {
   final bool isEmbedded;
@@ -147,6 +149,25 @@ class _BillingManagementContentState
   }
 
   void _openRecordPayment(BillingInvoiceModel invoice) async {
+    final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+    if (!isClockedIn) {
+      if (mounted) showClockInRequiredDialog(context, ref);
+      return;
+    }
+
+    if (invoice.remainingAmount <= 0.001) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot record payment: Invoice is already fully paid.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+
     final payment = await showDialog<BillingPaymentModel>(
       context: context,
       builder: (dialogCtx) => RecordPaymentDialog(invoice: invoice),
@@ -762,15 +783,17 @@ class _BillingManagementContentState
                               tooltip: 'Open Invoice Details & Edit',
                               onPressed: () => _showInvoiceDetails(inv),
                             ),
-                            IconButton(
-                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(2),
-                              icon: const Icon(Icons.payments_outlined, size: 18),
-                              color: Colors.green[700],
-                              tooltip: 'Record Payment',
-                              onPressed: () => _openRecordPayment(inv),
-                            ),
+                            if (inv.remainingAmount > 0.001 && !inv.isCancelled)
+                              IconButton(
+                                key: Key('desktop_record_payment_button_${inv.invoiceNumber}'),
+                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.all(2),
+                                icon: const Icon(Icons.payments_outlined, size: 18),
+                                color: Colors.green[700],
+                                tooltip: 'Record Payment',
+                                onPressed: () => _openRecordPayment(inv),
+                              ),
                           ],
                         ),
                       ),
@@ -902,7 +925,7 @@ class _BillingManagementContentState
                       tooltip: 'Download Invoice PDF',
                       onPressed: () => _generatePdf(inv),
                     ),
-                    if (inv.remainingAmount > 0 && !inv.isCancelled)
+                    if (inv.remainingAmount > 0.001 && !inv.isCancelled)
                       IconButton(
                         constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                         padding: const EdgeInsets.all(6),
@@ -998,6 +1021,25 @@ class _InvoiceDetailsDialogState extends ConsumerState<_InvoiceDetailsDialog> {
   List<BillingItemModel> _editItems = [];
 
   void _openRecordPayment(BuildContext context, BillingInvoiceModel invoice) async {
+    final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+    if (!isClockedIn) {
+      if (context.mounted) showClockInRequiredDialog(context, ref);
+      return;
+    }
+
+    if (invoice.remainingAmount <= 0.001) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot record payment: Invoice is already fully paid.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    if (!context.mounted) return;
+
     final payment = await showDialog<BillingPaymentModel>(
       context: context,
       builder: (dialogCtx) => RecordPaymentDialog(invoice: invoice),
@@ -1827,7 +1869,7 @@ class _InvoiceDetailsDialogState extends ConsumerState<_InvoiceDetailsDialog> {
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Edit Invoice'),
                   ),
-                  if (invoice.remainingAmount > 0 && !invoice.isCancelled)
+                  if (invoice.remainingAmount > 0.001 && !invoice.isCancelled)
                     FilledButton.icon(
                       onPressed: () => _openRecordPayment(context, invoice),
                       icon: const Icon(Icons.add, size: 16),

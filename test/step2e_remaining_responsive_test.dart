@@ -589,7 +589,7 @@ void main() {
                       children: [
                         Expanded(
                           child: Text(
-                            'Search powered by MKES Copilot',
+                            'Search powered by MKES CARE+',
                             style: AppTypography.labelCaps,
                             overflow: TextOverflow.ellipsis,
                           ),

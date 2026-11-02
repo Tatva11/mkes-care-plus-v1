@@ -77,11 +77,22 @@ class PatientRepository {
 
   /// Fetch a single patient by ID from Supabase.
   Future<PatientModel> getPatient(String id) async {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) {
+      throw ArgumentError('Patient ID cannot be empty');
+    }
+
     final response = await _supabase
         .from('patients')
         .select()
-        .eq('id', id)
-        .single();
+        .eq('id', cleanId)
+        .maybeSingle();
+
+    if (response == null) {
+      throw Exception(
+        'Patient record not found (ID: $cleanId). It may have been removed or access is restricted.',
+      );
+    }
     return PatientModel.fromJson(response);
   }
 
@@ -89,6 +100,11 @@ class PatientRepository {
   /// Modifies only: name, mobile, department, dob, address, reference, updated_at.
   /// Patient number is strictly preserved.
   Future<PatientModel> updatePatient(PatientModel patient) async {
+    final cleanId = patient.id.trim();
+    if (cleanId.isEmpty) {
+      throw ArgumentError('Patient ID cannot be empty for an update.');
+    }
+
     final department = patient.department?.trim().toLowerCase();
     if (department != null && department.isNotEmpty) {
       if (department != 'eye' && department != 'dental') {
@@ -111,7 +127,7 @@ class PatientRepository {
     final response = await _supabase
         .from('patients')
         .update(updateData)
-        .eq('id', patient.id)
+        .eq('id', cleanId)
         .select()
         .maybeSingle();
 
@@ -120,16 +136,16 @@ class PatientRepository {
       final existing = await _supabase
           .from('patients')
           .select('id')
-          .eq('id', patient.id)
+          .eq('id', cleanId)
           .maybeSingle();
 
       if (existing == null) {
         throw Exception(
-          'Patient record not found (ID: ${patient.id}). It may have been deleted.',
+          'Patient record not found (ID: $cleanId). It may have been deleted.',
         );
       } else {
         throw Exception(
-          'Permission denied: You do not have authorization to update patient details. Only clinic administrators can edit patient records.',
+          'Permission denied: You do not have authorization to update patient details. Only clinic administrators and authorized staff can edit patient records.',
         );
       }
     }

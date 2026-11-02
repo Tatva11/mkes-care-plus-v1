@@ -135,40 +135,84 @@ class _PerformanceWorkloadView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Staff Performance & Workload',
-                      style: AppTypography.headlineMd),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Track task completion, overdue rates, and staff capacity in real-time.',
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.onSurfaceVariant,
+          // Header Row (Responsive)
+          if (!isDesktop) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Staff Performance & Workload',
+                  style: AppTypography.headlineMd,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Track task completion, overdue rates, and staff capacity in real-time.',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                if (currentUser != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.add_task, size: 18),
+                      label: const Text('Assign Task'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primaryContainer,
+                      ),
+                      onPressed: () => _openCreateTaskDialog(
+                        context,
+                        ref,
+                        currentUser.id,
+                        usersAsync.valueOrNull ?? [],
+                      ),
                     ),
                   ),
                 ],
-              ),
-              if (currentUser != null)
-                FilledButton.icon(
-                  icon: const Icon(Icons.add_task, size: 18),
-                  label: const Text('Assign Task'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primaryContainer,
-                  ),
-                  onPressed: () => _openCreateTaskDialog(
-                    context,
-                    ref,
-                    currentUser.id,
-                    usersAsync.valueOrNull ?? [],
+              ],
+            ),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Staff Performance & Workload',
+                        style: AppTypography.headlineMd,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Track task completion, overdue rates, and staff capacity in real-time.',
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          ),
+                if (currentUser != null) ...[
+                  const SizedBox(width: AppSpacing.md),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.add_task, size: 18),
+                    label: const Text('Assign Task'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primaryContainer,
+                    ),
+                    onPressed: () => _openCreateTaskDialog(
+                      context,
+                      ref,
+                      currentUser.id,
+                      usersAsync.valueOrNull ?? [],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
 
           const SizedBox(height: AppSpacing.md),
 
@@ -863,30 +907,59 @@ class _AttendanceView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
+          if (!isDesktop) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   'Staff Attendance — ${DateFormat('MMMM d, yyyy').format(selectedDate)}',
                   style: AppTypography.headlineMd,
                 ),
-              ),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                label: const Text('Change Date'),
-                onPressed: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2024),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) onDateSelected(picked);
-                },
-              ),
-            ],
-          ),
+                const SizedBox(height: AppSpacing.xs),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                    label: const Text('Change Date'),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2024),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) onDateSelected(picked);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Staff Attendance — ${DateFormat('MMMM d, yyyy').format(selectedDate)}',
+                    style: AppTypography.headlineMd,
+                  ),
+                ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                  label: const Text('Change Date'),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2024),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) onDateSelected(picked);
+                  },
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           summaryAsync.when(
             data: (summary) {

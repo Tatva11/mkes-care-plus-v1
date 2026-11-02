@@ -12,6 +12,8 @@ import '../../appointments/repositories/appointment_repository.dart';
 import '../../patients/models/patient_model.dart';
 import '../models/dental_lab_model.dart';
 import '../models/dental_treatment_model.dart';
+import '../../staff/widgets/clock_in_required_dialog.dart';
+import '../../staff/providers/attendance_provider.dart';
 import '../providers/dental_lab_provider.dart';
 import '../providers/dental_treatment_provider.dart';
 
@@ -21,10 +23,12 @@ class DentalTreatmentFormDialog extends ConsumerStatefulWidget {
     super.key,
     required this.patient,
     this.initialRecord,
+    this.initialAppointmentId,
   });
 
   final PatientModel patient;
   final DentalTreatmentModel? initialRecord;
+  final String? initialAppointmentId;
 
   @override
   ConsumerState<DentalTreatmentFormDialog> createState() =>
@@ -88,7 +92,7 @@ class _DentalTreatmentFormDialogState
       _treatmentTime = TimeOfDay.now();
     }
 
-    _selectedAppointmentId = init?.appointmentId;
+    _selectedAppointmentId = init?.appointmentId ?? widget.initialAppointmentId;
     _selectedDentalLabCaseId = init?.dentalLabCaseId;
     _procedureStatus = init?.procedureStatus ?? 'completed';
 
@@ -170,6 +174,12 @@ class _DentalTreatmentFormDialogState
   }
 
   Future<void> _save() async {
+    final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+    if (!isClockedIn) {
+      if (mounted) showClockInRequiredDialog(context, ref);
+      return;
+    }
+
     if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
 

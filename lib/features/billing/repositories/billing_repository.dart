@@ -46,6 +46,33 @@ class BillingRepository {
 
   }) async {
 
+    final staffUser = _supabase.auth.currentUser;
+    if (staffUser != null) {
+      try {
+        final profile = await _supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', staffUser.id)
+            .maybeSingle();
+        if (profile != null && profile['role'] == 'staff') {
+          final todayStr = DateTime.now().toIso8601String().split('T').first;
+          final att = await _supabase
+              .from('staff_attendance')
+              .select('id, check_in_time')
+              .eq('staff_id', staffUser.id)
+              .eq('record_date', todayStr)
+              .not('check_in_time', 'is', null)
+              .limit(1);
+          if ((att as List).isEmpty) {
+            throw StateError(
+                'Clock-in required: You must clock in before performing any clinic operations.');
+          }
+        }
+      } catch (e) {
+        if (e.toString().contains('Clock-in required')) rethrow;
+      }
+    }
+
     final normDept = department.trim().toLowerCase();
 
     if (normDept != 'eye' && normDept != 'dental') {
@@ -621,7 +648,58 @@ class BillingRepository {
 
     }
 
+    final staffUser = _supabase.auth.currentUser;
+    if (staffUser != null) {
+      try {
+        final profile = await _supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', staffUser.id)
+            .maybeSingle();
+        if (profile != null && profile['role'] == 'staff') {
+          final todayStr = DateTime.now().toIso8601String().split('T').first;
+          final att = await _supabase
+              .from('staff_attendance')
+              .select('id, check_in_time')
+              .eq('staff_id', staffUser.id)
+              .eq('record_date', todayStr)
+              .not('check_in_time', 'is', null)
+              .limit(1);
+          if ((att as List).isEmpty) {
+            throw StateError(
+                'Clock-in required: You must clock in before performing any clinic operations.');
+          }
+        }
+      } catch (e) {
+        if (e.toString().contains('Clock-in required')) rethrow;
+      }
+    }
 
+    try {
+      final invResp = await _supabase
+          .from('billing')
+          .select('total_amount, amount_paid, payment_status')
+          .eq('id', billingId)
+          .maybeSingle();
+
+      if (invResp != null) {
+        final totalAmount = ((invResp['total_amount'] as num?) ?? 0).toDouble();
+        final amountPaid = ((invResp['amount_paid'] as num?) ?? 0).toDouble();
+        final remaining = (totalAmount - amountPaid).clamp(0.0, double.infinity);
+        if (remaining <= 0.001) {
+          throw StateError('Cannot record payment: Invoice is already fully paid.');
+        }
+        if (amount > remaining + 0.01) {
+          throw ArgumentError.value(
+            amount,
+            'amount',
+            'Payment amount cannot exceed remaining balance (₹${remaining.toStringAsFixed(2)}).',
+          );
+        }
+      }
+    } catch (e) {
+      if (e is StateError || e is ArgumentError) rethrow;
+    }
 
     final params = <String, dynamic>{
 

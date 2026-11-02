@@ -4,7 +4,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../staff_portal/widgets/staff_shell.dart';
-import '../widgets/patient_copilot_summary_card.dart';
 
 class StaffPatientProfileScreen extends StatelessWidget {
   const StaffPatientProfileScreen({super.key});
@@ -70,11 +69,7 @@ class StaffPatientProfileScreen extends StatelessWidget {
 
             const SizedBox(height: AppSpacing.md),
 
-            // AI Clinical Alert Banner
-            const PatientCopilotSummaryCard(),
-
-            const SizedBox(height: AppSpacing.md),
-
+            
             // Patient Visit History Section
             _buildVisitHistoryCard(context),
 

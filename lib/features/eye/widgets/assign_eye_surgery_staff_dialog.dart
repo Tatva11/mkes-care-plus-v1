@@ -118,8 +118,10 @@ class _AssignEyeSurgeryStaffDialogState
           const Expanded(child: Text('Assign Surgery Staff')),
         ],
       ),
-      content: SizedBox(
-        width: 440,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SizedBox(
+          width: double.maxFinite,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,6 +206,7 @@ class _AssignEyeSurgeryStaffDialogState
             ),
           ],
         ),
+      ),
       ),
       actions: [
         TextButton(

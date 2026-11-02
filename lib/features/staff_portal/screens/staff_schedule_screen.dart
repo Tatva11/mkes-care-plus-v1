@@ -19,6 +19,8 @@ import '../../appointments/providers/appointment_provider.dart';
 import '../../appointments/widgets/appointment_form_dialog.dart';
 
 import '../../auth/providers/auth_provider.dart';
+import '../../staff/widgets/clock_in_required_dialog.dart';
+import '../../staff/providers/attendance_provider.dart';
 
 import '../../billing/models/billing_invoice_model.dart';
 
@@ -31,14 +33,17 @@ import '../../eye/providers/eye_surgery_provider.dart';
 import '../../eye/screens/eye_surgery_screen.dart';
 
 import '../../patients/models/patient_model.dart';
+import '../../patients/screens/patient_details_screen.dart';
 
 import '../../department/providers/departments_provider.dart';
 
 import '../../staff/models/shift_configuration.dart';
-
-import '../../staff/providers/attendance_provider.dart';
 import '../../whatsapp/providers/whatsapp_appointment_provider.dart';
 import '../../whatsapp/widgets/whatsapp_requests_view.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../patients/providers/patient_attendance_provider.dart';
+import '../../patients/repositories/patient_attendance_repository.dart';
+import '../../patients/providers/patients_provider.dart';
 
 
 
@@ -288,6 +293,13 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
       AppointmentModel appointment, String newStatus) async {
 
+    final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+    if (!mounted) return;
+    if (!isClockedIn) {
+      showClockInRequiredDialog(context, ref);
+      return;
+    }
+
     if (newStatus.toLowerCase() == 'completed') {
 
       if (!appointment.isPresent) {
@@ -308,6 +320,17 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
         return;
 
+      }
+
+      if (!appointment.hasClinicalExam) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Cannot complete visit: Clinical examination must be recorded first.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
       }
 
       if (!appointment.isBilled) {
@@ -355,37 +378,105 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
 
   Future<void> _handleMarkPresent(AppointmentModel appointment) async {
-
     if (appointment.isPresent) return;
 
-
-
-    await ref
-
-        .read(appointmentsNotifierProvider.notifier)
-
-        .updateStatus(appointment.id, 'waiting');
-
-
-
-    if (mounted) {
-
-      ScaffoldMessenger.of(context).showSnackBar(
-
-        SnackBar(
-
-          content: Text(
-
-              '${appointment.patientName ?? "Patient"} marked present. Ready for Billing.'),
-
-          backgroundColor: AppColors.secondary,
-
-        ),
-
-      );
-
+    final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+    if (!mounted) return;
+    if (!isClockedIn) {
+      showClockInRequiredDialog(context, ref);
+      return;
     }
 
+    // 1. Update appointment status in appointments table (persisted to Supabase)
+    await ref
+        .read(appointmentsNotifierProvider.notifier)
+        .updateStatus(appointment.id, 'waiting');
+
+    // 2. Record patient attendance in patient_attendance table for today
+    if (appointment.patientId != null && appointment.patientId!.isNotEmpty) {
+      try {
+        final currentUid = Supabase.instance.client.auth.currentUser?.id ??
+            '00000000-0000-0000-0000-000000000002';
+        await ref.read(patientAttendanceRepositoryProvider).markAttended(
+          patientId: appointment.patientId!,
+          staffId: currentUid,
+          now: DateTime.now(),
+        );
+      } catch (e) {
+        // Handle 23505 (unique_violation: already recorded today) gracefully
+        debugPrint('Patient attendance already recorded or note: $e');
+      }
+      ref.invalidate(adminPatientAttendanceProvider);
+      ref.invalidate(patientAttendanceHistoryProvider(appointment.patientId!));
+    }
+
+    ref.invalidate(todayScheduledPatientsProvider);
+    ref.invalidate(appointmentsNotifierProvider);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '${appointment.patientName ?? "Patient"} marked present. Opening clinical record for examination...'),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+
+      final updatedAppointment = appointment.copyWith(status: 'waiting');
+      if (appointment.patientId != null && appointment.patientId!.isNotEmpty) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PatientDetailsScreen(
+              patientId: appointment.patientId!,
+              pendingAppointment: updatedAppointment,
+              showMandatoryExamBanner: false,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleOpenPatientProfile(AppointmentModel appointment) {
+    if (appointment.patientId != null && appointment.patientId!.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PatientDetailsScreen(
+            patientId: appointment.patientId!,
+            pendingAppointment: appointment,
+            showMandatoryExamBanner: false,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot view profile: Patient ID is not linked to this appointment.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleOpenClinicalRecord(AppointmentModel appointment) async {
+    if (appointment.patientId != null && appointment.patientId!.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PatientDetailsScreen(
+            patientId: appointment.patientId!,
+            pendingAppointment: appointment,
+            showMandatoryExamBanner: false,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot open clinical record: Patient ID is missing.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
 
@@ -660,40 +751,49 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.85,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.chat_bubble_outline,
-                          color: Color(0xFF25D366)),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text(
-                        'WhatsApp Booking Requests',
-                        style: AppTypography.headlineMd
-                            .copyWith(fontSize: 18, fontWeight: FontWeight.bold),
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.85,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.chat_bubble_outline,
+                              color: Color(0xFF25D366)),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'WhatsApp Booking Requests',
+                              style: AppTypography.headlineMd.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            const Expanded(child: WhatsAppRequestsView()),
-          ],
+              const Divider(height: 1),
+              const Expanded(child: WhatsAppRequestsView()),
+            ],
+          ),
         ),
       ),
     );
@@ -1368,65 +1468,31 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
 
     final Map<String, String> departmentOptions = {
-
       'all': 'All Departments',
-
       'eye': 'Eye',
-
       'dental': 'Dental',
-
-      'common': 'Common',
-
     };
 
-
-
     for (final d in dbDepts) {
-
       if (!d.isActive) continue;
-
       final key = d.name.trim().toLowerCase();
-
       if (key == 'eye' ||
-
           key == 'dental' ||
-
           key == 'common' ||
-
+          key == 'comment' ||
           key == 'shared') {
-
         continue;
-
       }
-
       departmentOptions[key] = d.name.trim();
-
     }
 
-
-
     // Filter by canonical department while strictly enforcing role/department authorization
-
     final filteredScheduleItems = scheduleItems.where((entry) {
-
       if (isRestrictedStaff && entry.canonicalDepartment != staffDept) {
-
         return false;
-
       }
-
       if (_selectedDepartment == 'all') return true;
-
-      if (_selectedDepartment == 'common') {
-
-        return entry.canonicalDepartment == 'common' ||
-
-            entry.canonicalDepartment == 'shared';
-
-      }
-
       return entry.canonicalDepartment == _selectedDepartment;
-
     }).toList();
 
 
@@ -1442,16 +1508,21 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
 
     return SingleChildScrollView(
-
-      padding: EdgeInsets.all(
-
-          isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
-
+      padding: isDesktop
+          ? const EdgeInsets.all(AppSpacing.marginDesktop)
+          : const EdgeInsets.fromLTRB(
+              AppSpacing.marginMobile,
+              AppSpacing.marginMobile,
+              AppSpacing.marginMobile,
+              88.0,
+            ),
       child: Column(
 
         crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
+
+          const ClockInRequiredBanner(),
 
           if (isDesktop) ...[
 
@@ -1593,6 +1664,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final isNarrow = constraints.maxWidth < 420;
+                final isExtraNarrow = constraints.maxWidth < 360;
                 final badge = currentUser != null
                     ? _StaffShiftHeaderBadge(
                         staffId: currentUser.id,
@@ -1603,15 +1675,18 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                 final bookBtn = FilledButton.icon(
                   key: const Key('staff_schedule_book_appointment_button'),
                   onPressed: () => _openNewAppointmentDialog(),
-                  icon: const Icon(Icons.add_circle_outline, size: 18),
-                  label: const Text('Book Appointment'),
+                  icon: const Icon(Icons.add_circle_outline, size: 16),
+                  label: Text(
+                    isExtraNarrow ? 'Book' : 'Book Appointment',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    minimumSize: isNarrow ? const Size(double.infinity, 42) : const Size(160, 42),
+                    visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -1622,7 +1697,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                 final whatsAppBtn = OutlinedButton.icon(
                   onPressed: _openWhatsAppRequestsSheet,
                   icon: const Icon(Icons.chat_bubble_outline,
-                      size: 18, color: Color(0xFF25D366)),
+                      size: 16, color: Color(0xFF25D366)),
                   label: Consumer(
                     builder: (context, ref, _) {
                       final pendingCount =
@@ -1630,12 +1705,15 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                       return Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('WhatsApp Requests'),
+                          Text(
+                            isNarrow ? 'WhatsApp' : 'WhatsApp Requests',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           if (pendingCount > 0) ...[
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                                  horizontal: 5, vertical: 1.5),
                               decoration: BoxDecoration(
                                 color: Colors.amber.shade800,
                                 borderRadius: BorderRadius.circular(10),
@@ -1644,7 +1722,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                                 '$pendingCount',
                                 style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 11,
+                                    fontSize: 10.5,
                                     fontWeight: FontWeight.bold),
                               ),
                             ),
@@ -1654,10 +1732,10 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                     },
                   ),
                   style: OutlinedButton.styleFrom(
-                    minimumSize: isNarrow ? const Size(double.infinity, 42) : const Size(160, 42),
+                    visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -1671,9 +1749,13 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                     children: [
                       Center(child: _buildDateSelector()),
                       const SizedBox(height: AppSpacing.xs + 2),
-                      bookBtn,
-                      const SizedBox(height: AppSpacing.xs + 2),
-                      whatsAppBtn,
+                      Row(
+                        children: [
+                          Expanded(child: bookBtn),
+                          const SizedBox(width: AppSpacing.xs),
+                          whatsAppBtn,
+                        ],
+                      ),
                       const SizedBox(height: AppSpacing.xs + 2),
                       badge,
                     ],
@@ -1977,6 +2059,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
 
 
+    final isNarrowScreen = MediaQuery.sizeOf(context).width < 380;
     return Padding(
 
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -1991,7 +2074,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
           SizedBox(
 
-            width: 64,
+            width: isNarrowScreen ? 52 : 64,
 
             child: Text(
 
@@ -2068,321 +2151,190 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
                 mainAxisSize: MainAxisSize.min,
 
                 children: [
-
-                  // Header Row: Patient Name + ID + Status & Badges
-
-                  Wrap(
-
-                    crossAxisAlignment: WrapCrossAlignment.center,
-
-                    spacing: 6,
-
-                    runSpacing: 4,
-
-                    children: [
-
-                      Text(
-
-                        patientDisplayName,
-
-                        style: AppTypography.bodyMd.copyWith(
-
-                          fontWeight: FontWeight.bold,
-
-                          fontSize: 14,
-
-                        ),
-
-                      ),
-
-                      Text(
-
-                        '($patientIdDisplay)',
-
-                        style: AppTypography.dataMono.copyWith(
-
-                          fontSize: 11,
-
-                          color: AppColors.outline,
-
-                        ),
-
-                      ),
-
-                      Container(
-
-                        padding: const EdgeInsets.symmetric(
-
-                            horizontal: 8, vertical: 2),
-
-                        decoration: BoxDecoration(
-
-                          color: item.statusColor.withValues(alpha: 0.15),
-
-                          borderRadius: BorderRadius.circular(10),
-
-                        ),
-
-                        child: Text(
-
-                          item.statusLabel,
-
-                          style: AppTypography.labelCaps.copyWith(
-
-                            color: item.statusColor,
-
-                            fontSize: 10,
-
-                            fontWeight: FontWeight.bold,
-
-                          ),
-
-                        ),
-
-                      ),
-
-                      if (item.isVisitingDoctor)
-
-                        Container(
-
-                          padding: const EdgeInsets.symmetric(
-
-                              horizontal: 5, vertical: 1),
-
-                          decoration: BoxDecoration(
-
-                            color: AppColors.secondaryContainer
-
-                                .withValues(alpha: 0.3),
-
-                            borderRadius: BorderRadius.circular(4),
-
-                            border: Border.all(
-
-                              color: AppColors.secondary
-
-                                  .withValues(alpha: 0.5),
-
-                            ),
-
-                          ),
-
-                          child: Text(
-
-                            'VISITING DOCTOR',
-
-                            style: AppTypography.labelCaps.copyWith(
-
-                              color: AppColors.secondary,
-
-                              fontSize: 9,
-
-                              fontWeight: FontWeight.bold,
-
-                            ),
-
-                          ),
-
-                        ),
-
-                      if (item.isBilled)
-
-                        Container(
-
-                          padding: const EdgeInsets.symmetric(
-
-                              horizontal: 6, vertical: 1),
-
-                          decoration: BoxDecoration(
-
-                            color: Colors.green.shade50,
-
-                            borderRadius: BorderRadius.circular(6),
-
-                            border:
-
-                                Border.all(color: Colors.green.shade300),
-
-                          ),
-
-                          child: Text.rich(
-
-                            TextSpan(
-
+                  // Clickable Header & Details Row: Opens Patient Profile
+                  InkWell(
+                    onTap: () => _handleOpenPatientProfile(item),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-
-                                WidgetSpan(
-
-                                  alignment: PlaceholderAlignment.middle,
-
-                                  child: Padding(
-
-                                    padding:
-
-                                        const EdgeInsets.only(right: 3),
-
-                                    child: Icon(Icons.receipt_outlined,
-
-                                        size: 10,
-
-                                        color: Colors.green.shade800),
-
-                                  ),
-
+                                // Header Row: Patient Name + ID + Status & Badges
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    Text(
+                                      patientDisplayName,
+                                      style: AppTypography.bodyMd.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      '($patientIdDisplay)',
+                                      style: AppTypography.dataMono.copyWith(
+                                        fontSize: 11,
+                                        color: AppColors.outline,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: item.statusColor.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        item.statusLabel,
+                                        style: AppTypography.labelCaps.copyWith(
+                                          color: item.statusColor,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    if (item.isVisitingDoctor)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.secondaryContainer
+                                              .withValues(alpha: 0.3),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: AppColors.secondary
+                                                .withValues(alpha: 0.5),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'VISITING DOCTOR',
+                                          style: AppTypography.labelCaps.copyWith(
+                                            color: AppColors.secondary,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    if (item.isBilled)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.shade50,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border:
+                                              Border.all(color: Colors.green.shade300),
+                                        ),
+                                        child: Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              WidgetSpan(
+                                                alignment: PlaceholderAlignment.middle,
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(right: 3),
+                                                  child: Icon(Icons.receipt_outlined,
+                                                      size: 10,
+                                                      color: Colors.green.shade800),
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text: item.billingReference ?? 'Billed',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.green.shade800,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
+                                const SizedBox(height: 4),
 
-                                TextSpan(
-
-                                  text: item.billingReference ?? 'Billed',
-
-                                  style: TextStyle(
-
-                                    fontSize: 10,
-
-                                    fontWeight: FontWeight.bold,
-
-                                    color: Colors.green.shade800,
-
-                                  ),
-
+                                // Subtitle Row: Department • Appointment Type • Doctor
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 6,
+                                  runSpacing: 2,
+                                  children: [
+                                    Text(
+                                      departmentLabel,
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: AppColors.onSurfaceVariant,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Text('•',
+                                        style: TextStyle(
+                                            color: AppColors.outlineVariant, fontSize: 11)),
+                                    Text(
+                                      appointmentLabel,
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: AppColors.onSurfaceVariant,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Text('•',
+                                        style: TextStyle(
+                                            color: AppColors.outlineVariant, fontSize: 11)),
+                                    Icon(
+                                      Icons.person_pin_outlined,
+                                      size: 13,
+                                      color: hasDoctor
+                                          ? AppColors.primary
+                                          : AppColors.outline,
+                                    ),
+                                    Text(
+                                      doctorDisplay,
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: hasDoctor
+                                            ? AppColors.onSurface
+                                            : AppColors.outline,
+                                        fontWeight: hasDoctor
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                        fontStyle: hasDoctor
+                                            ? FontStyle.normal
+                                            : FontStyle.italic,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    if (item.isVisitingDoctor &&
+                                        item.doctorName != null &&
+                                        item.specialty != null)
+                                      Text(
+                                        '(${item.specialty})',
+                                        style: AppTypography.bodySm.copyWith(
+                                          color: AppColors.secondary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                  ],
                                 ),
-
                               ],
-
                             ),
-
                           ),
-
-                        ),
-
-                    ],
-
-                  ),
-
-                  const SizedBox(height: 4),
-
-
-
-                  // Subtitle Row: Department • Appointment Type • Doctor
-
-                  Wrap(
-
-                    crossAxisAlignment: WrapCrossAlignment.center,
-
-                    spacing: 6,
-
-                    runSpacing: 2,
-
-                    children: [
-
-                      Text(
-
-                        departmentLabel,
-
-                        style: AppTypography.bodySm.copyWith(
-
-                          color: AppColors.onSurfaceVariant,
-
-                          fontSize: 12,
-
-                        ),
-
-                      ),
-
-                      Text('•',
-
-                          style: TextStyle(
-
-                              color: AppColors.outlineVariant, fontSize: 11)),
-
-                      Text(
-
-                        appointmentLabel,
-
-                        style: AppTypography.bodySm.copyWith(
-
-                          color: AppColors.onSurfaceVariant,
-
-                          fontSize: 12,
-
-                        ),
-
-                      ),
-
-                      Text('•',
-
-                          style: TextStyle(
-
-                              color: AppColors.outlineVariant, fontSize: 11)),
-
-                      Icon(
-
-                        Icons.person_pin_outlined,
-
-                        size: 13,
-
-                        color: hasDoctor
-
-                            ? AppColors.primary
-
-                            : AppColors.outline,
-
-                      ),
-
-                      Text(
-
-                        doctorDisplay,
-
-                        style: AppTypography.bodySm.copyWith(
-
-                          color: hasDoctor
-
-                              ? AppColors.onSurface
-
-                              : AppColors.outline,
-
-                          fontWeight: hasDoctor
-
-                              ? FontWeight.w600
-
-                              : FontWeight.normal,
-
-                          fontStyle: hasDoctor
-
-                              ? FontStyle.normal
-
-                              : FontStyle.italic,
-
-                          fontSize: 12,
-
-                        ),
-
-                      ),
-
-                      if (item.isVisitingDoctor &&
-
-                          item.doctorName != null &&
-
-                          item.specialty != null)
-
-                        Text(
-
-                          '(${item.specialty})',
-
-                          style: AppTypography.bodySm.copyWith(
-
-                            color: AppColors.secondary,
-
-                            fontWeight: FontWeight.w600,
-
-                            fontSize: 11,
-
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 18,
+                            color: AppColors.outline,
                           ),
-
-                        ),
-
-                    ],
-
+                        ],
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 6),
@@ -2469,102 +2421,102 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
 
 
-                      // STEP 2: Billing (Revealed after marked present)
-
+                      // STEP 2: Present, but clinical exam NOT yet recorded -> Mandatory Vitals & Exam
                       if (item.isPresent &&
-
+                          !item.hasClinicalExam &&
                           item.status.toLowerCase() != 'completed' &&
-
                           item.status.toLowerCase() != 'cancelled') ...[
-
-                        if (!item.isBilled) ...[
-
-                          FilledButton.icon(
-
-                            onPressed: () => _handleOpenBilling(item),
-
-                            icon: const Icon(Icons.receipt_long_outlined,
-
-                                size: 15),
-
-                            label: const Text('Bill Patient'),
-
-                            style: FilledButton.styleFrom(
-
-                              backgroundColor: AppColors.primary,
-
-                              padding: const EdgeInsets.symmetric(
-
-                                  horizontal: 8, vertical: 4),
-
-                              minimumSize: const Size(0, 38),
-
-                              textStyle: const TextStyle(fontSize: 12),
-
-                            ),
-
+                        FilledButton.icon(
+                          onPressed: () => _handleOpenClinicalRecord(item),
+                          icon: const Icon(Icons.assignment_outlined, size: 15),
+                          label: const Text('Record Vitals & Exam'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            minimumSize: const Size(0, 38),
+                            textStyle: const TextStyle(fontSize: 12),
                           ),
+                        ),
+                      ],
 
-                          OutlinedButton(
-
-                            onPressed: () => _handleMarkNoCharge(item),
-
-                            style: OutlinedButton.styleFrom(
-
-                              padding: const EdgeInsets.symmetric(
-
-                                  horizontal: 8, vertical: 4),
-
-                              minimumSize: const Size(0, 38),
-
-                              textStyle: const TextStyle(fontSize: 12),
-
-                            ),
-
-                            child: const Text('No-Charge Visit'),
-
+                      // STEP 3: Clinical Exam recorded -> Reveal Billing & No-Charge Visit
+                      if (item.isPresent &&
+                          item.hasClinicalExam &&
+                          item.status.toLowerCase() != 'completed' &&
+                          item.status.toLowerCase() != 'cancelled') ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: Colors.green.withValues(alpha: 0.3)),
                           ),
-
-                        ] else ...[
-
-                          OutlinedButton.icon(
-
-                            onPressed: () => _handleOpenBilling(item),
-
-                            icon: const Icon(Icons.check_circle,
-
-                                size: 15, color: Colors.green),
-
-                            label: Text(
-
-                              'Billed (${item.billingReference ?? "Recorded"})',
-
-                              style: TextStyle(
-
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle_outline,
+                                  size: 14, color: Colors.green),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Exam Recorded',
+                                style: TextStyle(
                                   color: Colors.green.shade800,
-
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600,
-
-                                  fontSize: 11),
-
-                            ),
-
-                            style: OutlinedButton.styleFrom(
-
-                              side: BorderSide(color: Colors.green.shade400),
-
-                              padding: const EdgeInsets.symmetric(
-
-                                  horizontal: 8, vertical: 4),
-
-                              minimumSize: const Size(0, 38),
-
-                            ),
-
+                                ),
+                              ),
+                            ],
                           ),
-
+                        ),
+                        const SizedBox(width: 6),
+                        if (!item.isBilled) ...[
+                          FilledButton.icon(
+                            onPressed: () => _handleOpenBilling(item),
+                            icon: const Icon(Icons.receipt_long_outlined,
+                                size: 15),
+                            label: const Text('Bill Patient'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              minimumSize: const Size(0, 38),
+                              textStyle: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: () => _handleMarkNoCharge(item),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              minimumSize: const Size(0, 38),
+                              textStyle: const TextStyle(fontSize: 12),
+                            ),
+                            child: const Text('No-Charge Visit'),
+                          ),
+                        ] else ...[
+                          OutlinedButton.icon(
+                            onPressed: () => _handleOpenBilling(item),
+                            icon: const Icon(Icons.check_circle,
+                                size: 15, color: Colors.green),
+                            label: Text(
+                              'Billed (${item.billingReference ?? "Recorded"})',
+                              style: TextStyle(
+                                  color: Colors.green.shade800,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: Colors.green.shade400),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              minimumSize: const Size(0, 38),
+                            ),
+                          ),
                         ],
-
                       ],
 
 
@@ -2669,7 +2621,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
                           icon: const Icon(Icons.edit_calendar, size: 15),
 
-                          label: const Text('Reschedule'),
+                          label: const Text('Edit / Reschedule'),
 
                           style: TextButton.styleFrom(
 
@@ -2725,7 +2677,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
                           icon: const Icon(Icons.replay, size: 15),
 
-                          label: const Text('Reschedule Missed'),
+                          label: const Text('Edit / Reschedule Missed'),
 
                           style: FilledButton.styleFrom(
 
@@ -2841,6 +2793,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
 
 
+    final isNarrowScreen = MediaQuery.sizeOf(context).width < 380;
     return Padding(
 
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -2853,7 +2806,7 @@ class _StaffScheduleScreenState extends ConsumerState<StaffScheduleScreen> {
 
           SizedBox(
 
-            width: 64,
+            width: isNarrowScreen ? 52 : 64,
 
             child: Text(
 

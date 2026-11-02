@@ -124,7 +124,7 @@ class _StaffTopAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final horizontalPadding =
-        isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile;
+        isDesktop ? AppSpacing.marginDesktop : 12.0;
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -141,8 +141,8 @@ class _StaffTopAppBar extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Row(
               children: [
-                _BrandCluster(isDesktop: isDesktop),
                 if (isDesktop) ...[
+                  _BrandCluster(isDesktop: isDesktop),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: SingleChildScrollView(
@@ -155,12 +155,14 @@ class _StaffTopAppBar extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.xs),
                 ] else ...[
-                  const Spacer(),
+                  Expanded(
+                    child: _BrandCluster(isDesktop: isDesktop),
+                  ),
                 ],
                 const WhatsAppInboxButton(),
-                const SizedBox(width: AppSpacing.xs),
+                const SizedBox(width: 4),
                 const NotificationCenterButton(),
-                const SizedBox(width: AppSpacing.xs),
+                const SizedBox(width: 4),
                 const _StaffProfileMenuConsumer(),
               ],
             ),
@@ -178,34 +180,51 @@ class _BrandCluster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final logoSize = isDesktop ? 36.0 : 30.0;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppColors.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.local_hospital,
-            color: AppColors.onPrimaryContainer,
-            size: 20,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.asset(
+            'assets/images/mkes_logo.png',
+            width: logoSize,
+            height: logoSize,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Container(
+              width: logoSize,
+              height: logoSize,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(
+                Icons.local_hospital,
+                color: AppColors.onPrimaryContainer,
+                size: 18,
+              ),
+            ),
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
+        const SizedBox(width: AppSpacing.xs + 2),
         Flexible(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'MKES CARE+',
-                style: AppTypography.headlineMd.copyWith(
-                  fontWeight: FontWeight.bold,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'MKES CARE+',
+                  style: AppTypography.headlineMd.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isDesktop ? 20 : 16.5,
+                    letterSpacing: 0.3,
+                  ),
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
               if (isDesktop)
                 Text(

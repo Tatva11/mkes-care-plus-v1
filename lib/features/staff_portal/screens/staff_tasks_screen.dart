@@ -6,6 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../staff/widgets/clock_in_required_dialog.dart';
+import '../../staff/providers/attendance_provider.dart';
 import '../../dental/screens/dental_lab_screen.dart';
 import '../../eye/screens/eye_surgery_screen.dart';
 import '../../inventory/screens/inventory_screen.dart';
@@ -113,6 +115,7 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const ClockInRequiredBanner(),
         // Sub-navigation bar under the Task section: Tasks | Inventory | Vendors | PO | Dental Lab | Eye Surgery
         Container(
           padding: EdgeInsets.symmetric(
@@ -266,8 +269,14 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
           ref.read(staffTasksProvider(currentUser.id).notifier).fetchTasks(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(
-            isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile),
+        padding: isDesktop
+            ? const EdgeInsets.all(AppSpacing.marginDesktop)
+            : const EdgeInsets.fromLTRB(
+                AppSpacing.marginMobile,
+                AppSpacing.marginMobile,
+                AppSpacing.marginMobile,
+                88.0,
+              ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -780,6 +789,12 @@ class _StaffTasksScreenState extends ConsumerState<StaffTasksScreen> {
                             child: CheckboxListTile(
                               value: isCompleted,
                               onChanged: (val) async {
+                                final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+                                if (!isClockedIn) {
+                                  if (context.mounted) showClockInRequiredDialog(context, ref);
+                                  return;
+                                }
+
                                 final newStatus =
                                     (val ?? false) ? 'completed' : 'pending';
                                 try {

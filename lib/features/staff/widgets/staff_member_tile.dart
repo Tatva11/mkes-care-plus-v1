@@ -260,12 +260,16 @@ class StaffMemberTile extends StatelessWidget {
                                 color: Color(0xFFE65100),
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                'Bypass Active (exp ${DateFormat('h:mm a').format(user.gpsBypassUntil!)})',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFE65100),
+                              Flexible(
+                                child: Text(
+                                  'Bypass Active (exp ${DateFormat('h:mm a').format(user.gpsBypassUntil!)})',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFE65100),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ),
                             ],
@@ -322,15 +326,6 @@ class StaffMemberTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                if (user.isGpsBypassActive)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 2.0),
-                    child: Icon(
-                      Icons.location_off,
-                      size: 16,
-                      color: Color(0xFFE65100),
-                    ),
-                  ),
                 const Icon(
                   Icons.chevron_right,
                   size: 20,

@@ -1612,8 +1612,10 @@ class _EyeSurgeryChecklistDialogState
           ),
         ],
       ),
-      content: SizedBox(
-        width: 460,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: SizedBox(
+          width: double.maxFinite,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1689,6 +1691,7 @@ class _EyeSurgeryChecklistDialogState
           ),
         ),
       ),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -1730,8 +1733,10 @@ class _RescheduleSurgeryDialogState extends State<_RescheduleSurgeryDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Reschedule Surgery'),
-      content: SizedBox(
-        width: 400,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: SizedBox(
+          width: double.maxFinite,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1784,7 +1789,8 @@ class _RescheduleSurgeryDialogState extends State<_RescheduleSurgeryDialog> {
           ],
         ),
       ),
-      actions: [
+    ),
+    actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
