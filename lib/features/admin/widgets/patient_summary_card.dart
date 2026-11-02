@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/utils/date_boundaries.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patients_provider.dart';
 import '../../patients/screens/patient_list_screen.dart';
@@ -232,12 +231,17 @@ class PatientSummaryCard extends ConsumerWidget {
     List<PatientModel> patients,
     List<ScheduledPatientEntry> scheduledEntries,
   ) {
-    // 1. Strictly count patients registered today (local calendar day)
+    // 1. Strictly count patients registered today (local clinic calendar day)
+    final nowLocal = DateTime.now().toLocal();
+    final todayStartLocal = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
+    final todayEndLocal = todayStartLocal.add(const Duration(days: 1));
+
     final registeredToday = patients.where((p) {
-      return DateBoundaries.isToday(p.createdAt);
+      final regTime = (p.registrationDate ?? p.createdAt).toLocal();
+      return !regTime.isBefore(todayStartLocal) && regTime.isBefore(todayEndLocal);
     }).length;
 
-    // 2. Count unique patients scheduled today vs total appointment records today
+    // 2. Count unique patients scheduled today vs total appointment tickets today
     final uniquePatientsScheduled = scheduledEntries.length;
     final totalAppointmentsToday = scheduledEntries.fold<int>(
       0,
@@ -283,17 +287,17 @@ class PatientSummaryCard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Two KPI summary tiles scoped strictly to today
+        // Two KPI summary tiles: Today's Appointment Tickets and New Registrations Today
         Row(
           children: [
             Expanded(
               child: _MetricTile(
-                title: 'Scheduled Today',
-                value: '$uniquePatientsScheduled',
+                title: "Today's Appointment Tickets",
+                value: '$totalAppointmentsToday',
                 subtitle: totalAppointmentsToday == 1
-                    ? '1 appointment'
-                    : '$totalAppointmentsToday appointments',
-                icon: Icons.calendar_month_outlined,
+                    ? '1 ticket · $uniquePatientsScheduled patient'
+                    : '$totalAppointmentsToday tickets · $uniquePatientsScheduled patients',
+                icon: Icons.confirmation_number_outlined,
                 iconColor: AppColors.primary,
                 bgColor: AppColors.primaryContainer.withValues(alpha: 0.12),
               ),
@@ -301,7 +305,7 @@ class PatientSummaryCard extends ConsumerWidget {
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: _MetricTile(
-                title: 'New Registrations',
+                title: 'New Registrations Today',
                 value: '$registeredToday',
                 subtitle: registeredToday > 0
                     ? '$registeredToday registered today'

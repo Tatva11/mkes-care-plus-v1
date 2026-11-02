@@ -71,32 +71,45 @@ class _PurchaseOrderManagementContentState
     super.dispose();
   }
 
-  void _openCreateDialog() {
-    showDialog(
+  Future<void> _openCreateDialog() async {
+    final result = await showDialog(
       context: context,
       builder: (_) => const PurchaseOrderFormDialog(),
     );
+    if (result == true && mounted) {
+      ref.read(purchaseOrderStatusFilterProvider.notifier).state = 'All';
+      ref.read(purchaseOrdersProvider.notifier).fetchOrders();
+    }
   }
 
-  void _openDetailsDialog(PurchaseOrder po) {
-    showDialog(
+  Future<void> _openDetailsDialog(PurchaseOrder po) async {
+    await showDialog(
       context: context,
       builder: (_) => PurchaseOrderDetailsDialog(order: po),
     );
+    if (mounted) {
+      ref.read(purchaseOrdersProvider.notifier).fetchOrders();
+    }
   }
 
-  void _openReceiveDialog(PurchaseOrder po) {
-    showDialog(
+  Future<void> _openReceiveDialog(PurchaseOrder po) async {
+    final result = await showDialog(
       context: context,
       builder: (_) => ReceivePurchaseOrderDialog(order: po),
     );
+    if (result == true && mounted) {
+      ref.read(purchaseOrdersProvider.notifier).fetchOrders();
+    }
   }
 
-  void _openEditDialog(PurchaseOrder po) {
-    showDialog(
+  Future<void> _openEditDialog(PurchaseOrder po) async {
+    final result = await showDialog(
       context: context,
       builder: (_) => PurchaseOrderFormDialog(order: po),
     );
+    if (result == true && mounted) {
+      ref.read(purchaseOrdersProvider.notifier).fetchOrders();
+    }
   }
 
   Future<void> _cancelOrder(PurchaseOrder po) async {
@@ -325,7 +338,9 @@ class _PurchaseOrderManagementContentState
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth > 700
             ? (constraints.maxWidth - (AppSpacing.sm * 4)) / 5
-            : (constraints.maxWidth - AppSpacing.sm) / 2;
+            : (constraints.maxWidth < 360
+                ? constraints.maxWidth
+                : (constraints.maxWidth - AppSpacing.sm) / 2);
 
         return Wrap(
           spacing: AppSpacing.sm,
@@ -352,8 +367,8 @@ class _PurchaseOrderManagementContentState
     return Container(
       width: width,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLow,

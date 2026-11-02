@@ -49,7 +49,14 @@ class MkesPrimaryButton extends StatelessWidget {
                 : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(label, style: AppTypography.labelCaps),
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppTypography.labelCaps,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
               if (icon != null) ...[
                 const SizedBox(width: AppSpacing.xs),
                 Icon(icon, size: 18),

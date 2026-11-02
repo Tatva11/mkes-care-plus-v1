@@ -10,7 +10,6 @@ import '../../department/screens/department_management_screen.dart';
 import '../../patients/screens/patient_list_screen.dart';
 import '../../admin/screens/user_form_dialog.dart';
 import '../widgets/staff_attendance_summary_card.dart';
-import '../widgets/staff_copilot_insights_card.dart';
 import '../widgets/staff_roster_card.dart';
 import '../widgets/staff_stat_card.dart';
 import '../../admin/screens/admin_leave_screen.dart';
@@ -326,7 +325,6 @@ class _DesktopLayout extends StatelessWidget {
             children: [
               StaffAttendanceSummaryCard(),
               SizedBox(height: AppSpacing.md),
-              StaffCopilotInsightsCard(),
             ],
           ),
         ),
@@ -348,7 +346,6 @@ class _MobileLayout extends StatelessWidget {
       children: const [
         StaffAttendanceSummaryCard(),
         SizedBox(height: AppSpacing.md),
-        StaffCopilotInsightsCard(),
         SizedBox(height: AppSpacing.md),
         StaffRosterCard(),
       ],

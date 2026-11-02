@@ -546,7 +546,8 @@ class _TestDepartmentRepository implements DepartmentRepository {
       ];
 
   @override
-  Future<void> createDepartment({required String name, String? description}) async {}
+  Future<Department> createDepartment({required String name, String? description}) async =>
+      Department(id: 'dept-new', name: name, description: description, isActive: true);
 
   @override
   Future<void> updateDepartment({

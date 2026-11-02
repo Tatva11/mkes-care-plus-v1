@@ -414,21 +414,25 @@ class ReportsDonutChart extends StatelessWidget {
       );
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: size,
-          height: size,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 340;
+        final chartSize = isNarrow
+            ? (constraints.maxWidth < 280 ? 130.0 : 150.0)
+            : size;
+
+        final chartWidget = SizedBox(
+          width: chartSize,
+          height: chartSize,
           child: Stack(
             alignment: Alignment.center,
             children: [
               CustomPaint(
-                size: Size(size, size),
+                size: Size(chartSize, chartSize),
                 painter: _DonutPainter(
                   segments: segments,
                   total: total,
-                  strokeWidth: 20,
+                  strokeWidth: isNarrow ? 16 : 20,
                   isDark: isDark,
                 ),
               ),
@@ -438,7 +442,7 @@ class ReportsDonutChart extends StatelessWidget {
                   Text(
                     centerTitle,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: isNarrow ? 15 : 18,
                       fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white : AppColors.onSurface,
                     ),
@@ -447,7 +451,7 @@ class ReportsDonutChart extends StatelessWidget {
                     Text(
                       centerSubtitle,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: isNarrow ? 10 : 11,
                         color: isDark
                             ? AppColors.outlineVariant
                             : AppColors.outline,
@@ -457,10 +461,10 @@ class ReportsDonutChart extends StatelessWidget {
               ),
             ],
           ),
-        ),
-        const SizedBox(width: 24),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        );
+
+        final legendWidget = Column(
+          crossAxisAlignment: isNarrow ? CrossAxisAlignment.center : CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: segments.map((seg) {
             final pct = (seg.value / total * 100).toStringAsFixed(1);
@@ -502,8 +506,28 @@ class ReportsDonutChart extends StatelessWidget {
               ),
             );
           }).toList(),
-        ),
-      ],
+        );
+
+        if (isNarrow) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              chartWidget,
+              const SizedBox(height: 16),
+              legendWidget,
+            ],
+          );
+        }
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            chartWidget,
+            const SizedBox(width: 24),
+            legendWidget,
+          ],
+        );
+      },
     );
   }
 }
@@ -578,38 +602,49 @@ class DepartmentRatioBar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.remove_red_eye_outlined,
                     size: 16, color: AppColors.primary),
                 const SizedBox(width: 6),
-                Text(
-                  'Eye Care: ${eyeCount.toString()} (${eyePercentage.toStringAsFixed(1)}%)',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color:
-                        isDark ? AppColors.primaryContainer : AppColors.primary,
+                Flexible(
+                  child: Text(
+                    'Eye Care: ${eyeCount.toString()} (${eyePercentage.toStringAsFixed(1)}%)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          isDark ? AppColors.primaryContainer : AppColors.primary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.medical_services_outlined,
                     size: 16, color: AppColors.secondary),
                 const SizedBox(width: 6),
-                Text(
-                  'Dental Care: ${dentalCount.toString()} (${dentalPercentage.toStringAsFixed(1)}%)',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.secondaryContainer
-                        : AppColors.secondary,
+                Flexible(
+                  child: Text(
+                    'Dental Care: ${dentalCount.toString()} (${dentalPercentage.toStringAsFixed(1)}%)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.secondaryContainer
+                          : AppColors.secondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

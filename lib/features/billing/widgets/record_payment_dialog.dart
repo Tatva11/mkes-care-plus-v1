@@ -10,6 +10,9 @@ import '../../../core/theme/app_typography.dart';
 import '../../../shared/widgets/adaptive_dialog_shell.dart';
 import '../models/billing_invoice_model.dart';
 import '../providers/billing_provider.dart';
+import 'upi_qr_card.dart';
+import '../../staff/widgets/clock_in_required_dialog.dart';
+import '../../staff/providers/attendance_provider.dart';
 
 class RecordPaymentDialog extends ConsumerStatefulWidget {
   final BillingInvoiceModel invoice;
@@ -33,6 +36,7 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
   String _paymentMode = 'cash';
   DateTime _paidAt = DateTime.now();
   String? _errorMessage;
+  bool _isFullyPaid = true;
 
   @override
   void initState() {
@@ -43,10 +47,24 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
           ? widget.invoice.remainingAmount.toStringAsFixed(2)
           : '',
     );
+    _isFullyPaid = widget.invoice.remainingAmount > 0;
+    _amountController.addListener(_onAmountChanged);
+  }
+
+  void _onAmountChanged() {
+    final numVal = double.tryParse(_amountController.text.trim());
+    final isFull = numVal != null &&
+        (numVal - widget.invoice.remainingAmount).abs() < 0.01;
+    if (_isFullyPaid != isFull) {
+      setState(() {
+        _isFullyPaid = isFull;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _amountController.removeListener(_onAmountChanged);
     _amountController.dispose();
     _referenceController.dispose();
     _notesController.dispose();
@@ -74,6 +92,12 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
   }
 
   Future<void> _submitPayment() async {
+    final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+    if (!isClockedIn) {
+      if (mounted) showClockInRequiredDialog(context, ref);
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
@@ -320,6 +344,50 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: Checkbox(
+                        key: const Key('dialog_fully_paid_checkbox'),
+                        value: _isFullyPaid,
+                        onChanged: (val) {
+                          final checked = val ?? false;
+                          setState(() {
+                            _isFullyPaid = checked;
+                            if (checked) {
+                              _amountController.text =
+                                  widget.invoice.remainingAmount.toStringAsFixed(2);
+                            }
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () {
+                        final checked = !_isFullyPaid;
+                        setState(() {
+                          _isFullyPaid = checked;
+                          if (checked) {
+                            _amountController.text =
+                                widget.invoice.remainingAmount.toStringAsFixed(2);
+                          }
+                        });
+                      },
+                      child: Text(
+                        'Fully Paid',
+                        style: AppTypography.bodySm.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: AppSpacing.md),
 
                 // Payment Mode Selection
@@ -362,6 +430,10 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                     },
                   ),
                 ),
+                if (_paymentMode == 'upi') ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  const UpiPaymentQrCard(),
+                ],
                 const SizedBox(height: AppSpacing.md),
 
                 // Reference & Date (Row on Desktop, Column on Mobile)

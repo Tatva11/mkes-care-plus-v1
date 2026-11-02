@@ -117,6 +117,20 @@ class AdministrationContent extends StatelessWidget {
                               );
                             },
                           ),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildSettingCard(
+                            Icons.business_outlined,
+                            'Department Management',
+                            'Manage hospital departments, operational status, and descriptions.',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const DepartmentManagementScreen(),
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -232,6 +246,20 @@ class AdministrationContent extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => const DoctorManagementScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildSettingCard(
+                      Icons.business_outlined,
+                      'Department Management',
+                      'Manage hospital departments, operational status, and descriptions.',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const DepartmentManagementScreen(),
                           ),
                         );
                       },

@@ -275,6 +275,8 @@ class _DentalLabWhatsAppDialogState
       titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       contentPadding: EdgeInsets.zero,
       actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+      actionsOverflowButtonSpacing: 8,
+      actionsOverflowDirection: VerticalDirection.down,
       title: Row(
         children: [
           Container(
@@ -297,9 +299,9 @@ class _DentalLabWhatsAppDialogState
           ),
         ],
       ),
-      content: SizedBox(
-        width: 480,
-        child: content,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SizedBox(width: double.maxFinite, child: content),
       ),
       actions: [
         TextButton(

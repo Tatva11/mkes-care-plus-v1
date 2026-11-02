@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../appointments/models/appointment_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../clinical/providers/clinical_inventory_provider.dart';
 import '../../clinical/widgets/clinical_inventory_consumption_dialog.dart';
@@ -19,9 +20,13 @@ class EyeExaminationPatientSection extends ConsumerWidget {
   const EyeExaminationPatientSection({
     super.key,
     required this.patient,
+    this.pendingAppointment,
+    this.onRecordSaved,
   });
 
   final PatientModel patient;
+  final AppointmentModel? pendingAppointment;
+  final void Function(EyeExaminationModel exam)? onRecordSaved;
 
   static const Color _successColor = Color(0xFF2E7D32);
 
@@ -50,59 +55,60 @@ class EyeExaminationPatientSection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Section Header
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                ),
-                child: const Icon(
-                  Icons.visibility_outlined,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'Clinical Examinations',
-                        style: AppTypography.headlineMd.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 420;
+              final titleRow = Row(
+                mainAxisSize: isNarrow ? MainAxisSize.max : MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryContainer.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    examsAsync.whenOrNull(
-                          data: (exams) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryContainer.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${exams.length}',
-                              style: AppTypography.bodySm.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
+                    child: const Icon(
+                      Icons.visibility_outlined,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Flexible(
+                    child: Text(
+                      'Clinical Examinations',
+                      style: AppTypography.headlineMd.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isNarrow ? 16 : 18,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  examsAsync.whenOrNull(
+                        data: (exams) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryContainer.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '',
+                            style: AppTypography.bodySm.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ) ??
-                        const SizedBox.shrink(),
-                  ],
-                ),
-              ),
-              FilledButton.icon(
+                        ),
+                      ) ??
+                      const SizedBox.shrink(),
+                ],
+              );
+
+              final actionBtn = FilledButton.icon(
                 key: const Key('add_eye_examination_button'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
@@ -112,15 +118,41 @@ class EyeExaminationPatientSection extends ConsumerWidget {
                   visualDensity: VisualDensity.compact,
                 ),
                 onPressed: () async {
-                  await showDialog(
+                  final saved = await showDialog<EyeExaminationModel>(
                     context: context,
-                    builder: (_) => EyeExaminationFormDialog(patient: patient),
+                    builder: (_) => EyeExaminationFormDialog(
+                      patient: patient,
+                      initialAppointmentId: pendingAppointment?.id,
+                    ),
                   );
+                  if (saved != null && onRecordSaved != null) {
+                    onRecordSaved!(saved);
+                  }
                 },
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Record Exam'),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    titleRow,
+                    const SizedBox(height: AppSpacing.xs),
+                    actionBtn,
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: titleRow),
+                  const SizedBox(width: AppSpacing.sm),
+                  actionBtn,
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.md),
 
@@ -226,71 +258,87 @@ class EyeExaminationPatientSection extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top row: Date, time, actions
-            Row(
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryContainer.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.event, size: 14, color: AppColors.primary),
-                      const SizedBox(width: 4),
-                      Text(
-                        exam.formattedDate,
-                        style: AppTypography.bodySm.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       ),
-                      if (exam.formattedTime != null) ...[
-                        const SizedBox(width: 4),
-                        Text(
-                          '• ${exam.formattedTime}',
-                          style: AppTypography.bodySm.copyWith(
-                            color: AppColors.primary,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.event, size: 14, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            exam.formattedDate,
+                            style: AppTypography.bodySm.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (exam.createdByName != null) ...[
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    'by ${exam.createdByName}',
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                // Edit button
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  tooltip: 'Edit Examination',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () async {
-                    await showDialog(
-                      context: context,
-                      builder: (_) => EyeExaminationFormDialog(
-                        patient: patient,
-                        initialRecord: exam,
+                          if (exam.formattedTime != null) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '• ${exam.formattedTime}',
+                              style: AppTypography.bodySm.copyWith(
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    );
-                  },
+                    ),
+                    if (exam.createdByName != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      Flexible(
+                        child: Text(
+                          'by ${exam.createdByName}',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                // Admin-only delete
-                if (isAdmin)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        size: 18, color: AppColors.error),
-                    tooltip: 'Delete Examination',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => _confirmDelete(context, ref, exam),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Edit button
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      tooltip: 'Edit Examination',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        await showDialog(
+                          context: context,
+                          builder: (_) => EyeExaminationFormDialog(
+                            patient: patient,
+                            initialRecord: exam,
+                          ),
+                        );
+                      },
+                    ),
+                    // Admin-only delete
+                    if (isAdmin)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            size: 18, color: AppColors.error),
+                        tooltip: 'Delete Examination',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _confirmDelete(context, ref, exam),
+                      ),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -469,10 +517,13 @@ class EyeExaminationPatientSection extends ConsumerWidget {
               color: AppColors.primary,
             ),
           ),
-          Text(
-            value,
-            style: AppTypography.bodySm.copyWith(
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              value,
+              style: AppTypography.bodySm.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

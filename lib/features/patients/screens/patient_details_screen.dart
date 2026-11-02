@@ -1,3 +1,13 @@
+import 'package:flutter/foundation.dart';
+import '../../appointments/models/appointment_model.dart';
+import '../../appointments/providers/appointment_provider.dart';
+import '../../billing/models/billing_invoice_model.dart';
+import '../../dental/models/dental_treatment_model.dart';
+import '../../eye/models/eye_examination_model.dart';
+import '../../dental/widgets/dental_treatment_form_dialog.dart';
+import '../../eye/widgets/eye_examination_form_dialog.dart';
+import '../../staff/widgets/clock_in_required_dialog.dart';
+import '../../staff/providers/attendance_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -26,32 +36,81 @@ import '../repositories/patient_repository.dart';
 
 /// Screen displaying complete details for a single patient, including
 /// personal/contact information and their attendance history.
-class PatientDetailsScreen extends ConsumerWidget {
+class PatientDetailsScreen extends ConsumerStatefulWidget {
   const PatientDetailsScreen({
     super.key,
     required this.patientId,
+    this.pendingAppointment,
+    this.showMandatoryExamBanner = true,
   });
 
   final String patientId;
+  final AppointmentModel? pendingAppointment;
+  final bool showMandatoryExamBanner;
+
+  static String normalizePhoneNumber(String raw) =>
+      _PatientDetailsScreenState.normalizePhoneNumber(raw);
+
+  @override
+  ConsumerState<PatientDetailsScreen> createState() =>
+      _PatientDetailsScreenState();
+}
+
+class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
+  String get patientId => widget.patientId;
+  AppointmentModel? _activeAppointment;
+  bool _isNavigatingToBilling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeAppointment = widget.pendingAppointment;
+  }
+
+  static String normalizePhoneNumber(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+    final hasPlus = trimmed.startsWith('+');
+    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return '';
+    return hasPlus ? '+$digits' : digits;
+  }
 
   Future<void> _makePhoneCall(BuildContext context, String phoneNumber) async {
-    final cleaned = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
-    if (cleaned.isEmpty) {
+    final normalized = normalizePhoneNumber(phoneNumber);
+    final rawDigits = normalized.replaceAll(RegExp(r'\D'), '');
+    if (normalized.isEmpty || rawDigits.length < 7) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Invalid phone number.'),
+          content: Text('Invalid or incomplete phone number for calling.'),
           backgroundColor: AppColors.error,
         ),
       );
       return;
     }
-    final uri = Uri(scheme: 'tel', path: cleaned);
+
+    final uri = Uri.parse('tel:$normalized');
     try {
-      final launched = await launchUrl(uri);
+      bool launched = false;
+      if (kIsWeb) {
+        launched = await launchUrl(uri);
+      } else {
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (!launched) {
+            launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+          }
+        } catch (_) {
+          launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+        }
+      }
+
       if (!launched && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not open phone dialer for $cleaned'),
+            content: Text(
+              'Could not open phone dialer for $normalized. Please check dialer settings.',
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -69,7 +128,7 @@ class PatientDetailsScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final patientAsync = ref.watch(patientDetailsProvider(patientId));
     final historyAsync = ref.watch(patientAttendanceHistoryProvider(patientId));
 
@@ -158,6 +217,8 @@ class PatientDetailsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_activeAppointment != null && widget.showMandatoryExamBanner)
+                  _buildActiveVisitBanner(context, patient, _activeAppointment!),
                 _buildHeaderCard(context, ref, patient),
                 const SizedBox(height: AppSpacing.md),
                 _buildInfoCard(context, ref, patient),
@@ -166,7 +227,12 @@ class PatientDetailsScreen extends ConsumerWidget {
                     ref
                         .watch(patientDentalLabCasesProvider(patient.id))
                         .isNotEmpty) ...[
-                  DentalTreatmentPatientSection(patient: patient),
+                  DentalTreatmentPatientSection(
+                    patient: patient,
+                    pendingAppointment: _activeAppointment,
+                    onRecordSaved: (treatment) =>
+                        _handleExamCompleted(patient, treatment.id),
+                  ),
                   const SizedBox(height: AppSpacing.lg),
                   _buildDentalLabSection(context, ref, patient),
                   const SizedBox(height: AppSpacing.lg),
@@ -178,7 +244,12 @@ class PatientDetailsScreen extends ConsumerWidget {
                             ?.isNotEmpty ==
                         true) ...[
                   if (patient.department == 'eye') ...[
-                    EyeExaminationPatientSection(patient: patient),
+                    EyeExaminationPatientSection(
+                      patient: patient,
+                      pendingAppointment: _activeAppointment,
+                      onRecordSaved: (exam) =>
+                          _handleExamCompleted(patient, exam.id),
+                    ),
                     const SizedBox(height: AppSpacing.lg),
                   ],
                   EyeSurgeryPatientSection(patientId: patient.id),
@@ -1050,5 +1121,274 @@ class PatientDetailsScreen extends ConsumerWidget {
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts[0][0].toUpperCase();
     return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+  }
+
+  Widget _buildActiveVisitBanner(
+    BuildContext context,
+    PatientModel patient,
+    AppointmentModel appointment,
+  ) {
+    final isDental = appointment.department.toLowerCase() == 'dental' ||
+        patient.department?.toLowerCase() == 'dental';
+    final hasExam = appointment.hasClinicalExam;
+
+    final bannerBg = hasExam
+        ? const Color(0xFFE8F5E9)
+        : const Color(0xFFFFF3E0);
+    final borderColor = hasExam
+        ? const Color(0xFF81C784)
+        : const Color(0xFFFFB74D);
+    final titleColor = hasExam
+        ? const Color(0xFF1B5E20)
+        : const Color(0xFFE65100);
+    final bodyColor = hasExam
+        ? const Color(0xFF2E7D32)
+        : const Color(0xFFBF360C);
+
+    final formattedDate =
+        DateFormat('dd MMM yyyy').format(appointment.appointmentDate);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: bannerBg,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 600;
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    hasExam ? Icons.check_circle : Icons.assignment_late_outlined,
+                    color: titleColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      hasExam
+                          ? 'Clinical Examination Recorded'
+                          : 'Mandatory Clinical Examination',
+                      style: AppTypography.bodyMd.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: titleColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                hasExam
+                    ? 'Clinical examination is recorded for visit on $formattedDate. Proceed to billing to complete visit.'
+                    : 'Patient is marked present. Please record ${isDental ? "dental diagnosis and treatment details" : "vitals, visual acuity, and clinical examination"} before billing.',
+                style: AppTypography.bodySm.copyWith(color: bodyColor),
+              ),
+            ],
+          );
+
+          final actionButton = hasExam
+              ? FilledButton.icon(
+                  key: const Key('proceed_to_billing_button'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                  ),
+                  onPressed: () => _navigateToBilling(patient, appointment),
+                  icon: const Icon(Icons.receipt_long, size: 16),
+                  label: const Text('Proceed to Billing'),
+                )
+              : FilledButton.icon(
+                  key: const Key('record_exam_from_banner_button'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                  ),
+                  onPressed: () => _openExamDialogForVisit(patient, appointment),
+                  icon: const Icon(Icons.edit_note, size: 16),
+                  label: Text(isDental ? 'Record Treatment' : 'Record Vitals & Exam'),
+                );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                content,
+                const SizedBox(height: AppSpacing.sm),
+                actionButton,
+              ],
+            );
+          } else {
+            return Row(
+              children: [
+                Expanded(child: content),
+                const SizedBox(width: AppSpacing.md),
+                actionButton,
+              ],
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _openExamDialogForVisit(
+    PatientModel patient,
+    AppointmentModel appointment,
+  ) async {
+    final isClockedIn = await ref.read(staffClockInStatusProvider.future);
+    if (!mounted) return;
+    if (!isClockedIn) {
+      showClockInRequiredDialog(context, ref);
+      return;
+    }
+
+    final isDental = appointment.department.toLowerCase() == 'dental' ||
+        patient.department?.toLowerCase() == 'dental';
+
+    if (isDental) {
+      final savedTreatment = await showDialog<DentalTreatmentModel>(
+        context: context,
+        builder: (_) => DentalTreatmentFormDialog(
+          patient: patient,
+          initialAppointmentId: appointment.id,
+        ),
+      );
+      if (savedTreatment != null && mounted) {
+        await _handleExamCompleted(patient, savedTreatment.id);
+      }
+    } else {
+      final savedExam = await showDialog<EyeExaminationModel>(
+        context: context,
+        builder: (_) => EyeExaminationFormDialog(
+          patient: patient,
+          initialAppointmentId: appointment.id,
+        ),
+      );
+      if (savedExam != null && mounted) {
+        await _handleExamCompleted(patient, savedExam.id);
+      }
+    }
+  }
+
+  Future<void> _handleExamCompleted(
+    PatientModel patient,
+    String examOrTreatmentId,
+  ) async {
+    if (_activeAppointment == null) return;
+    final apt = _activeAppointment!;
+
+    final currentNotes = apt.notes ?? '';
+    final examTag = '[EXAMINED: $examOrTreatmentId]';
+    final updatedNotes = currentNotes.contains('[EXAMINED')
+        ? currentNotes
+        : (currentNotes.isEmpty ? examTag : '$currentNotes | $examTag');
+
+    final updatedApt = apt.copyWith(notes: updatedNotes);
+    if (mounted) {
+      setState(() {
+        _activeAppointment = updatedApt;
+      });
+    }
+
+    try {
+      await ref.read(appointmentsNotifierProvider.notifier).updateAppointment(
+        apt.id,
+        {'notes': updatedNotes},
+      );
+    } catch (e) {
+      debugPrint('Failed to update appointment with exam reference: $e');
+    }
+
+    ref.invalidate(eyeExaminationsForPatientProvider(patient.id));
+    ref.invalidate(dentalTreatmentsForPatientProvider(patient.id));
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+            'Clinical examination saved successfully. Redirecting to billing...'),
+        backgroundColor: Color(0xFF2E7D32),
+      ),
+    );
+
+    await _navigateToBilling(patient, updatedApt);
+  }
+
+  Future<void> _navigateToBilling(
+    PatientModel patient,
+    AppointmentModel appointment,
+  ) async {
+    if (_isNavigatingToBilling) return;
+    if (mounted) {
+      setState(() => _isNavigatingToBilling = true);
+    }
+
+    try {
+      final createdInvoice =
+          await Navigator.of(context).push<BillingInvoiceModel>(
+        MaterialPageRoute(
+          builder: (_) => CreateInvoiceScreen(
+            initialPatient: patient,
+            initialDepartment: appointment.department,
+          ),
+        ),
+      );
+
+      if (createdInvoice != null && mounted) {
+        final currentNotes =
+            _activeAppointment?.notes ?? appointment.notes ?? '';
+        final billedTag = '[BILLED: ${createdInvoice.invoiceNumber}]';
+        final updatedNotes = currentNotes.contains('[BILLED')
+            ? currentNotes
+            : (currentNotes.isEmpty ? billedTag : '$currentNotes | $billedTag');
+
+        final billedApt =
+            (_activeAppointment ?? appointment).copyWith(notes: updatedNotes);
+        if (mounted) {
+          setState(() {
+            _activeAppointment = billedApt;
+          });
+        }
+
+        try {
+          await ref
+              .read(appointmentsNotifierProvider.notifier)
+              .updateAppointment(
+            appointment.id,
+            {'notes': updatedNotes},
+          );
+        } catch (e) {
+          debugPrint('Failed to update appointment with billing reference: $e');
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Invoice ${createdInvoice.invoiceNumber} recorded for ${patient.name}. Clinical visit complete.',
+              ),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isNavigatingToBilling = false);
+      }
+    }
   }
 }

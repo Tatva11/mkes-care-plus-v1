@@ -581,37 +581,43 @@ class _StaffProfileDetailScreenState
                   ],
                 ),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isBypassActive
-                      ? Colors.orange.shade800
-                      : AppColors.primaryContainer.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isBypassActive ? Icons.lock_open : Icons.lock_outline,
-                      size: 14,
-                      color: isBypassActive
-                          ? Colors.white
-                          : AppColors.primaryContainer,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isBypassActive ? 'BYPASS ACTIVE' : '200M ENFORCED',
-                      style: AppTypography.labelCaps.copyWith(
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isBypassActive
+                        ? Colors.orange.shade800
+                        : AppColors.primaryContainer.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isBypassActive ? Icons.lock_open : Icons.lock_outline,
+                        size: 14,
                         color: isBypassActive
                             ? Colors.white
                             : AppColors.primaryContainer,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          isBypassActive ? 'BYPASS ACTIVE' : '200M ENFORCED',
+                          style: AppTypography.labelCaps.copyWith(
+                            color: isBypassActive
+                                ? Colors.white
+                                : AppColors.primaryContainer,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

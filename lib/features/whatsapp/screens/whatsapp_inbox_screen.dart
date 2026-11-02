@@ -1200,8 +1200,10 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text('Link Phone to Patient Record'),
-              content: SizedBox(
-                width: 400,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: SizedBox(
+                  width: double.maxFinite,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1242,6 +1244,7 @@ class _WhatsAppInboxScreenState extends ConsumerState<WhatsAppInboxScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
               actions: [
                 TextButton(

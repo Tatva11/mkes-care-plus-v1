@@ -107,123 +107,206 @@ class _NotificationDialog extends ConsumerStatefulWidget {
 class _NotificationDialogState extends ConsumerState<_NotificationDialog> {
   String _selectedCategory = 'all'; // 'all' | 'unread' | 'whatsapp' | 'appointment' | 'clinical'
 
+  Widget _buildUnreadBadge(AsyncValue<List<NotificationModel>> notifAsync) {
+    return notifAsync.when(
+      data: (items) {
+        final unread = items.where((n) => !n.isRead).length;
+        if (unread == 0) return const SizedBox.shrink();
+        return Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 2,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            '$unread new',
+            style: AppTypography.labelCaps.copyWith(
+              color: AppColors.onPrimaryContainer,
+              fontSize: 10,
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildMarkAllReadButton(AsyncValue<List<NotificationModel>> notifAsync) {
+    return notifAsync.maybeWhen(
+      data: (items) {
+        final hasUnread = items.any((n) => !n.isRead);
+        if (!hasUnread) return const SizedBox.shrink();
+        return TextButton(
+          onPressed: () => ref
+              .read(notificationsProvider.notifier)
+              .markAllRead(),
+          child: Text(
+            'Mark all read',
+            style: AppTypography.labelCaps
+                .copyWith(color: AppColors.primary),
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildClearAllButton(AsyncValue<List<NotificationModel>> notifAsync) {
+    return notifAsync.maybeWhen(
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+        return IconButton(
+          icon: const Icon(Icons.delete_sweep_outlined, size: 20),
+          color: AppColors.onSurfaceVariant,
+          tooltip: 'Clear all',
+          onPressed: () {
+            ref
+                .read(notificationsProvider.notifier)
+                .deleteAll();
+            Navigator.of(context).pop();
+          },
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final notifAsync = ref.watch(notificationsProvider);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final isMobile = screenWidth < 600;
 
     return Dialog(
-      alignment: Alignment.topRight,
-      insetPadding: const EdgeInsets.only(top: 60, right: 16, left: 16),
+      alignment: isMobile ? Alignment.center : Alignment.topRight,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 16,
+        vertical: isMobile ? 20 : 60,
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         side: const BorderSide(color: AppColors.outlineVariant),
       ),
-      child: Container(
-        width: 440,
-        constraints: const BoxConstraints(maxHeight: 600),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
-        ),
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Title + unread badge
-                      Flexible(
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Notifications',
-                                style: AppTypography.headlineMd,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            notifAsync.when(
-                              data: (items) {
-                                final unread = items.where((n) => !n.isRead).length;
-                                if (unread == 0) return const SizedBox.shrink();
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primaryContainer,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '$unread new',
-                                    style: AppTypography.labelCaps.copyWith(
-                                      color: AppColors.onPrimaryContainer,
-                                      fontSize: 10,
+      child: SafeArea(
+        child: Container(
+          width: isMobile ? double.infinity : 440,
+          constraints: BoxConstraints(
+            maxHeight:
+                (screenHeight * (isMobile ? 0.82 : 0.85)).clamp(360.0, 640.0),
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md, AppSpacing.sm + 4, AppSpacing.md, AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (isMobile) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Notifications',
+                                      style: AppTypography.headlineMd.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
                                     ),
                                   ),
-                                );
-                              },
-                              loading: () => const SizedBox.shrink(),
-                              error: (_, __) => const SizedBox.shrink(),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Actions
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.refresh, size: 20),
-                            color: AppColors.onSurfaceVariant,
-                            tooltip: 'Refresh',
-                            onPressed: () =>
-                                ref.read(notificationsProvider.notifier).fetch(),
-                          ),
-                          notifAsync.maybeWhen(
-                            data: (items) {
-                              final hasUnread = items.any((n) => !n.isRead);
-                              if (!hasUnread) return const SizedBox.shrink();
-                              return TextButton(
-                                onPressed: () => ref
-                                    .read(notificationsProvider.notifier)
-                                    .markAllRead(),
-                                child: Text(
-                                  'Mark all read',
-                                  style: AppTypography.labelCaps
-                                      .copyWith(color: AppColors.primary),
                                 ),
-                              );
-                            },
-                            orElse: () => const SizedBox.shrink(),
+                                const SizedBox(width: AppSpacing.xs),
+                                _buildUnreadBadge(notifAsync),
+                              ],
+                            ),
                           ),
-                          notifAsync.maybeWhen(
-                            data: (items) {
-                              if (items.isEmpty) return const SizedBox.shrink();
-                              return IconButton(
-                                icon: const Icon(Icons.delete_sweep_outlined, size: 20),
-                                color: AppColors.onSurfaceVariant,
-                                tooltip: 'Clear all',
-                                onPressed: () {
-                                  ref
-                                      .read(notificationsProvider.notifier)
-                                      .deleteAll();
-                                  Navigator.of(context).pop();
-                                },
-                              );
-                            },
-                            orElse: () => const SizedBox.shrink(),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            color: AppColors.onSurfaceVariant,
+                            tooltip: 'Close',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 32, minHeight: 32),
+                            onPressed: () => Navigator.of(context).pop(),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildMarkAllReadButton(notifAsync),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.refresh, size: 20),
+                              color: AppColors.onSurfaceVariant,
+                              tooltip: 'Refresh',
+                              onPressed: () =>
+                                  ref.read(notificationsProvider.notifier).fetch(),
+                            ),
+                            _buildClearAllButton(notifAsync),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Title + unread badge
+                        Flexible(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Notifications',
+                                  style: AppTypography.headlineMd,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              _buildUnreadBadge(notifAsync),
+                            ],
+                          ),
+                        ),
+                        // Actions
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.refresh, size: 20),
+                              color: AppColors.onSurfaceVariant,
+                              tooltip: 'Refresh',
+                              onPressed: () =>
+                                  ref.read(notificationsProvider.notifier).fetch(),
+                            ),
+                            _buildMarkAllReadButton(notifAsync),
+                            _buildClearAllButton(notifAsync),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.xs),
                   // Filter Chips
                   SingleChildScrollView(
@@ -323,9 +406,9 @@ class _NotificationDialogState extends ConsumerState<_NotificationDialog> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
-
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _selectedCategory == value;
     return ChoiceChip(

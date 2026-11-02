@@ -230,27 +230,35 @@ class _BrandCluster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatarSize = isDesktop ? 40.0 : 32.0;
-    final iconSize = isDesktop ? 24.0 : 20.0;
+    final avatarSize = isDesktop ? 38.0 : 30.0;
 
     return Row(
       mainAxisSize: isDesktop ? MainAxisSize.min : MainAxisSize.max,
       children: [
-        Container(
-          width: avatarSize,
-          height: avatarSize,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE5E2E1),
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.outlineVariant),
-          ),
-          child: Icon(
-            Icons.person,
-            size: iconSize,
-            color: AppColors.onSurfaceVariant,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.asset(
+            'assets/images/mkes_logo.png',
+            width: avatarSize,
+            height: avatarSize,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Container(
+              width: avatarSize,
+              height: avatarSize,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5E2E1),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: const Icon(
+                Icons.person,
+                size: 18,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
+        const SizedBox(width: AppSpacing.xs + 2),
         if (isDesktop)
           Text(
             'MKES CARE+',
@@ -261,15 +269,19 @@ class _BrandCluster extends StatelessWidget {
           )
         else
           Expanded(
-            child: Text(
-              'MKES CARE+',
-              style: AppTypography.headlineMd.copyWith(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'MKES CARE+',
+                style: AppTypography.headlineMd.copyWith(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                  letterSpacing: 0.3,
+                ),
+                maxLines: 1,
               ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
             ),
           ),
       ],

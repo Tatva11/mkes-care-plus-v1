@@ -163,6 +163,7 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
     );
 
     final isDesktop = MediaQuery.sizeOf(context).width > 768;
+    final isSmallMobile = MediaQuery.sizeOf(context).width < 400;
     final dateFormat = DateFormat('MMM d, yyyy');
 
     return Dialog(
@@ -170,9 +171,9 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surfaceContainerLowest,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.lg,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isSmallMobile ? 8.0 : AppSpacing.md,
+        vertical: isSmallMobile ? 8.0 : AppSpacing.lg,
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -187,7 +188,7 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
             const Divider(height: 1, color: AppColors.outlineVariant),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: EdgeInsets.all(isSmallMobile ? AppSpacing.sm : AppSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -239,73 +240,79 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Vendor info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SUPPLIER / VENDOR',
-                      style: AppTypography.labelCaps.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        fontSize: 10,
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 450;
+              final vendorInfo = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SUPPLIER / VENDOR',
+                    style: AppTypography.labelCaps.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontSize: 10,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      po.vendorName ?? 'Vendor',
-                      style: AppTypography.headlineMd.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    po.vendorName ?? 'Vendor',
+                    style: AppTypography.headlineMd.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: isNarrow ? 18 : 20,
                     ),
-                    if (hasPhone) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.phone_outlined, size: 14, color: Colors.blue.shade700),
-                          const SizedBox(width: 4),
-                          Text(
-                            po.vendorPhone!,
-                            style: AppTypography.bodySm.copyWith(
-                              color: AppColors.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          InkWell(
-                            onTap: () => _handleCallVendor(context, po.vendorPhone),
-                            borderRadius: BorderRadius.circular(4),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.call, size: 13, color: Colors.green.shade700),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    'Call Vendor',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.green.shade700,
-                                    ),
-                                  ),
-                                ],
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                  if (hasPhone) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.phone_outlined, size: 14, color: Colors.blue.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              po.vendorPhone!,
+                              style: AppTypography.bodySm.copyWith(
+                                color: AppColors.onSurfaceVariant,
                               ),
                             ),
+                          ],
+                        ),
+                        InkWell(
+                          onTap: () => _handleCallVendor(context, po.vendorPhone),
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.call, size: 13, color: Colors.green.shade700),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Call Vendor',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-              ),
+                ],
+              );
 
-              // Total Order Amount
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              final totalInfo = Column(
+                crossAxisAlignment: isNarrow ? CrossAxisAlignment.start : CrossAxisAlignment.end,
                 children: [
                   Text(
                     'TOTAL AMOUNT',
@@ -320,44 +327,96 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
                     style: AppTypography.displayLg.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w800,
-                      fontSize: 22,
+                      fontSize: isNarrow ? 20 : 22,
                     ),
                   ),
                 ],
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    vendorInfo,
+                    const SizedBox(height: 12),
+                    totalInfo,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: vendorInfo),
+                  const SizedBox(width: AppSpacing.md),
+                  totalInfo,
+                ],
+              );
+            },
           ),
           const Divider(height: 20),
 
           // Dates & Progress
-          Row(
-            children: [
-              Expanded(
-                child: _buildInfoItem(
-                  'Order Date',
-                  dateFormat.format(po.orderDate),
-                  Icons.calendar_today_outlined,
-                ),
-              ),
-              Expanded(
-                child: _buildInfoItem(
-                  'Expected Delivery',
-                  po.expectedDeliveryDate != null
-                      ? dateFormat.format(po.expectedDeliveryDate!)
-                      : '—',
-                  Icons.event_available_outlined,
-                ),
-              ),
-              Expanded(
-                child: _buildInfoItem(
-                  'Actual Delivery',
-                  po.actualDeliveryDate != null
-                      ? dateFormat.format(po.actualDeliveryDate!)
-                      : 'Pending',
-                  Icons.check_circle_outline,
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 450) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoItem(
+                      'Order Date',
+                      dateFormat.format(po.orderDate),
+                      Icons.calendar_today_outlined,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoItem(
+                      'Expected Delivery',
+                      po.expectedDeliveryDate != null
+                          ? dateFormat.format(po.expectedDeliveryDate!)
+                          : '—',
+                      Icons.event_available_outlined,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoItem(
+                      'Actual Delivery',
+                      po.actualDeliveryDate != null
+                          ? dateFormat.format(po.actualDeliveryDate!)
+                          : 'Pending',
+                      Icons.check_circle_outline,
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(
+                    child: _buildInfoItem(
+                      'Order Date',
+                      dateFormat.format(po.orderDate),
+                      Icons.calendar_today_outlined,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildInfoItem(
+                      'Expected Delivery',
+                      po.expectedDeliveryDate != null
+                          ? dateFormat.format(po.expectedDeliveryDate!)
+                          : '—',
+                      Icons.event_available_outlined,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildInfoItem(
+                      'Actual Delivery',
+                      po.actualDeliveryDate != null
+                          ? dateFormat.format(po.actualDeliveryDate!)
+                          : 'Pending',
+                      Icons.check_circle_outline,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -366,26 +425,34 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
 
   Widget _buildInfoItem(String label, String value, IconData icon) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 16, color: AppColors.onSurfaceVariant),
         const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: AppTypography.labelCaps.copyWith(
-                color: AppColors.onSurfaceVariant,
-                fontSize: 10,
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTypography.labelCaps.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  fontSize: 10,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            Text(
-              value,
-              style: AppTypography.bodySm.copyWith(
-                fontWeight: FontWeight.w600,
+              Text(
+                value,
+                style: AppTypography.bodySm.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -395,8 +462,11 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             Text(
               'ORDERED PRODUCTS (${po.items.length})',
@@ -431,126 +501,201 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
               final item = po.items[index];
               return Padding(
                 padding: const EdgeInsets.all(AppSpacing.sm),
-                child: Row(
-                  children: [
-                    // Item name & SKU
-                    Expanded(
-                      flex: 4,
-                      child: Column(
+                child: LayoutBuilder(
+                  builder: (context, itemConstraints) {
+                    final isSmallScreen = itemConstraints.maxWidth < 450;
+                    if (isSmallScreen) {
+                      return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            item.inventoryName,
-                            style: AppTypography.bodyMd.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (item.inventorySku != null)
-                            Text(
-                              'SKU: ${item.inventorySku}',
-                              style: AppTypography.bodySm.copyWith(
-                                color: AppColors.onSurfaceVariant,
-                                fontSize: 11,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.inventoryName,
+                                      style: AppTypography.bodyMd.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    if (item.inventorySku != null)
+                                      Text(
+                                        'SKU: ${item.inventorySku}',
+                                        style: AppTypography.bodySm.copyWith(
+                                          color: AppColors.onSurfaceVariant,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Text(
+                                item.formattedTotalAmount,
+                                style: AppTypography.bodyMd.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            children: [
+                              Text(
+                                'Ordered: ${item.formattedQuantity}',
+                                style: AppTypography.bodySm.copyWith(
+                                  fontSize: 11,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                'Received: ${item.formattedReceivedQuantity}',
+                                style: AppTypography.bodySm.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                              Text(
+                                'Unit: ${item.formattedUnitPrice}',
+                                style: AppTypography.bodySm.copyWith(
+                                  fontSize: 11,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
-                      ),
-                    ),
+                      );
+                    }
+                    return Row(
+                      children: [
+                        // Item name & SKU
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.inventoryName,
+                                style: AppTypography.bodyMd.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (item.inventorySku != null)
+                                Text(
+                                  'SKU: ${item.inventorySku}',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
 
-                    // Ordered Qty
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            'ORDERED',
-                            style: AppTypography.labelCaps.copyWith(
-                              fontSize: 9,
-                              color: AppColors.onSurfaceVariant,
-                            ),
+                        // Ordered Qty
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                'ORDERED',
+                                style: AppTypography.labelCaps.copyWith(
+                                  fontSize: 9,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                item.formattedQuantity,
+                                style: AppTypography.bodySm.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            item.formattedQuantity,
-                            style: AppTypography.bodySm.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    // Received Qty
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            'RECEIVED',
-                            style: AppTypography.labelCaps.copyWith(
-                              fontSize: 9,
-                              color: Colors.green.shade700,
-                            ),
+                        // Received Qty
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                'RECEIVED',
+                                style: AppTypography.labelCaps.copyWith(
+                                  fontSize: 9,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                              Text(
+                                item.formattedReceivedQuantity,
+                                style: AppTypography.bodySm.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            item.formattedReceivedQuantity,
-                            style: AppTypography.bodySm.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    // Unit Price
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            'UNIT PRICE',
-                            style: AppTypography.labelCaps.copyWith(
-                              fontSize: 9,
-                              color: AppColors.onSurfaceVariant,
-                            ),
+                        // Unit Price
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                'UNIT PRICE',
+                                style: AppTypography.labelCaps.copyWith(
+                                  fontSize: 9,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                item.formattedUnitPrice,
+                                style: AppTypography.bodySm.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            item.formattedUnitPrice,
-                            style: AppTypography.bodySm.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    // Line Total
-                    SizedBox(
-                      width: 80,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            'TOTAL',
-                            style: AppTypography.labelCaps.copyWith(
-                              fontSize: 9,
-                              color: AppColors.onSurfaceVariant,
-                            ),
+                        // Line Total
+                        SizedBox(
+                          width: 80,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'TOTAL',
+                                style: AppTypography.labelCaps.copyWith(
+                                  fontSize: 9,
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                item.formattedTotalAmount,
+                                style: AppTypography.bodySm.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.onSurface,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            item.formattedTotalAmount,
-                            style: AppTypography.bodySm.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onSurface,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
               );
             },
@@ -796,19 +941,20 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: 4,
             children: [
-              Expanded(
-                child: Text(
-                  'Created By: $createdByName',
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                'Created By: $createdByName',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  fontSize: 12,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: AppSpacing.sm),
               Text(
                 'Created At: $createdAtStr',
                 style: AppTypography.bodySm.copyWith(
@@ -821,20 +967,21 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
           const SizedBox(height: AppSpacing.xs),
           const Divider(height: 1, color: AppColors.outlineVariant),
           const SizedBox(height: AppSpacing.xs),
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: 4,
             children: [
-              Expanded(
-                child: Text(
-                  'Order Placed By: $orderPlacedByName',
-                  style: AppTypography.bodySm.copyWith(
-                    color: po.isDraft ? AppColors.onSurfaceVariant : AppColors.primary,
-                    fontWeight: po.isDraft ? FontWeight.normal : FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                'Order Placed By: $orderPlacedByName',
+                style: AppTypography.bodySm.copyWith(
+                  color: po.isDraft ? AppColors.onSurfaceVariant : AppColors.primary,
+                  fontWeight: po.isDraft ? FontWeight.normal : FontWeight.w600,
+                  fontSize: 12,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: AppSpacing.sm),
               Text(
                 'Order Placed At: $orderPlacedAtStr',
                 style: AppTypography.bodySm.copyWith(
@@ -853,52 +1000,55 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
   Widget _buildDialogHeader(BuildContext context, PurchaseOrder po) {
     return Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: po.status.color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                ),
-                child: Icon(
-                  po.status.icon,
-                  color: po.status.color,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'PO #${po.purchaseOrderNumber}',
-                style: AppTypography.headlineMd.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: po.status.color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: po.status.color),
-                ),
-                child: Text(
-                  po.status.label,
-                  style: TextStyle(
+          Expanded(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.xs,
+              runSpacing: 4,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: po.status.color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                  child: Icon(
+                    po.status.icon,
                     color: po.status.color,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
+                    size: 20,
                   ),
                 ),
-              ),
-            ],
+                Text(
+                  'PO #${po.purchaseOrderNumber}',
+                  style: AppTypography.headlineMd.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: po.status.color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: po.status.color),
+                  ),
+                  child: Text(
+                    po.status.label,
+                    style: TextStyle(
+                      color: po.status.color,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.close),
@@ -912,8 +1062,11 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
   Widget _buildDialogFooter(BuildContext context, WidgetRef ref, PurchaseOrder po) {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xs,
         children: [
           // Cancel PO button (if draft or ordered)
           if (po.canCancel)
@@ -929,22 +1082,23 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
           else
             const SizedBox.shrink(),
 
-          Row(
+          Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
             children: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Close'),
               ),
-              if (po.canEdit) ...[
-                const SizedBox(width: AppSpacing.sm),
+              if (po.canEdit)
                 OutlinedButton.icon(
                   onPressed: () => _handleEdit(context, po),
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: const Text('Edit PO'),
                 ),
-              ],
-              if (po.isDraft) ...[
-                const SizedBox(width: AppSpacing.sm),
+              if (po.isDraft)
                 FilledButton.icon(
                   onPressed: () => _handleMarkOrdered(context, ref, po),
                   icon: const Icon(Icons.send_outlined, size: 18),
@@ -954,9 +1108,7 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
                     foregroundColor: Colors.white,
                   ),
                 ),
-              ],
-              if (po.canReceive) ...[
-                const SizedBox(width: AppSpacing.sm),
+              if (po.canReceive)
                 FilledButton.icon(
                   onPressed: () => _handleReceive(context, po),
                   icon: const Icon(Icons.inventory, size: 18),
@@ -966,7 +1118,6 @@ class PurchaseOrderDetailsDialog extends ConsumerWidget {
                     foregroundColor: Colors.white,
                   ),
                 ),
-              ],
             ],
           ),
         ],

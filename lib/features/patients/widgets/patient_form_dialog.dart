@@ -47,7 +47,10 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
     _mobileController = TextEditingController(text: p?.mobile ?? '');
     _addressController = TextEditingController(text: p?.address ?? '');
     _referenceController = TextEditingController(text: p?.reference ?? '');
-    _selectedDepartment = p?.department ?? widget.initialDepartment;
+
+    final dept =
+        (p?.department ?? widget.initialDepartment).toLowerCase().trim();
+    _selectedDepartment = (dept == 'dental') ? 'dental' : 'eye';
     _selectedDob = p?.dob;
   }
 
@@ -59,7 +62,6 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
     _referenceController.dispose();
     super.dispose();
   }
-
 
   String _sanitizeMobile(String raw) {
     var digits = raw.replaceAll(RegExp(r'\D'), '');
@@ -118,6 +120,7 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
             .updatePatient(updatedPatient);
 
         ref.invalidate(patientDetailsProvider(saved.id));
+        ref.invalidate(patientsProvider);
         ref.invalidate(patientsByDepartmentProvider('eye'));
         ref.invalidate(patientsByDepartmentProvider('dental'));
         ref.invalidate(patientSearchProvider);
@@ -208,263 +211,265 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final viewInsets = MediaQuery.viewInsetsOf(context);
+    final isNarrow = screenWidth < 380;
 
-    final dialogMaxWidth = (screenWidth - 32).clamp(280.0, 520.0);
-    final dialogMaxHeight =
-        (screenHeight - viewInsets.bottom - 60).clamp(320.0, 680.0);
+    final dialogMaxWidth =
+        (screenWidth - (isNarrow ? 16 : 32)).clamp(280.0, 540.0);
+    final availableHeight =
+        screenHeight - viewInsets.bottom - (isNarrow ? 24 : 48);
+    final dialogMaxHeight = availableHeight.clamp(280.0, 720.0);
 
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: dialogMaxWidth,
-          maxHeight: dialogMaxHeight,
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Dialog Header
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: AppColors.outlineVariant),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 8 : 16,
+        vertical: isNarrow ? 8 : 24,
+      ),
+      child: SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: dialogMaxWidth,
+            maxHeight: dialogMaxHeight,
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Dialog Header
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isNarrow ? 12 : AppSpacing.md,
+                    vertical: isNarrow ? 10 : AppSpacing.md,
                   ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.15),
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusSm),
-                            ),
-                            child: Icon(
-                              _isEditing
-                                  ? Icons.edit_outlined
-                                  : Icons.person_add_alt_1,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              _isEditing ? 'Edit Patient' : 'Register New Patient',
-                              style: AppTypography.headlineMd,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: AppColors.outlineVariant),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(),
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ),
-
-              // Form Body
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  child: Row(
                     children: [
-                      // Patient ID Badge preview
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _isEditing
-                                ? 'PATIENT NUMBER'
-                                : 'ASSIGNED IDENTIFIER',
-                            style: AppTypography.labelCaps,
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(4),
-                              border:
-                                  Border.all(color: AppColors.outlineVariant),
-                            ),
-                            child: Text(
-                              _isEditing
-                                  ? widget.patient!.patientNumber
-                                  : '${_selectedDepartment == 'eye' ? 'E' : 'D'} (assigned on save)',
-                              style: AppTypography.dataMono.copyWith(
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(isNarrow ? 6 : 8),
+                              decoration: BoxDecoration(
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.15),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusSm),
+                              ),
+                              child: Icon(
+                                _isEditing
+                                    ? Icons.edit_outlined
+                                    : Icons.person_add_alt_1,
                                 color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
+                                size: 20,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Full Name
-                      MkesTextField(
-                        controller: _nameController,
-                        label: 'Full Name *',
-                        hintText: 'e.g. Alexander Graham',
-                        prefixIcon: Icons.badge_outlined,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Full Name is required'
-                            : null,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Contact & Department
-                      ResponsiveFormRow(
-                        breakpoint: 440,
-                        children: [
-                          MkesTextField(
-                            controller: _mobileController,
-                            label: 'Mobile Number',
-                            hintText: '9876543210',
-                            keyboardType: TextInputType.number,
-                            prefixIcon: Icons.phone_outlined,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'[\d\s+\-]')),
-                              LengthLimitingTextInputFormatter(16),
-                            ],
-                            validator: _validateIndianMobile,
-                          ),
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedDepartment,
-                            decoration: InputDecoration(
-                              labelText: 'Department *',
-                              prefixIcon:
-                                  const Icon(Icons.local_hospital_outlined),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(
-                                    AppSpacing.radiusMd),
+                            SizedBox(width: isNarrow ? 6 : AppSpacing.sm),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  _isEditing
+                                      ? 'Edit Patient (${widget.patient!.patientNumber})'
+                                      : 'Register New Patient',
+                                  style: AppTypography.headlineMd.copyWith(
+                                    fontSize: isNarrow ? 17.0 : 20.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'eye',
-                                child: Text('Eye Clinic'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'dental',
-                                child: Text('Dental Clinic'),
-                              ),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => _selectedDepartment = val);
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // DOB Picker
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime(1995, 1, 1),
-                            firstDate: DateTime(1900),
-                            lastDate: DateTime.now(),
-                          );
-                          if (picked != null) {
-                            setState(() => _selectedDob = picked);
-                          }
-                        },
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Date of Birth (Optional)',
-                            prefixIcon: const Icon(Icons.cake_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusMd),
-                            ),
-                          ),
-                          child: Text(
-                            _selectedDob != null
-                                ? '${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}'
-                                : 'Select Date of Birth',
-                            style: AppTypography.bodyMd.copyWith(
-                              color: _selectedDob != null
-                                  ? AppColors.onSurface
-                                  : AppColors.onSurfaceVariant,
-                            ),
-                          ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Address
-                      MkesTextField(
-                        controller: _addressController,
-                        label: 'Residential Address',
-                        hintText: 'Street, City, State / Region',
-                        prefixIcon: Icons.home_outlined,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Reference
-                      MkesTextField(
-                        controller: _referenceController,
-                        label: 'Referred By / Reference',
-                        hintText: 'Self / Dr. Vance / Walk-in',
-                        prefixIcon: Icons.connect_without_contact_outlined,
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 36,
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        color: AppColors.onSurfaceVariant,
+                        tooltip: 'Close',
                       ),
                     ],
                   ),
                 ),
-              ),
 
-              // Dialog Footer
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: AppColors.outlineVariant),
+                // Form Body
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Full Name
+                        MkesTextField(
+                          controller: _nameController,
+                          label: 'Full Name *',
+                          hintText: 'e.g. Alexander Graham',
+                          prefixIcon: Icons.badge_outlined,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Full Name is required'
+                              : null,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+
+                        // Contact & Department
+                        ResponsiveFormRow(
+                          breakpoint: 440,
+                          children: [
+                            MkesTextField(
+                              controller: _mobileController,
+                              label: 'Mobile Number',
+                              hintText: '9876543210',
+                              keyboardType: TextInputType.number,
+                              prefixIcon: Icons.phone_outlined,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'[\d\s+\-]')),
+                                LengthLimitingTextInputFormatter(16),
+                              ],
+                              validator: _validateIndianMobile,
+                            ),
+                            DropdownButtonFormField<String>(
+                              initialValue: _selectedDepartment,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'Department *',
+                                prefixIcon:
+                                    const Icon(Icons.local_hospital_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      AppSpacing.radiusMd),
+                                ),
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'eye',
+                                  child: Text('Eye Clinic'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'dental',
+                                  child: Text('Dental Clinic'),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _selectedDepartment = val);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+
+                        // DOB Picker
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime(1995, 1, 1),
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setState(() => _selectedDob = picked);
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Date of Birth (Optional)',
+                              prefixIcon: const Icon(Icons.cake_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusMd),
+                              ),
+                            ),
+                            child: Text(
+                              _selectedDob != null
+                                  ? '${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}'
+                                  : 'Select Date of Birth',
+                              style: AppTypography.bodyMd.copyWith(
+                                color: _selectedDob != null
+                                    ? AppColors.onSurface
+                                    : AppColors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+
+                        // Address
+                        MkesTextField(
+                          controller: _addressController,
+                          label: 'Residential Address',
+                          hintText: 'Street, City, State / Region',
+                          prefixIcon: Icons.home_outlined,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+
+                        // Reference
+                        MkesTextField(
+                          controller: _referenceController,
+                          label: 'Referred By / Reference',
+                          hintText: 'Self / Dr. Vance / Walk-in',
+                          prefixIcon: Icons.connect_without_contact_outlined,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                child: Row(
-                  children: [
-                    TextButton(
-                      onPressed:
-                          _isLoading ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    if (_isLoading)
-                      const Expanded(
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else
-                      Expanded(
-                        child: MkesPrimaryButton(
-                          label: _isEditing ? 'Save Changes' : 'Register Patient',
-                          onPressed: _submit,
-                        ),
+
+                // Dialog Footer
+                SafeArea(
+                  top: false,
+                  child: Container(
+                    padding: EdgeInsets.all(
+                        isNarrow ? AppSpacing.sm : AppSpacing.md),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: AppColors.outlineVariant),
                       ),
-                  ],
+                    ),
+                    child: Row(
+                      children: [
+                        TextButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        SizedBox(
+                            width: isNarrow ? AppSpacing.xs : AppSpacing.md),
+                        if (_isLoading)
+                          const Expanded(
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else
+                          Expanded(
+                            child: MkesPrimaryButton(
+                              label: _isEditing
+                                  ? 'Save Changes'
+                                  : 'Register Patient',
+                              onPressed: _submit,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
