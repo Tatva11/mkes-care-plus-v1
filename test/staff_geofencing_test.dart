@@ -47,8 +47,8 @@ void main() {
 
   group('Clinic Location Constants & Distance Calculations', () {
     test('Clinic coordinates and radius are exact', () {
-      expect(ClinicLocationConstants.clinicLatitude, equals(18.99110));
-      expect(ClinicLocationConstants.clinicLongitude, equals(72.838885));
+      expect(ClinicLocationConstants.clinicLatitude, equals(18.990374));
+      expect(ClinicLocationConstants.clinicLongitude, equals(72.835143));
       expect(ClinicLocationConstants.allowedRadiusMeters, equals(200.0));
       expect(ClinicLocationConstants.maxAcceptableAccuracyMeters, equals(150.0));
       expect(ClinicLocationConstants.verificationFreshness,
@@ -70,8 +70,8 @@ void main() {
       final distance = Geolocator.distanceBetween(
         ClinicLocationConstants.clinicLatitude,
         ClinicLocationConstants.clinicLongitude,
-        18.99210,
-        72.838885,
+        18.991374,
+        72.835143,
       );
       expect(distance, lessThanOrEqualTo(200.0));
       expect(distance, greaterThan(50.0));
@@ -82,8 +82,8 @@ void main() {
       final distance = Geolocator.distanceBetween(
         ClinicLocationConstants.clinicLatitude,
         ClinicLocationConstants.clinicLongitude,
-        18.99360,
-        72.838885,
+        18.992874,
+        72.835143,
       );
       expect(distance, greaterThan(200.0));
     });

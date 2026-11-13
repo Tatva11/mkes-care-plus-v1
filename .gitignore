@@ -37,6 +37,12 @@ migrate_working_dir/
 api.env
 .env
 
+# Raw patient database files & PII data
+*.xlsx
+*Pt database*
+MKES_CARE_REPLACE_PATIENT_DATABASE_FROM_EXCEL.sql
+*.sql.bak
+
 # Symbolication related
 app.*.symbols
 

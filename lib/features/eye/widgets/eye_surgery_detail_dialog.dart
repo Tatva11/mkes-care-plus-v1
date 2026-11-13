@@ -89,10 +89,12 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
       );
     }
 
+    final isDesktop = MediaQuery.sizeOf(context).width >= 768;
+
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.md,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? AppSpacing.sm : 8.0,
+        vertical: isDesktop ? AppSpacing.md : 12.0,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -103,7 +105,7 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
           maxHeight: MediaQuery.sizeOf(context).height * 0.9,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: EdgeInsets.all(isDesktop ? AppSpacing.md : 12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -137,7 +139,7 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
                               surgery.displaySurgeryType,
                               style: AppTypography.headlineMd.copyWith(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: isDesktop ? 16 : 14,
                               ),
                             ),
                             _buildStatusChip(surgery.status, surgery.isMissed),
@@ -677,50 +679,54 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   border: Border.all(color: AppColors.outlineVariant),
                 ),
-                child: Row(
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Invoice #${invoice.invoiceNumber}',
-                                style: AppTypography.headlineMd.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: AppSpacing.xs,
+                          runSpacing: 2,
+                          children: [
+                            Text(
+                              'Invoice #${invoice.invoiceNumber}',
+                              style: AppTypography.headlineMd.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
                               ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  invoice.paymentStatus.toUpperCase().replaceAll('_', ' '),
-                                  style: TextStyle(
-                                    color: statusColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Billed on ${DateFormat('dd MMM yyyy, h:mm a').format(invoice.createdAt)}',
-                            style: AppTypography.bodySm.copyWith(
-                              color: AppColors.onSurfaceVariant,
-                              fontSize: 12,
                             ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                invoice.paymentStatus.toUpperCase().replaceAll('_', ' '),
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Billed on ${DateFormat('dd MMM yyyy, h:mm a').format(invoice.createdAt)}',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontSize: 12,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                     if (!isFullyPaid)
                       FilledButton.tonalIcon(
@@ -753,10 +759,12 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
                               child: Text(
                                 item.serviceName,
                                 style: const TextStyle(fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: AppSpacing.xs),
                             Text('${item.quantity} × ₹${item.unitPrice.toStringAsFixed(2)}'),
-                            const SizedBox(width: AppSpacing.md),
+                            const SizedBox(width: AppSpacing.xs),
                             Text(
                               '₹${item.totalAmount.toStringAsFixed(2)}',
                               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -769,7 +777,7 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Subtotal:'),
+                        const Expanded(child: Text('Subtotal:')),
                         Text('₹${invoice.subtotal.toStringAsFixed(2)}'),
                       ],
                     ),
@@ -779,8 +787,10 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Discount:',
-                                style: TextStyle(color: AppColors.error)),
+                            const Expanded(
+                              child: Text('Discount:',
+                                  style: TextStyle(color: AppColors.error)),
+                            ),
                             Text('-₹${invoice.discount.toStringAsFixed(2)}',
                                 style: const TextStyle(color: AppColors.error)),
                           ],
@@ -790,8 +800,10 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Total Surgery Bill:',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Expanded(
+                          child: Text('Total Surgery Bill:',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
                         Text('₹${invoice.totalAmount.toStringAsFixed(2)}',
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold, fontSize: 16)),
@@ -958,7 +970,10 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: AppSpacing.xs,
+                            runSpacing: 4,
                             children: [
                               Text(
                                 '${insurance.arrangement.label.toUpperCase()} ARRANGEMENT',
@@ -971,7 +986,6 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
                                   letterSpacing: 1.1,
                                 ),
                               ),
-                              const SizedBox(width: AppSpacing.sm),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 2),
@@ -1580,9 +1594,10 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
     required Widget child,
     Widget? trailingBadge,
   }) {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 768;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: EdgeInsets.all(isDesktop ? AppSpacing.md : 10.0),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -1595,17 +1610,20 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
             children: [
               Icon(icon, size: 16, color: AppColors.primary),
               const SizedBox(width: AppSpacing.xs),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                  color: AppColors.primary,
+              Expanded(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
               if (trailingBadge != null) ...[
-                const Spacer(),
+                const SizedBox(width: AppSpacing.xs),
                 trailingBadge,
               ],
             ],
@@ -1628,15 +1646,17 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
       child: Row(
         children: [
           Icon(icon, size: 16, color: AppColors.onSurfaceVariant),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            label,
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.onSurfaceVariant,
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          const Spacer(),
+          const SizedBox(width: AppSpacing.xs),
           Flexible(
             child: Text(
               value,
@@ -1663,9 +1683,15 @@ class _EyeSurgeryDetailDialogState extends ConsumerState<EyeSurgeryDetailDialog>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
+          Expanded(
+            child: Text(
+              label,
               style: const TextStyle(
-                  fontSize: 12, color: AppColors.onSurfaceVariant)),
+                  fontSize: 12, color: AppColors.onSurfaceVariant),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             value,
             style: TextStyle(

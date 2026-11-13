@@ -1,10 +1,10 @@
 /// Constants defining the MKES CARE+ physical clinic location and geofence parameters.
 abstract final class ClinicLocationConstants {
-  /// Target clinic latitude: 18.99110
-  static const double clinicLatitude = 18.99110;
+  /// Target clinic latitude: 18.990374
+  static const double clinicLatitude = 18.990374;
 
-  /// Target clinic longitude: 72.838885
-  static const double clinicLongitude = 72.838885;
+  /// Target clinic longitude: 72.835143
+  static const double clinicLongitude = 72.835143;
 
   /// Maximum allowed distance from clinic coordinates for staff access (in metres).
   static const double allowedRadiusMeters = 200.0;

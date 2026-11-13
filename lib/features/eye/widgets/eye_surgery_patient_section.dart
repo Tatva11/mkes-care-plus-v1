@@ -117,6 +117,7 @@ class _PatientSurgeryTile extends StatelessWidget {
               style: AppTypography.bodySm.copyWith(
                 color: AppColors.onSurfaceVariant,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
             Text(
@@ -125,6 +126,7 @@ class _PatientSurgeryTile extends StatelessWidget {
                 color: AppColors.primary,
                 fontWeight: FontWeight.w500,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

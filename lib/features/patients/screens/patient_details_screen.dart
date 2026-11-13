@@ -221,10 +221,13 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
             onRefresh: () async {
               ref.invalidate(patientDetailsProvider(patientId));
               ref.invalidate(patientAttendanceHistoryProvider(patientId));
-              ref.invalidate(dentalLabListProvider);
-              ref.invalidate(eyeSurgeriesForPatientProvider(patientId));
-              ref.invalidate(eyeExaminationsForPatientProvider(patientId));
-              ref.invalidate(dentalTreatmentsForPatientProvider(patientId));
+              if (patient.department == 'dental') {
+                ref.invalidate(dentalLabListProvider);
+                ref.invalidate(dentalTreatmentsForPatientProvider(patientId));
+              } else if (patient.department == 'eye') {
+                ref.invalidate(eyeSurgeriesForPatientProvider(patientId));
+                ref.invalidate(eyeExaminationsForPatientProvider(patientId));
+              }
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -240,10 +243,7 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
                   const SizedBox(height: AppSpacing.md),
                   _buildInfoCard(context, ref, patient),
                   const SizedBox(height: AppSpacing.lg),
-                  if (patient.department == 'dental' ||
-                      ref
-                          .watch(patientDentalLabCasesProvider(patient.id))
-                          .isNotEmpty) ...[
+                  if (patient.department == 'dental') ...[
                     DentalTreatmentPatientSection(
                       patient: patient,
                       pendingAppointment: _activeAppointment,
@@ -254,21 +254,14 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
                     _buildDentalLabSection(context, ref, patient),
                     const SizedBox(height: AppSpacing.lg),
                   ],
-                  if (patient.department == 'eye' ||
-                      ref
-                              .watch(eyeSurgeriesForPatientProvider(patient.id))
-                              .valueOrNull
-                              ?.isNotEmpty ==
-                          true) ...[
-                    if (patient.department == 'eye') ...[
-                      EyeExaminationPatientSection(
-                        patient: patient,
-                        pendingAppointment: _activeAppointment,
-                        onRecordSaved: (exam) =>
-                            _handleExamCompleted(patient, exam.id),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                    ],
+                  if (patient.department == 'eye') ...[
+                    EyeExaminationPatientSection(
+                      patient: patient,
+                      pendingAppointment: _activeAppointment,
+                      onRecordSaved: (exam) =>
+                          _handleExamCompleted(patient, exam.id),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
                     EyeSurgeryPatientSection(patientId: patient.id),
                     const SizedBox(height: AppSpacing.lg),
                   ],

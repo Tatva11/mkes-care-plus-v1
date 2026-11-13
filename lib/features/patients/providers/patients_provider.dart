@@ -26,6 +26,7 @@ class PatientsNotifier extends StateNotifier<AsyncValue<List<PatientModel>>> {
       final items = await _repository.fetchPatients(
         department: department,
         searchQuery: search,
+        limit: 50,
       );
       state = AsyncValue.data(items);
     } catch (error, stackTrace) {
@@ -67,7 +68,26 @@ final patientSearchProvider = FutureProvider.family<List<PatientModel>,
   return ref.watch(patientRepositoryProvider).fetchPatients(
         department: params.department,
         searchQuery: params.query,
+        limit: 50,
+        offset: 0,
       );
+});
+
+final paginatedPatientSearchProvider = FutureProvider.family<List<PatientModel>,
+    ({String department, String query, int page})>((ref, params) {
+  return ref.watch(patientRepositoryProvider).fetchPatients(
+        department: params.department,
+        searchQuery: params.query,
+        limit: 50,
+        offset: params.page * 50,
+      );
+});
+
+final todayRegisteredPatientsProvider =
+    FutureProvider.family<List<PatientModel>, String?>((ref, department) {
+  return ref
+      .watch(patientRepositoryProvider)
+      .fetchTodayRegisteredPatients(department: department);
 });
 
 final patientsByDepartmentProvider =
@@ -78,10 +98,7 @@ final patientsByDepartmentProvider =
 
   return ref
       .watch(patientRepositoryProvider)
-      .fetchPatients(department: department)
-      .then((patients) => patients
-          .where((patient) => patient.department == department)
-          .toList());
+      .fetchPatients(department: department, limit: 100);
 });
 
 class ScheduledPatientEntry {

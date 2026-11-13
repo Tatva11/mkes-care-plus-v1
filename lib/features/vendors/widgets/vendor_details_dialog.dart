@@ -107,7 +107,8 @@ class VendorDetailsDialog extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: newStatus ? Colors.green.shade700 : Colors.grey.shade800,
+            backgroundColor:
+                newStatus ? Colors.green.shade700 : Colors.grey.shade800,
             content: Text(
               'Vendor "${activeVendor.name}" marked as ${newStatus ? 'Active' : 'Inactive'}.',
             ),
@@ -145,9 +146,9 @@ class VendorDetailsDialog extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surfaceContainerLowest,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.lg,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? AppSpacing.md : 8.0,
+        vertical: isDesktop ? AppSpacing.lg : 16.0,
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -155,13 +156,12 @@ class VendorDetailsDialog extends ConsumerWidget {
           maxHeight: MediaQuery.sizeOf(context).height * 0.9,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Header
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? AppSpacing.lg : 12.0,
                 vertical: AppSpacing.md,
               ),
               decoration: BoxDecoration(
@@ -193,18 +193,20 @@ class VendorDetailsDialog extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: AppSpacing.xs,
+                          runSpacing: 4,
                           children: [
-                            Flexible(
-                              child: Text(
-                                activeVendor.name,
-                                style: AppTypography.headlineMd.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                            Text(
+                              activeVendor.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.headlineMd.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: isDesktop ? 18 : 15,
                               ),
                             ),
-                            const SizedBox(width: AppSpacing.xs),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
@@ -234,6 +236,8 @@ class VendorDetailsDialog extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             'Contact: ${activeVendor.contactPerson}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: AppTypography.bodySm.copyWith(
                               color: AppColors.onSurfaceVariant,
                             ),
@@ -251,20 +255,22 @@ class VendorDetailsDialog extends ConsumerWidget {
             ),
 
             // Details Content
-            Flexible(
+            Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: EdgeInsets.all(isDesktop ? AppSpacing.lg : 12.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Card 1: Contact Information
-                    _buildSectionHeader('CONTACT INFORMATION', Icons.contacts_outlined),
+                    _buildSectionHeader(
+                        'CONTACT INFORMATION', Icons.contacts_outlined),
                     const SizedBox(height: AppSpacing.xs),
                     Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
+                      padding: const EdgeInsets.all(12.0),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusLg),
                         border: Border.all(color: AppColors.outlineVariant),
                       ),
                       child: Column(
@@ -279,6 +285,7 @@ class VendorDetailsDialog extends ConsumerWidget {
                             icon: Icons.phone_outlined,
                             label: 'Phone Number',
                             value: activeVendor.phone ?? '—',
+                            isPhone: true,
                           ),
                           const Divider(height: 16),
                           _buildDetailRow(
@@ -298,13 +305,15 @@ class VendorDetailsDialog extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.lg),
 
                     // Card 2: Supply & Deliveries
-                    _buildSectionHeader('SUPPLY & DELIVERY OPERATIONS', Icons.inventory_outlined),
+                    _buildSectionHeader('SUPPLY & DELIVERY OPERATIONS',
+                        Icons.inventory_outlined),
                     const SizedBox(height: AppSpacing.xs),
                     Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
+                      padding: const EdgeInsets.all(12.0),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusLg),
                         border: Border.all(color: AppColors.outlineVariant),
                       ),
                       child: Column(
@@ -379,17 +388,21 @@ class VendorDetailsDialog extends ConsumerWidget {
                             Wrap(
                               spacing: 6,
                               runSpacing: 6,
-                              children: activeVendor.productsSupplied.map((product) {
+                              children:
+                                  activeVendor.productsSupplied.map((product) {
                                 return Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
                                     vertical: 3,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primaryContainer.withValues(alpha: 0.25),
-                                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                                    color: AppColors.primaryContainer
+                                        .withValues(alpha: 0.25),
+                                    borderRadius: BorderRadius.circular(
+                                        AppSpacing.radiusSm),
                                     border: Border.all(
-                                      color: AppColors.primary.withValues(alpha: 0.3),
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.3),
                                     ),
                                   ),
                                   child: Text(
@@ -411,14 +424,16 @@ class VendorDetailsDialog extends ConsumerWidget {
                     if (activeVendor.remarks != null &&
                         activeVendor.remarks!.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.lg),
-                      _buildSectionHeader('REMARKS & AGREEMENTS', Icons.notes_outlined),
+                      _buildSectionHeader(
+                          'REMARKS & AGREEMENTS', Icons.notes_outlined),
                       const SizedBox(height: AppSpacing.xs),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusLg),
                           border: Border.all(color: AppColors.outlineVariant),
                         ),
                         child: Text(
@@ -432,7 +447,8 @@ class VendorDetailsDialog extends ConsumerWidget {
 
                     // Card 4: Purchase Order History
                     const SizedBox(height: AppSpacing.lg),
-                    _buildPurchaseOrderHistorySection(context, ref, activeVendor),
+                    _buildPurchaseOrderHistorySection(
+                        context, ref, activeVendor),
                   ],
                 ),
               ),
@@ -441,25 +457,28 @@ class VendorDetailsDialog extends ConsumerWidget {
 
             // Footer Actions
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? AppSpacing.md : AppSpacing.xs,
+                vertical: AppSpacing.xs,
               ),
               child: Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: AppSpacing.sm,
+                spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: [
                   // Delete & Deactivate (Admin or Staff)
                   if (canManage)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                    Wrap(
+                      spacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                          icon: const Icon(Icons.delete_outline,
+                              color: AppColors.error),
                           tooltip: 'Delete Vendor',
-                          onPressed: () => _handleDelete(context, ref, activeVendor),
+                          onPressed: () =>
+                              _handleDelete(context, ref, activeVendor),
                         ),
                         TextButton.icon(
                           icon: Icon(
@@ -468,30 +487,39 @@ class VendorDetailsDialog extends ConsumerWidget {
                                 : Icons.play_circle_outline,
                             size: 16,
                           ),
-                          label: Text(activeVendor.isActive ? 'Deactivate' : 'Activate'),
-                          onPressed: () => _handleToggleStatus(context, ref, activeVendor),
+                          label: Text(activeVendor.isActive
+                              ? 'Deactivate'
+                              : 'Activate'),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onPressed: () =>
+                              _handleToggleStatus(context, ref, activeVendor),
                         ),
                       ],
                     ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       TextButton(
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text('Close'),
                       ),
-                      if (canManage) ...[
-                        const SizedBox(width: AppSpacing.sm),
+                      if (canManage)
                         FilledButton.icon(
                           icon: const Icon(Icons.edit_outlined, size: 16),
-                          label: const Text('Edit Vendor'),
+                          label: Text(isDesktop ? 'Edit Vendor' : 'Edit'),
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
                           ),
                           onPressed: () => _handleEdit(context, activeVendor),
                         ),
-                      ],
                     ],
                   ),
                 ],
@@ -507,12 +535,16 @@ class VendorDetailsDialog extends ConsumerWidget {
     return Row(
       children: [
         Icon(icon, size: 14, color: AppColors.onSurfaceVariant),
-        const SizedBox(width: 4),
-        Text(
-          title,
-          style: AppTypography.labelCaps.copyWith(
-            color: AppColors.onSurfaceVariant,
-            fontSize: 10,
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            title,
+            style: AppTypography.labelCaps.copyWith(
+              color: AppColors.onSurfaceVariant,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -523,30 +555,92 @@ class VendorDetailsDialog extends ConsumerWidget {
     required IconData icon,
     required String label,
     required String value,
+    bool isPhone = false,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: AppColors.onSurfaceVariant),
-        const SizedBox(width: AppSpacing.sm),
-        SizedBox(
-          width: 110,
-          child: Text(
-            label,
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.onSurfaceVariant,
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 300;
+        final iconWidget = Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primaryContainer.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(4),
           ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTypography.bodySm.copyWith(
-              fontWeight: FontWeight.w600,
+          child: Icon(icon, size: 14, color: AppColors.primary),
+        );
+
+        if (isNarrow) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                iconWidget,
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: AppTypography.labelCaps.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 10,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      SelectableText(
+                        value,
+                        style: AppTypography.bodyMd.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isPhone && value != '—'
+                              ? AppColors.primary
+                              : AppColors.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              iconWidget,
+              const SizedBox(width: AppSpacing.sm),
+              SizedBox(
+                width: 125,
+                child: Text(
+                  label,
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: SelectableText(
+                  value,
+                  style: AppTypography.bodySm.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isPhone && value != '—'
+                        ? AppColors.primary
+                        : AppColors.onSurface,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -561,7 +655,10 @@ class VendorDetailsDialog extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 12, color: highlight ? AppColors.primary : AppColors.onSurfaceVariant),
+            Icon(icon,
+                size: 12,
+                color:
+                    highlight ? AppColors.primary : AppColors.onSurfaceVariant),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
@@ -569,7 +666,9 @@ class VendorDetailsDialog extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
                 style: AppTypography.labelCaps.copyWith(
-                  color: highlight ? AppColors.primary : AppColors.onSurfaceVariant,
+                  color: highlight
+                      ? AppColors.primary
+                      : AppColors.onSurfaceVariant,
                   fontSize: 9,
                 ),
               ),
@@ -635,63 +734,67 @@ class VendorDetailsDialog extends ConsumerWidget {
                       onTap: () {
                         showDialog(
                           context: context,
-                          builder: (_) =>
-                              PurchaseOrderDetailsDialog(order: po),
+                          builder: (_) => PurchaseOrderDetailsDialog(order: po),
                         );
                       },
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusMd),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      po.purchaseOrderNumber,
-                                      style: AppTypography.bodyMd.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(width: AppSpacing.xs),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: po.status.color
-                                            .withValues(alpha: 0.12),
-                                        borderRadius:
-                                            BorderRadius.circular(4),
-                                        border: Border.all(
-                                            color: po.status.color),
-                                      ),
-                                      child: Text(
-                                        po.status.label,
-                                        style: TextStyle(
-                                          color: po.status.color,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 10,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          po.purchaseOrderNumber,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppTypography.bodyMd.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Ordered: ${dateFormat.format(po.orderDate)}${po.actualDeliveryDate != null ? ' • Delivered: ${dateFormat.format(po.actualDeliveryDate!)}' : ''}',
-                                  style: AppTypography.bodySm.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                    fontSize: 11,
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: po.status.color
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          border: Border.all(
+                                              color: po.status.color),
+                                        ),
+                                        child: Text(
+                                          po.status.label,
+                                          style: TextStyle(
+                                            color: po.status.color,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Ordered: ${dateFormat.format(po.orderDate)}${po.actualDeliveryDate != null ? ' • Delivered: ${dateFormat.format(po.actualDeliveryDate!)}' : ''}',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            const SizedBox(width: AppSpacing.sm),
                             Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   po.formattedTotal,

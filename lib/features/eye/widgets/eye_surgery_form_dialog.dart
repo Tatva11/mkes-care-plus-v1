@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -117,8 +119,11 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
     }
   }
 
+  Timer? _debounceTimer;
+
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     _customTypeController.dispose();
     _iolController.dispose();
@@ -143,26 +148,30 @@ class _EyeSurgeryFormDialogState extends ConsumerState<EyeSurgeryFormDialog> {
         '${time.minute.toString().padLeft(2, '0')}:00';
   }
 
-  Future<void> _searchPatients(String query) async {
-    final requestId = ++_searchRequestId;
-    final normalized = query.trim();
-    if (normalized.isEmpty) {
-      setState(() => _searchResults = []);
-      return;
-    }
-    try {
-      final results = await ref.read(patientRepositoryProvider).fetchPatients(
-            department: 'eye',
-            searchQuery: normalized,
-          );
-      if (mounted && requestId == _searchRequestId) {
-        setState(() => _searchResults = results);
+  void _searchPatients(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 350), () async {
+      final requestId = ++_searchRequestId;
+      final normalized = query.trim();
+      if (normalized.isEmpty) {
+        if (mounted) setState(() => _searchResults = []);
+        return;
       }
-    } catch (_) {
-      if (mounted && requestId == _searchRequestId) {
-        setState(() => _searchResults = []);
+      try {
+        final results = await ref.read(patientRepositoryProvider).fetchPatients(
+              department: 'eye',
+              searchQuery: normalized,
+              limit: 25,
+            );
+        if (mounted && requestId == _searchRequestId) {
+          setState(() => _searchResults = results);
+        }
+      } catch (_) {
+        if (mounted && requestId == _searchRequestId) {
+          setState(() => _searchResults = []);
+        }
       }
-    }
+    });
   }
 
   void _selectPatient(PatientModel patient) {

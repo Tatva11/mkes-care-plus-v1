@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,9 +36,13 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedDepartment = 'all'; // 'all', 'eye', 'dental'
+  Timer? _debounceTimer;
+  int _currentPage = 0;
+  static const int _pageSize = 50;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -61,16 +67,18 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
     // Effective department passed to patient repository
     final effectiveDept = isRestrictedToDept
         ? staffDept
-        : (_selectedDepartment == 'all' ? '' : _selectedDepartment);
+        : (_selectedDepartment == 'all' ? 'all' : _selectedDepartment);
 
-    final patientsAsync = ref.watch(patientSearchProvider((
+    final patientsAsync = ref.watch(paginatedPatientSearchProvider((
       department: effectiveDept,
       query: _searchQuery,
+      page: _currentPage,
     )));
 
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(patientSearchProvider);
+        ref.invalidate(paginatedPatientSearchProvider);
         ref.invalidate(patientsProvider);
       },
       child: SingleChildScrollView(
@@ -154,6 +162,7 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                           if (created != null) {
                             if (!context.mounted) return;
                             ref.invalidate(patientSearchProvider);
+                            ref.invalidate(paginatedPatientSearchProvider);
                             ref.invalidate(patientsProvider);
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -229,6 +238,7 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                           if (created != null) {
                             if (!context.mounted) return;
                             ref.invalidate(patientSearchProvider);
+                            ref.invalidate(paginatedPatientSearchProvider);
                             ref.invalidate(patientsProvider);
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -254,17 +264,44 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
               ),
               child: TextField(
                 controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                onChanged: (val) {
+                  _debounceTimer?.cancel();
+                  _debounceTimer = Timer(const Duration(milliseconds: 350), () {
+                    if (mounted) {
+                      final trimmed = val.trim();
+                      if (_searchQuery != trimmed) {
+                        setState(() {
+                          _searchQuery = trimmed;
+                          _currentPage = 0;
+                        });
+                      }
+                    }
+                  });
+                },
+                onSubmitted: (val) {
+                  _debounceTimer?.cancel();
+                  final trimmed = val.trim();
+                  if (_searchQuery != trimmed) {
+                    setState(() {
+                      _searchQuery = trimmed;
+                      _currentPage = 0;
+                    });
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: 'Search patients by name, ID, or mobile...',
                   prefixIcon:
                       const Icon(Icons.search, color: AppColors.primary),
-                  suffixIcon: _searchQuery.isNotEmpty
+                  suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
                           onPressed: () {
+                            _debounceTimer?.cancel();
                             _searchController.clear();
-                            setState(() => _searchQuery = '');
+                            setState(() {
+                              _searchQuery = '';
+                              _currentPage = 0;
+                            });
                           },
                         )
                       : null,
@@ -289,7 +326,10 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                       label: const Text('All Departments'),
                       onSelected: (selected) {
                         if (selected) {
-                          setState(() => _selectedDepartment = 'all');
+                          setState(() {
+                            _selectedDepartment = 'all';
+                            _currentPage = 0;
+                          });
                         }
                       },
                       selectedColor:
@@ -309,8 +349,10 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                       selected: _selectedDepartment == 'eye',
                       label: const Text('Eye Clinic'),
                       onSelected: (selected) {
-                        setState(() =>
-                            _selectedDepartment = selected ? 'eye' : 'all');
+                        setState(() {
+                          _selectedDepartment = selected ? 'eye' : 'all';
+                          _currentPage = 0;
+                        });
                       },
                       selectedColor:
                           AppColors.primaryContainer.withValues(alpha: 0.2),
@@ -329,8 +371,10 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                       selected: _selectedDepartment == 'dental',
                       label: const Text('Dental Clinic'),
                       onSelected: (selected) {
-                        setState(() =>
-                            _selectedDepartment = selected ? 'dental' : 'all');
+                        setState(() {
+                          _selectedDepartment = selected ? 'dental' : 'all';
+                          _currentPage = 0;
+                        });
                       },
                       selectedColor:
                           AppColors.primaryContainer.withValues(alpha: 0.2),
@@ -360,7 +404,7 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
               ),
               error: (e, _) => _ErrorRetry(
                 error: e,
-                onRetry: () => ref.invalidate(patientSearchProvider),
+                onRetry: () => ref.invalidate(paginatedPatientSearchProvider),
               ),
               data: (patients) {
                 // Ensure unique patient rows by patient.id to avoid duplicate rows
@@ -420,12 +464,62 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                         child: _StaffPatientCard(patient: patient),
                       );
                     }),
+                    _buildPaginationControls(uniquePatients.length),
                   ],
                 );
               },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls(int currentCount) {
+    if (currentCount == 0 && _currentPage == 0) return const SizedBox.shrink();
+
+    final hasNext = currentCount >= _pageSize;
+    final hasPrev = _currentPage > 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          Text(
+            'Showing $currentCount patients (Page ${_currentPage + 1})',
+            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                onPressed: hasPrev
+                    ? () => setState(() => _currentPage--)
+                    : null,
+                icon: const Icon(Icons.chevron_left, size: 18),
+                label: const Text('Previous'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: hasNext
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                icon: const Icon(Icons.chevron_right, size: 18),
+                label: const Text('Next'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -637,20 +731,24 @@ class _StaffPatientCard extends StatelessWidget {
                                 ],
                                 if (patient.mobile != null &&
                                     patient.mobile!.isNotEmpty) ...[
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.phone_outlined,
-                                          size: 13, color: AppColors.outline),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        patient.mobile!,
-                                        style: AppTypography.bodySm.copyWith(
-                                          color: AppColors.onSurfaceVariant,
-                                          fontSize: 12,
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.phone_outlined,
+                                            size: 13, color: AppColors.outline),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          patient.mobile!,
+                                          style: AppTypography.bodySm.copyWith(
+                                            color: AppColors.onSurfaceVariant,
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ],

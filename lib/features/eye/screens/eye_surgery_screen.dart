@@ -427,7 +427,8 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
                   key: const Key('surgery_inventory_presets_button'),
                   onPressed: () => _managePresets(context),
                   icon: const Icon(Icons.inventory_2_outlined, size: 18),
-                  label: Text(isDesktop ? 'Surgery Inventory Presets' : 'Presets'),
+                  label:
+                      Text(isDesktop ? 'Surgery Inventory Presets' : 'Presets'),
                   style: FilledButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                   ),
@@ -459,91 +460,139 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
             // Date Selector Bar (matching Staff Tasks pattern)
             SliverToBoxAdapter(
               child: Container(
-            margin: const EdgeInsets.fromLTRB(
-                AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              border: Border.all(color: AppColors.outlineVariant),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  tooltip: 'Previous Day',
-                  onPressed: () {
-                    final cur = ref.read(eyeSurgerySelectedDateProvider);
-                    ref.read(eyeSurgerySelectedDateProvider.notifier).state =
-                        DateTime(cur.year, cur.month, cur.day - 1);
-                  },
+                margin: EdgeInsets.fromLTRB(
+                  isDesktop ? AppSpacing.md : 12.0,
+                  AppSpacing.sm,
+                  isDesktop ? AppSpacing.md : 12.0,
+                  0,
                 ),
-                InkWell(
-                  onTap: () async {
-                    final cur = ref.read(eyeSurgerySelectedDateProvider);
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: cur,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2035),
-                    );
-                    if (picked != null) {
-                      ref.read(eyeSurgerySelectedDateProvider.notifier).state =
-                          DateTime(picked.year, picked.month, picked.day);
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.calendar_today,
-                            size: 16, color: AppColors.primary),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          EyeSurgeryModel.isSameCalendarDay(
-                                  selectedDate, DateTime.now())
-                              ? 'Today (${DateFormat('d MMM').format(selectedDate)})'
-                              : DateFormat('EEE, d MMM yyyy')
-                                  .format(selectedDate),
-                          style: AppTypography.bodyMd.copyWith(
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 2,
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  border: Border.all(color: AppColors.outlineVariant),
+                ),
+                child: Row(
                   children: [
-                    if (!EyeSurgeryModel.isSameCalendarDay(
-                        selectedDate, DateTime.now()))
-                      TextButton(
-                        onPressed: () {
-                          final now = DateTime.now();
-                          ref
-                              .read(eyeSurgerySelectedDateProvider.notifier)
-                              .state =
-                              DateTime(now.year, now.month, now.day);
-                        },
-                        child: const Text('Today'),
-                      ),
                     IconButton(
-                      icon: const Icon(Icons.chevron_right),
-                      tooltip: 'Next Day',
+                      icon: const Icon(Icons.chevron_left, size: 20),
+                      tooltip: 'Previous Day',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
                       onPressed: () {
                         final cur = ref.read(eyeSurgerySelectedDateProvider);
-                        ref.read(eyeSurgerySelectedDateProvider.notifier).state =
-                            DateTime(cur.year, cur.month, cur.day + 1);
+                        ref
+                            .read(eyeSurgerySelectedDateProvider.notifier)
+                            .state = DateTime(cur.year, cur.month, cur.day - 1);
+                      },
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final cur = ref.read(eyeSurgerySelectedDateProvider);
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: cur,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2035),
+                          );
+                          if (picked != null) {
+                            ref
+                                    .read(eyeSurgerySelectedDateProvider.notifier)
+                                    .state =
+                                DateTime(picked.year, picked.month, picked.day);
+                          }
+                        },
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusSm),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.calendar_today,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  EyeSurgeryModel.isSameCalendarDay(
+                                          selectedDate, DateTime.now())
+                                      ? 'Today (${DateFormat('d MMM').format(selectedDate)})'
+                                      : DateFormat('EEE, d MMM yyyy')
+                                          .format(selectedDate),
+                                  style: AppTypography.bodyMd.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (!EyeSurgeryModel.isSameCalendarDay(
+                        selectedDate, DateTime.now()))
+                      Tooltip(
+                        message: 'Return to Today',
+                        child: TextButton.icon(
+                          onPressed: () {
+                            final now = DateTime.now();
+                            ref
+                                .read(eyeSurgerySelectedDateProvider.notifier)
+                                .state = DateTime(now.year, now.month, now.day);
+                          },
+                          icon: const Icon(Icons.today, size: 14),
+                          label: const Text(
+                            'Today',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, size: 20),
+                      tooltip: 'Next Day',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
+                      onPressed: () {
+                        final cur = ref.read(eyeSurgerySelectedDateProvider);
+                        ref
+                            .read(eyeSurgerySelectedDateProvider.notifier)
+                            .state = DateTime(cur.year, cur.month, cur.day + 1);
                       },
                     ),
                   ],
                 ),
-              ],
-            ),
               ),
             ),
             // ── KPI Summary Cards (Matching Dental Lab design) ──────────
@@ -637,209 +686,206 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
                 if (filtered.isEmpty) {
                   return [
                     SliverToBoxAdapter(
-                      child:
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.lg),
-                            child: _MessageState(
-                              icon: Icons.calendar_today_outlined,
-                              title: search.isEmpty && status == 'all'
-                                  ? 'No surgeries scheduled for this date'
-                                  : 'No matching surgeries',
-                              detail: search.isEmpty && status == 'all'
-                                  ? (EyeSurgeryModel.isSameCalendarDay(
-                                          selectedDate, DateTime.now())
-                                      ? 'No surgeries scheduled for today.'
-                                      : 'No surgeries scheduled for ${DateFormat('d MMM yyyy').format(selectedDate)}.')
-                                  : 'Adjust the date, search query, or status filter.',
-                              action: Wrap(
-                                spacing: AppSpacing.sm,
-                                runSpacing: AppSpacing.xs,
-                                alignment: WrapAlignment.center,
-                                children: [
-                                  if (!EyeSurgeryModel.isSameCalendarDay(
-                                      selectedDate, DateTime.now()))
-                                    FilledButton.icon(
-                                      onPressed: () {
-                                        final now = DateTime.now();
-                                        ref
-                                            .read(eyeSurgerySelectedDateProvider
-                                                .notifier)
-                                            .state =
-                                            DateTime(
-                                                now.year, now.month, now.day);
-                                      },
-                                      icon: const Icon(Icons.today, size: 16),
-                                      label: const Text('Return to Today'),
-                                    ),
-                                  OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: selectedDate,
-                                        firstDate: DateTime(2020),
-                                        lastDate: DateTime(2035),
-                                      );
-                                      if (picked != null) {
-                                        ref
-                                            .read(eyeSurgerySelectedDateProvider
-                                                .notifier)
-                                            .state =
-                                            DateTime(picked.year, picked.month,
-                                                picked.day);
-                                      }
-                                    },
-                                    icon: const Icon(Icons.calendar_month,
-                                        size: 16),
-                                    label: const Text('Select another date'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ];
-                    }
-
-                  final selectedSurgery = filtered.firstWhere(
-                    (s) => s.id == _selectedSurgeryId,
-                    orElse: () => filtered.first,
-                  );
-
-                  final screenWidth = MediaQuery.sizeOf(context).width;
-                  final isWideDesktop = screenWidth >= 960;
-
-                  if (isWideDesktop) {
-                    return [
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.md, AppSpacing.xs, AppSpacing.md, 96),
-                        sliver: SliverToBoxAdapter(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                        child: _MessageState(
+                          icon: Icons.calendar_today_outlined,
+                          title: search.isEmpty && status == 'all'
+                              ? 'No surgeries scheduled for this date'
+                              : 'No matching surgeries',
+                          detail: search.isEmpty && status == 'all'
+                              ? (EyeSurgeryModel.isSameCalendarDay(
+                                      selectedDate, DateTime.now())
+                                  ? 'No surgeries scheduled for today.'
+                                  : 'No surgeries scheduled for ${DateFormat('d MMM yyyy').format(selectedDate)}.')
+                              : 'Adjust the date, search query, or status filter.',
+                          action: Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.xs,
+                            alignment: WrapAlignment.center,
                             children: [
-                              // Left: Surgeries List
-                              Expanded(
-                                flex: 6,
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: filtered.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(height: AppSpacing.sm),
-                                  itemBuilder: (context, index) {
-                                    final surgery = filtered[index];
-                                    return _SurgeryCard(
-                                      surgery: surgery,
-                                      role: role,
-                                      isDesktop: true,
-                                      isSelected:
-                                          surgery.id == selectedSurgery.id,
-                                      onSelect: () => setState(() =>
-                                          _selectedSurgeryId = surgery.id),
-                                      onDetails: () =>
-                                          _showDetails(context, surgery, 0),
-                                      onBilling: () =>
-                                          _showDetails(context, surgery, 1),
-                                      onEdit: () =>
-                                          _editSurgery(context, ref, surgery),
-                                      onAssignStaff: () =>
-                                          showAssignEyeSurgeryStaffDialog(context, ref, surgery),
-                                      onChecklist: () =>
-                                          _showChecklist(context, ref, surgery),
-                                      onItems: () =>
-                                          _showItems(context, ref, surgery),
-                                      onAdvance: (next) =>
-                                          _changeStatus(context, ref, surgery, next),
-                                      onScheduleFollowUp: () =>
-                                          _scheduleFollowUp(context, ref, surgery),
-                                      onReschedule: () =>
-                                          _rescheduleSurgery(context, ref, surgery),
-                                      onDelete: () =>
-                                          _confirmDeleteSurgery(context, ref, surgery),
-                                      onPatient: surgery.patientId.isEmpty
-                                          ? null
-                                          : () => Navigator.of(context).push(
-                                                MaterialPageRoute<void>(
-                                                  builder: (_) =>
-                                                      PatientDetailsScreen(
-                                                          patientId:
-                                                              surgery.patientId),
-                                                ),
-                                              ),
-                                    );
+                              if (!EyeSurgeryModel.isSameCalendarDay(
+                                  selectedDate, DateTime.now()))
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    final now = DateTime.now();
+                                    ref
+                                            .read(eyeSurgerySelectedDateProvider
+                                                .notifier)
+                                            .state =
+                                        DateTime(now.year, now.month, now.day);
                                   },
+                                  icon: const Icon(Icons.today, size: 16),
+                                  label: const Text('Return to Today'),
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.md),
-                              // Right: Surgery Required Supplies & Items Panel (Requirement 10)
-                              Expanded(
-                                flex: 4,
-                                child: _EyeSurgeryRightSidePanel(
-                                  surgery: selectedSurgery,
-                                  onCustomize: () =>
-                                      _showItems(context, ref, selectedSurgery),
-                                ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2035),
+                                  );
+                                  if (picked != null) {
+                                    ref
+                                            .read(eyeSurgerySelectedDateProvider
+                                                .notifier)
+                                            .state =
+                                        DateTime(picked.year, picked.month,
+                                            picked.day);
+                                  }
+                                },
+                                icon:
+                                    const Icon(Icons.calendar_month, size: 16),
+                                label: const Text('Select another date'),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ];
-                  }
+                    ),
+                  ];
+                }
 
+                final selectedSurgery = filtered.firstWhere(
+                  (s) => s.id == _selectedSurgeryId,
+                  orElse: () => filtered.first,
+                );
+
+                final screenWidth = MediaQuery.sizeOf(context).width;
+                final isWideDesktop = screenWidth >= 960;
+
+                if (isWideDesktop) {
                   return [
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(
                           AppSpacing.md, AppSpacing.xs, AppSpacing.md, 96),
-                      sliver: SliverList.separated(
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: AppSpacing.sm),
-                        itemBuilder: (context, index) {
-                          final surgery = filtered[index];
-                          return _SurgeryCard(
-                            surgery: surgery,
-                            role: role,
-                            isDesktop: false,
-                            isSelected: false,
-                            onDetails: () =>
-                                _showDetails(context, surgery, 0),
-                            onBilling: () =>
-                                _showDetails(context, surgery, 1),
-                            onEdit: () => _editSurgery(context, ref, surgery),
-                            onAssignStaff: () =>
-                                showAssignEyeSurgeryStaffDialog(context, ref, surgery),
-                            onChecklist: () =>
-                                _showChecklist(context, ref, surgery),
-                            onItems: () => _showItems(context, ref, surgery),
-                            onAdvance: (next) =>
-                                _changeStatus(context, ref, surgery, next),
-                            onScheduleFollowUp: () =>
-                                _scheduleFollowUp(context, ref, surgery),
-                            onReschedule: () =>
-                                _rescheduleSurgery(context, ref, surgery),
-                            onDelete: () =>
-                                _confirmDeleteSurgery(context, ref, surgery),
-                            onPatient: surgery.patientId.isEmpty
-                                ? null
-                                : () => Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => PatientDetailsScreen(
-                                            patientId: surgery.patientId),
-                                      ),
-                                    ),
-                          );
-                        },
+                      sliver: SliverToBoxAdapter(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left: Surgeries List
+                            Expanded(
+                              flex: 6,
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: AppSpacing.sm),
+                                itemBuilder: (context, index) {
+                                  final surgery = filtered[index];
+                                  return _SurgeryCard(
+                                    surgery: surgery,
+                                    role: role,
+                                    isDesktop: true,
+                                    isSelected:
+                                        surgery.id == selectedSurgery.id,
+                                    onSelect: () => setState(
+                                        () => _selectedSurgeryId = surgery.id),
+                                    onDetails: () =>
+                                        _showDetails(context, surgery, 0),
+                                    onBilling: () =>
+                                        _showDetails(context, surgery, 1),
+                                    onEdit: () =>
+                                        _editSurgery(context, ref, surgery),
+                                    onAssignStaff: () =>
+                                        showAssignEyeSurgeryStaffDialog(
+                                            context, ref, surgery),
+                                    onChecklist: () =>
+                                        _showChecklist(context, ref, surgery),
+                                    onItems: () =>
+                                        _showItems(context, ref, surgery),
+                                    onAdvance: (next) => _changeStatus(
+                                        context, ref, surgery, next),
+                                    onScheduleFollowUp: () => _scheduleFollowUp(
+                                        context, ref, surgery),
+                                    onReschedule: () => _rescheduleSurgery(
+                                        context, ref, surgery),
+                                    onDelete: () => _confirmDeleteSurgery(
+                                        context, ref, surgery),
+                                    onPatient: surgery.patientId.isEmpty
+                                        ? null
+                                        : () => Navigator.of(context).push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) =>
+                                                    PatientDetailsScreen(
+                                                        patientId:
+                                                            surgery.patientId),
+                                              ),
+                                            ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            // Right: Surgery Required Supplies & Items Panel (Requirement 10)
+                            Expanded(
+                              flex: 4,
+                              child: _EyeSurgeryRightSidePanel(
+                                surgery: selectedSurgery,
+                                onCustomize: () =>
+                                    _showItems(context, ref, selectedSurgery),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ];
-                },
-              ),
-            ],
-          ),
+                }
+
+                return [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md, AppSpacing.xs, AppSpacing.md, 96),
+                    sliver: SliverList.separated(
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        final surgery = filtered[index];
+                        return _SurgeryCard(
+                          surgery: surgery,
+                          role: role,
+                          isDesktop: false,
+                          isSelected: false,
+                          onDetails: () => _showDetails(context, surgery, 0),
+                          onBilling: () => _showDetails(context, surgery, 1),
+                          onEdit: () => _editSurgery(context, ref, surgery),
+                          onAssignStaff: () => showAssignEyeSurgeryStaffDialog(
+                              context, ref, surgery),
+                          onChecklist: () =>
+                              _showChecklist(context, ref, surgery),
+                          onItems: () => _showItems(context, ref, surgery),
+                          onAdvance: (next) =>
+                              _changeStatus(context, ref, surgery, next),
+                          onScheduleFollowUp: () =>
+                              _scheduleFollowUp(context, ref, surgery),
+                          onReschedule: () =>
+                              _rescheduleSurgery(context, ref, surgery),
+                          onDelete: () =>
+                              _confirmDeleteSurgery(context, ref, surgery),
+                          onPatient: surgery.patientId.isEmpty
+                              ? null
+                              : () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => PatientDetailsScreen(
+                                          patientId: surgery.patientId),
+                                    ),
+                                  ),
+                        );
+                      },
+                    ),
+                  ),
+                ];
+              },
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
 
   static String _statusLabel(String status) {
@@ -882,9 +928,8 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
         count: '${stats.scheduled}',
         icon: Icons.calendar_today_outlined,
         color: AppColors.secondary,
-        onTap: () => ref
-            .read(eyeSurgeryStatusFilterProvider.notifier)
-            .state = 'scheduled',
+        onTap: () => ref.read(eyeSurgeryStatusFilterProvider.notifier).state =
+            'scheduled',
         isActive: currentFilter == 'scheduled',
       ),
       _KpiCard(
@@ -892,9 +937,8 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
         count: '${stats.inProgress}',
         icon: Icons.hourglass_top_outlined,
         color: Colors.amber.shade800,
-        onTap: () => ref
-            .read(eyeSurgeryStatusFilterProvider.notifier)
-            .state = 'in_progress',
+        onTap: () => ref.read(eyeSurgeryStatusFilterProvider.notifier).state =
+            'in_progress',
         isActive: currentFilter == 'in_progress',
       ),
       _KpiCard(
@@ -902,9 +946,8 @@ class _EyeSurgeryScreenState extends ConsumerState<EyeSurgeryScreen> {
         count: '${stats.discharged}',
         icon: Icons.check_circle_outline,
         color: Colors.green.shade700,
-        onTap: () => ref
-            .read(eyeSurgeryStatusFilterProvider.notifier)
-            .state = 'discharged',
+        onTap: () => ref.read(eyeSurgeryStatusFilterProvider.notifier).state =
+            'discharged',
         isActive: currentFilter == 'discharged',
       ),
     ];
@@ -1048,7 +1091,11 @@ class _SurgeryCard extends StatelessWidget {
                     if (action == 'details') onDetails?.call();
                     if (action == 'billing') onBilling?.call();
                     if (action == 'edit') onEdit();
-                    if (action == 'assign_staff' && isAdmin && !surgery.isDischarged) onAssignStaff();
+                    if (action == 'assign_staff' &&
+                        isAdmin &&
+                        !surgery.isDischarged) {
+                      onAssignStaff();
+                    }
                     if (action == 'checklist') onChecklist();
                     if (action == 'items' || action == 'customize_items') {
                       onItems();
@@ -1078,7 +1125,8 @@ class _SurgeryCard extends StatelessWidget {
                           value: 'details', child: Text('Surgery details')),
                       if (surgery.canAccessBilling)
                         const PopupMenuItem(
-                            value: 'billing', child: Text('Billing & Insurance')),
+                            value: 'billing',
+                            child: Text('Billing & Insurance')),
                       const PopupMenuItem(
                           value: 'edit', child: Text('Edit surgery')),
                       if (isAdmin && !surgery.isDischarged)
@@ -1097,8 +1145,13 @@ class _SurgeryCard extends StatelessWidget {
                           value: 'reschedule',
                           child: Text('Reschedule surgery'),
                         ),
-                      if (const {'scheduled', 'pre_op', 'in_surgery', 'post_op', 'billing'}
-                          .contains(surgery.status))
+                      if (const {
+                        'scheduled',
+                        'pre_op',
+                        'in_surgery',
+                        'post_op',
+                        'billing'
+                      }.contains(surgery.status))
                         const PopupMenuItem(
                             value: 'cancel', child: Text('Cancel surgery')),
                       if (isAdmin)
@@ -1154,31 +1207,36 @@ class _SurgeryCard extends StatelessWidget {
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                       ),
                       onPressed: onScheduleFollowUp,
                       icon: const Icon(Icons.calendar_month_outlined, size: 16),
                       label: const Text(
                         'Schedule Follow-up Appointment',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     )
                   else
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         foregroundColor: Colors.green.shade800,
                         side: BorderSide(color: Colors.green.shade600),
                       ),
                       onPressed: onScheduleFollowUp,
-                      icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+                      icon: const Icon(Icons.check_circle_outline,
+                          size: 16, color: Colors.green),
                       label: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             'Follow-up Scheduled',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                           Text(
                             ' · Edit',
@@ -1190,7 +1248,8 @@ class _SurgeryCard extends StatelessWidget {
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                     ),
                     onPressed: onBilling ?? onDetails,
                     icon: const Icon(Icons.receipt_long_outlined, size: 16),
@@ -1213,15 +1272,18 @@ class _SurgeryCard extends StatelessWidget {
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                     ),
                     onPressed: onChecklist,
                     icon: Icon(
-                      completedChecklist == EyeSurgeryModel.checklistItems.length
+                      completedChecklist ==
+                              EyeSurgeryModel.checklistItems.length
                           ? Icons.check_circle
                           : Icons.checklist_outlined,
                       size: 16,
-                      color: completedChecklist == EyeSurgeryModel.checklistItems.length
+                      color: completedChecklist ==
+                              EyeSurgeryModel.checklistItems.length
                           ? Colors.green
                           : AppColors.primary,
                     ),
@@ -1230,7 +1292,8 @@ class _SurgeryCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: completedChecklist == EyeSurgeryModel.checklistItems.length
+                        color: completedChecklist ==
+                                EyeSurgeryModel.checklistItems.length
                             ? Colors.green.shade800
                             : AppColors.primary,
                       ),
@@ -1240,7 +1303,8 @@ class _SurgeryCard extends StatelessWidget {
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                       ),
                       onPressed: onBilling ?? onDetails,
                       icon: const Icon(Icons.receipt_long_outlined, size: 16),
@@ -1256,12 +1320,16 @@ class _SurgeryCard extends StatelessWidget {
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                       ),
                       onPressed: onAssignStaff,
-                      icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+                      icon:
+                          const Icon(Icons.person_add_alt_1_outlined, size: 16),
                       label: Text(
-                        surgery.assignedStaffName == null ? 'Assign Staff' : 'Reassign Staff',
+                        surgery.assignedStaffName == null
+                            ? 'Assign Staff'
+                            : 'Reassign Staff',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1300,7 +1368,8 @@ class _SurgeryCard extends StatelessWidget {
                     ),
                     onPressed: () => onAdvance('discharged'),
                     icon: const Icon(Icons.exit_to_app, size: 16),
-                    label: const Text('Discharge Patient (Review Billing & Insurance)'),
+                    label: const Text(
+                        'Discharge Patient (Review Billing & Insurance)'),
                   ),
                 ),
               ],
@@ -1344,11 +1413,11 @@ class _SurgeryCard extends StatelessWidget {
                 onCustomize: onItems,
               ),
             ],
-            ],
-          ),
+          ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
   static String? _nextStatus(String status) => const {
         'scheduled': 'pre_op',
@@ -1616,81 +1685,84 @@ class _EyeSurgeryChecklistDialogState
         constraints: const BoxConstraints(maxWidth: 460),
         child: SizedBox(
           width: double.maxFinite,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.highlightIncomplete && completedCount < totalCount) ...[
-                Container(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    border: Border.all(color: AppColors.error),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded,
-                          color: AppColors.error, size: 20),
-                      SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          'Complete all 8 required items before surgery',
-                          style: TextStyle(
-                            color: AppColors.error,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.highlightIncomplete &&
+                    completedCount < totalCount) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      border: Border.all(color: AppColors.error),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: AppColors.error, size: 20),
+                        SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            'Complete all 8 required items before surgery',
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              ...EyeSurgeryModel.checklistItems.entries.map((item) {
-                final isDone = _checklist[item.key] ?? false;
-                final isIncomplete = !isDone && widget.highlightIncomplete;
-
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 2),
-                  decoration: BoxDecoration(
-                    border: isIncomplete
-                        ? Border.all(color: AppColors.error.withValues(alpha: 0.4))
-                        : null,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Material(
-                    color: isIncomplete
-                        ? AppColors.error.withValues(alpha: 0.05)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(4),
-                    child: CheckboxListTile(
-                      dense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      title: Text(
-                        item.value,
-                        style: TextStyle(
-                          fontWeight:
-                              isIncomplete ? FontWeight.bold : FontWeight.normal,
-                          color: isIncomplete ? AppColors.error : null,
-                        ),
-                      ),
-                      value: isDone,
-                      onChanged: (checked) => setState(
-                        () => _checklist[item.key] = checked ?? false,
-                      ),
+                      ],
                     ),
                   ),
-                );
-              }),
-            ],
+                ],
+                ...EyeSurgeryModel.checklistItems.entries.map((item) {
+                  final isDone = _checklist[item.key] ?? false;
+                  final isIncomplete = !isDone && widget.highlightIncomplete;
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    decoration: BoxDecoration(
+                      border: isIncomplete
+                          ? Border.all(
+                              color: AppColors.error.withValues(alpha: 0.4))
+                          : null,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Material(
+                      color: isIncomplete
+                          ? AppColors.error.withValues(alpha: 0.05)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(4),
+                      child: CheckboxListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 0),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: Text(
+                          item.value,
+                          style: TextStyle(
+                            fontWeight: isIncomplete
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isIncomplete ? AppColors.error : null,
+                          ),
+                        ),
+                        value: isDone,
+                        onChanged: (checked) => setState(
+                          () => _checklist[item.key] = checked ?? false,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         ),
-      ),
       ),
       actions: [
         TextButton(
@@ -1737,60 +1809,62 @@ class _RescheduleSurgeryDialogState extends State<_RescheduleSurgeryDialog> {
         constraints: const BoxConstraints(maxWidth: 400),
         child: SizedBox(
           width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              '${widget.surgery.patientName ?? 'Patient'} · ${widget.surgery.displaySurgeryType}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            const Text(
-              'Select a new future date and time for the surgery. Patient, assigned staff, checklist, and items will be preserved.',
-              style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _newDate,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (picked != null) {
-                  setState(() => _newDate = picked);
-                }
-              },
-              icon: const Icon(Icons.calendar_today_outlined),
-              label: Text(
-                'New Date: ${DateFormat('d MMM yyyy').format(_newDate)}',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${widget.surgery.patientName ?? 'Patient'} · ${widget.surgery.displaySurgeryType}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final picked = await showTimePicker(
-                  context: context,
-                  initialTime: _newTime ?? const TimeOfDay(hour: 9, minute: 0),
-                );
-                if (picked != null) {
-                  setState(() => _newTime = picked);
-                }
-              },
-              icon: const Icon(Icons.access_time_outlined),
-              label: Text(
-                _newTime == null
-                    ? 'Select New Time *'
-                    : 'New Time *: ${_newTime!.format(context)}',
+              const SizedBox(height: AppSpacing.sm),
+              const Text(
+                'Select a new future date and time for the surgery. Patient, assigned staff, checklist, and items will be preserved.',
+                style:
+                    TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.md),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _newDate,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (picked != null) {
+                    setState(() => _newDate = picked);
+                  }
+                },
+                icon: const Icon(Icons.calendar_today_outlined),
+                label: Text(
+                  'New Date: ${DateFormat('d MMM yyyy').format(_newDate)}',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime:
+                        _newTime ?? const TimeOfDay(hour: 9, minute: 0),
+                  );
+                  if (picked != null) {
+                    setState(() => _newTime = picked);
+                  }
+                },
+                icon: const Icon(Icons.access_time_outlined),
+                label: Text(
+                  _newTime == null
+                      ? 'Select New Time *'
+                      : 'New Time *: ${_newTime!.format(context)}',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-    actions: [
+      actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
@@ -1812,7 +1886,9 @@ class _RescheduleSurgeryDialogState extends State<_RescheduleSurgeryDialog> {
             );
             if (!scheduledDateTime.isAfter(DateTime.now())) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Rescheduled date and time must be in the future.')),
+                const SnackBar(
+                    content: Text(
+                        'Rescheduled date and time must be in the future.')),
               );
               return;
             }
@@ -1949,8 +2025,8 @@ class _EyeSurgeryRightSidePanel extends ConsumerWidget {
                   FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                     ),
                     onPressed: onCustomize,
                     icon: const Icon(Icons.tune, size: 15),
