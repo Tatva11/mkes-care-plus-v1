@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/services/push_notification_service.dart';
 import '../providers/auth_provider.dart';
 import '../screens/role_selection_screen.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
 import '../../staff_portal/screens/staff_dashboard_screen.dart';
+import '../providers/staff_location_provider.dart';
+import 'staff_geofence_guard.dart';
 
 /// Central authentication routing wrapper.
 ///
@@ -38,6 +41,10 @@ class AuthWrapper extends ConsumerWidget {
 
         if (session == null) {
           debugPrint('[LOGOUT] AuthWrapper showing RoleSelectionScreen');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(pushNotificationServiceProvider).deactivateToken();
+            ref.read(staffLocationProvider.notifier).clearLocation();
+          });
           return const RoleSelectionScreen();
         }
 
@@ -49,11 +56,19 @@ class AuthWrapper extends ConsumerWidget {
 
         return roleAsync.when(
           data: (role) {
+            if (role == 'admin' || role == 'staff') {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ref.read(pushNotificationServiceProvider).initialize();
+              });
+            }
+
             switch (role) {
               case 'admin':
                 return const AdminDashboardScreen();
               case 'staff':
-                return const StaffDashboardScreen();
+                return const StaffGeofenceGuard(
+                  child: StaffDashboardScreen(),
+                );
               case 'inactive':
                 _signOutWithMessage(
                   context,
@@ -92,8 +107,27 @@ class AuthWrapper extends ConsumerWidget {
   }
 
   Widget _loadingScaffold() {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/mkes_logo.png',
+              width: 96,
+              height: 96,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 24),
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

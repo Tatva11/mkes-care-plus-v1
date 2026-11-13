@@ -7,7 +7,6 @@ import '../../admin/widgets/admin_shell.dart';
 import '../../admin/screens/administration_screen.dart';
 import '../../department/screens/department_management_screen.dart';
 import '../../staff/screens/staff_management_screen.dart';
-import '../widgets/patient_copilot_summary_card.dart';
 
 class PatientProfileScreen extends StatefulWidget {
   const PatientProfileScreen({super.key});
@@ -257,9 +256,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           ),
           const SizedBox(height: AppSpacing.md),
           if (_selectedTabIndex == 0) ...[
-            const PatientCopilotSummaryCard(),
-            const SizedBox(height: AppSpacing.md),
-            _buildInfoGrid('Basic Details', [
+                        _buildInfoGrid('Basic Details', [
               _infoRow('Blood Group', 'O+ (Positive)'),
               _infoRow('Height / Weight', '168 cm / 62 kg'),
               _infoRow('Primary Physician', 'Dr. Alex Morgan'),

@@ -29,6 +29,7 @@ class _StaffProfileDetailScreenState
     extends ConsumerState<StaffProfileDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isBypassLoading = false;
 
   @override
   void initState() {
@@ -87,9 +88,7 @@ class _StaffProfileDetailScreenState
 
     if (confirmed == true) {
       try {
-        await ref
-            .read(usersProvider.notifier)
-            .toggleStatus(user.id, newStatus);
+        await ref.read(usersProvider.notifier).toggleStatus(user.id, newStatus);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Staff member ${action}d successfully.')),
@@ -147,7 +146,8 @@ class _StaffProfileDetailScreenState
                     DropdownMenuItem(value: 'low', child: Text('Low')),
                     DropdownMenuItem(value: 'medium', child: Text('Medium')),
                     DropdownMenuItem(value: 'high', child: Text('High')),
-                    DropdownMenuItem(value: 'critical', child: Text('Critical')),
+                    DropdownMenuItem(
+                        value: 'critical', child: Text('Critical')),
                   ],
                   onChanged: (val) {
                     if (val != null) setModalState(() => priority = val);
@@ -198,9 +198,7 @@ class _StaffProfileDetailScreenState
                         priority: priority,
                       );
                   // Refresh staff tasks notifier too
-                  ref
-                      .read(staffTasksProvider(user.id).notifier)
-                      .fetchTasks();
+                  ref.read(staffTasksProvider(user.id).notifier).fetchTasks();
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 } catch (e) {
                   if (ctx.mounted) {
@@ -214,6 +212,507 @@ class _StaffProfileDetailScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _showGrantBypassDialog(UserProfile user) async {
+    int selectedDuration = 4; // default 4 hours
+    final reasonCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !isSubmitting,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.location_off, color: Colors.orange),
+              SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text('Temporarily Disable GPS Restriction'),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Grant temporary GPS bypass for ${user.fullName}?',
+                  style: AppTypography.headlineMd.copyWith(fontSize: 16),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'This will allow ${user.fullName} to sign in and access clinical data remotely without physical presence inside the 200-metre clinic radius. Other staff will remain geofenced.',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Bypass Duration *',
+                  style: AppTypography.labelCaps.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  spacing: 8,
+                  children: [1, 4, 8, 24].map((hours) {
+                    final isSelected = selectedDuration == hours;
+                    return ChoiceChip(
+                      label: Text('$hours ${hours == 1 ? "Hour" : "Hours"}'),
+                      selected: isSelected,
+                      onSelected: isSubmitting
+                          ? null
+                          : (selected) {
+                              if (selected) {
+                                setModalState(() {
+                                  selectedDuration = hours;
+                                });
+                              }
+                            },
+                      selectedColor: AppColors.primaryContainer,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : AppColors.onSurface,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: reasonCtrl,
+                  enabled: !isSubmitting,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason (Optional)',
+                    hintText: 'e.g., remote shift, off-site outreach',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.orange.shade800,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setModalState(() {
+                        isSubmitting = true;
+                      });
+                      setState(() {
+                        _isBypassLoading = true;
+                      });
+                      try {
+                        await ref.read(usersProvider.notifier).grantGpsBypass(
+                              staffId: user.id,
+                              durationHours: selectedDuration,
+                              reason: reasonCtrl.text.trim().isNotEmpty
+                                  ? reasonCtrl.text.trim()
+                                  : null,
+                            );
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
+                        }
+                        if (mounted) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'GPS restriction disabled for ${user.fullName} for $selectedDuration ${selectedDuration == 1 ? "hour" : "hours"}.',
+                              ),
+                              backgroundColor: Colors.green.shade700,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setModalState(() {
+                          isSubmitting = false;
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to grant GPS bypass: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            _isBypassLoading = false;
+                          });
+                        }
+                      }
+                    },
+              icon: isSubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.check, size: 18),
+              label: Text(
+                isSubmitting ? 'Granting...' : 'Confirm & Disable GPS',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showRevokeBypassDialog(UserProfile user) async {
+    bool isSubmitting = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !isSubmitting,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.location_on, color: AppColors.primary),
+              SizedBox(width: AppSpacing.xs),
+              Expanded(child: Text('Enable GPS Restriction')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Restore 200m GPS restriction for ${user.fullName}?',
+                style: AppTypography.headlineMd.copyWith(fontSize: 16),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'This will immediately revoke the active GPS bypass and terminate any remote access. ${user.fullName} will be required to be within 200 metres of the clinic to access protected clinical data.',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setModalState(() {
+                        isSubmitting = true;
+                      });
+                      setState(() {
+                        _isBypassLoading = true;
+                      });
+                      try {
+                        await ref.read(usersProvider.notifier).revokeGpsBypass(
+                              staffId: user.id,
+                              reason: 'Revoked by administrator',
+                            );
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
+                        }
+                        if (mounted) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'GPS restriction restored for ${user.fullName}. Normal 200m geofence is now enforced.',
+                              ),
+                              backgroundColor: Colors.green.shade700,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setModalState(() {
+                          isSubmitting = false;
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to revoke GPS bypass: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            _isBypassLoading = false;
+                          });
+                        }
+                      }
+                    },
+              icon: isSubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.lock, size: 18),
+              label: Text(
+                isSubmitting ? 'Restoring...' : 'Enable GPS Restriction',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGpsGeofenceCard(UserProfile user) {
+    final isBypassActive = user.isGpsBypassActive;
+    final bypassUntil = user.gpsBypassUntil;
+
+    String expiryText = '';
+    if (isBypassActive && bypassUntil != null) {
+      final remaining = bypassUntil.difference(DateTime.now());
+      final hours = remaining.inHours;
+      final mins = remaining.inMinutes % 60;
+      final remainingStr =
+          hours > 0 ? '${hours}h ${mins}m remaining' : '${mins}m remaining';
+      final formattedTime =
+          DateFormat('MMM d, yyyy • h:mm a').format(bypassUntil);
+      expiryText = '$formattedTime ($remainingStr)';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isBypassActive
+            ? const Color(0xFFFFF8E1)
+            : AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(
+          color: isBypassActive
+              ? Colors.orange.shade300
+              : AppColors.outlineVariant,
+          width: isBypassActive ? 1.5 : 1.0,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isBypassActive
+                      ? Colors.orange.shade100
+                      : AppColors.primaryContainer.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isBypassActive ? Icons.location_off : Icons.near_me,
+                  color: isBypassActive
+                      ? Colors.orange.shade800
+                      : AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'GPS Geofence Restriction',
+                      style: AppTypography.headlineMd.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Clinic radius: 200 metres',
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isBypassActive
+                        ? Colors.orange.shade800
+                        : AppColors.primaryContainer.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isBypassActive ? Icons.lock_open : Icons.lock_outline,
+                        size: 14,
+                        color: isBypassActive
+                            ? Colors.white
+                            : AppColors.primaryContainer,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          isBypassActive ? 'BYPASS ACTIVE' : '200M ENFORCED',
+                          style: AppTypography.labelCaps.copyWith(
+                            color: isBypassActive
+                                ? Colors.white
+                                : AppColors.primaryContainer,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Divider(height: 1, color: AppColors.outlineVariant),
+          const SizedBox(height: AppSpacing.md),
+          if (isBypassActive) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.timer_outlined,
+                    size: 18, color: Colors.orange),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Bypass Expiry Date/Time',
+                        style: AppTypography.labelCaps.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        expiryText,
+                        style: AppTypography.bodyMd.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                      if (user.gpsBypassReason != null &&
+                          user.gpsBypassReason!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Reason: ${user.gpsBypassReason}',
+                          style: AppTypography.bodySm.copyWith(
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              icon: _isBypassLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.lock_rounded, size: 18),
+              label: Text(_isBypassLoading
+                  ? 'Processing...'
+                  : 'Enable GPS Restriction'),
+              onPressed:
+                  _isBypassLoading ? null : () => _showRevokeBypassDialog(user),
+            ),
+          ] else ...[
+            Text(
+              'This staff account is currently subject to the 200m clinic geofence restriction. Staff must be physically near the clinic to access protected clinical data.',
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.orange.shade800,
+                side: BorderSide(color: Colors.orange.shade400),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              icon: _isBypassLoading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.orange.shade800),
+                      ),
+                    )
+                  : const Icon(Icons.location_off, size: 18),
+              label: Text(_isBypassLoading
+                  ? 'Processing...'
+                  : 'Temporarily Disable GPS Restriction'),
+              onPressed:
+                  _isBypassLoading ? null : () => _showGrantBypassDialog(user),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -408,9 +907,8 @@ class _StaffProfileDetailScreenState
                   _InfoCard(
                     icon: Icons.business_outlined,
                     label: 'Department',
-                    value: user.departmentName ??
-                        user.department ??
-                        'Unassigned',
+                    value:
+                        user.departmentName ?? user.department ?? 'Unassigned',
                   ),
                   _InfoCard(
                     icon: Icons.badge_outlined,
@@ -443,8 +941,8 @@ class _StaffProfileDetailScreenState
                         .map(
                           (item) => Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.0),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4.0),
                               child: item,
                             ),
                           ),
@@ -465,6 +963,11 @@ class _StaffProfileDetailScreenState
               },
             ),
 
+            if (user.role.toLowerCase() != 'admin') ...[
+              const SizedBox(height: AppSpacing.md),
+              _buildGpsGeofenceCard(user),
+            ],
+
             const SizedBox(height: AppSpacing.lg),
 
             // ── Tabs for Tasks, Attendance, Leave ──
@@ -482,7 +985,9 @@ class _StaffProfileDetailScreenState
                 tabs: const [
                   Tab(icon: Icon(Icons.assignment_outlined), text: 'Tasks'),
                   Tab(icon: Icon(Icons.history_outlined), text: 'Attendance'),
-                  Tab(icon: Icon(Icons.beach_access_outlined), text: 'Leave History'),
+                  Tab(
+                      icon: Icon(Icons.beach_access_outlined),
+                      text: 'Leave History'),
                 ],
               ),
             ),
@@ -604,8 +1109,11 @@ class _StaffTasksTab extends ConsumerWidget {
 
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
           children: [
             Text('Assigned Tasks', style: AppTypography.headlineMd),
             FilledButton.icon(
@@ -650,8 +1158,10 @@ class _StaffTasksTab extends ConsumerWidget {
 
               return Column(
                 children: [
-                  // Task counters
-                  Row(
+                  // Task counters (Responsive Wrap)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       _StatChip(label: 'Total', count: tasks.length),
                       _StatChip(
@@ -769,8 +1279,9 @@ class _TaskTile extends StatelessWidget {
                   task.title,
                   style: AppTypography.bodyMd.copyWith(
                     fontWeight: FontWeight.w600,
-                    decoration:
-                        isDone ? TextDecoration.lineThrough : TextDecoration.none,
+                    decoration: isDone
+                        ? TextDecoration.lineThrough
+                        : TextDecoration.none,
                   ),
                 ),
                 if (task.description != null &&
@@ -786,7 +1297,10 @@ class _TaskTile extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 4),
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -804,7 +1318,6 @@ class _TaskTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     if (task.dueDate != null)
                       Text(
                         'Due: ${DateFormat('MMM d, yyyy').format(task.dueDate!)}',
@@ -914,25 +1427,48 @@ class _StaffAttendanceTab extends ConsumerWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              DateFormat('EEEE, MMM d, yyyy')
-                                  .format(rec.recordDate),
-                              style: AppTypography.bodyMd.copyWith(
-                                fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                DateFormat('EEEE, MMM d, yyyy')
+                                    .format(rec.recordDate),
+                                style: AppTypography.bodyMd.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'In: $checkInStr  •  Out: $checkOutStr  •  Hours: ${rec.workingHours != null ? "${rec.workingHours!.toStringAsFixed(1)} hrs" : "—"}',
-                              style: AppTypography.bodySm.copyWith(
-                                color: AppColors.onSurfaceVariant,
+                              const SizedBox(height: 2),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 2,
+                                children: [
+                                  Text(
+                                    'In: $checkInStr',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  Text(
+                                    '•  Out: $checkOutStr',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  Text(
+                                    '•  ${rec.workingHours != null ? "${rec.workingHours!.toStringAsFixed(1)} hrs" : "—"}',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: AppSpacing.xs),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -999,8 +1535,11 @@ class _StaffLeaveTab extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
+          runSpacing: 4,
           children: [
             Text('Leave History & Deductions', style: AppTypography.headlineMd),
             if (deductionConfig.dailyRate > 0)
@@ -1060,12 +1599,16 @@ class _StaffLeaveTab extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              '${DateFormat('MMM d, yyyy').format(req.startDate)} - ${DateFormat('MMM d, yyyy').format(req.endDate)}',
-                              style: AppTypography.bodyMd.copyWith(
-                                fontWeight: FontWeight.w700,
+                            Expanded(
+                              child: Text(
+                                '${DateFormat('MMM d, yyyy').format(req.startDate)} - ${DateFormat('MMM d, yyyy').format(req.endDate)}',
+                                style: AppTypography.bodyMd.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: AppSpacing.xs),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,

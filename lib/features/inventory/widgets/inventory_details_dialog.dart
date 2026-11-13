@@ -28,7 +28,8 @@ class InventoryDetailsDialog extends ConsumerWidget {
 
   final InventoryItem item;
 
-  Future<void> _handleEdit(BuildContext context, InventoryItem activeItem) async {
+  Future<void> _handleEdit(
+      BuildContext context, InventoryItem activeItem) async {
     Navigator.of(context).pop();
     await showDialog<InventoryItem>(
       context: context,
@@ -36,7 +37,8 @@ class InventoryDetailsDialog extends ConsumerWidget {
     );
   }
 
-  Future<void> _handleDelete(BuildContext context, WidgetRef ref, InventoryItem activeItem) async {
+  Future<void> _handleDelete(
+      BuildContext context, WidgetRef ref, InventoryItem activeItem) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -107,28 +109,32 @@ class InventoryDetailsDialog extends ConsumerWidget {
     }
   }
 
-  Future<void> _handleStockIn(BuildContext context, InventoryItem activeItem) async {
+  Future<void> _handleStockIn(
+      BuildContext context, InventoryItem activeItem) async {
     await showDialog(
       context: context,
       builder: (_) => StockOperationDialog.stockIn(item: activeItem),
     );
   }
 
-  Future<void> _handleStockOut(BuildContext context, InventoryItem activeItem) async {
+  Future<void> _handleStockOut(
+      BuildContext context, InventoryItem activeItem) async {
     await showDialog(
       context: context,
       builder: (_) => StockOperationDialog.stockOut(item: activeItem),
     );
   }
 
-  Future<void> _handleViewHistory(BuildContext context, InventoryItem activeItem) async {
+  Future<void> _handleViewHistory(
+      BuildContext context, InventoryItem activeItem) async {
     await showDialog(
       context: context,
       builder: (_) => InventoryTransactionHistoryDialog(item: activeItem),
     );
   }
 
-  Future<void> _handleCreatePO(BuildContext context, InventoryItem activeItem) async {
+  Future<void> _handleCreatePO(
+      BuildContext context, InventoryItem activeItem) async {
     await showDialog(
       context: context,
       builder: (_) => PurchaseOrderFormDialog(
@@ -148,7 +154,8 @@ class InventoryDetailsDialog extends ConsumerWidget {
     );
 
     // Watch transactions for this item
-    final transactionsAsync = ref.watch(itemTransactionsProvider(activeItem.id));
+    final transactionsAsync =
+        ref.watch(itemTransactionsProvider(activeItem.id));
 
     // Role-based permissions
     final role = ref.watch(currentUserRoleProvider).valueOrNull;
@@ -162,9 +169,9 @@ class InventoryDetailsDialog extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surfaceContainerLowest,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.lg,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? AppSpacing.md : 8.0,
+        vertical: isDesktop ? AppSpacing.lg : 16.0,
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -177,8 +184,8 @@ class InventoryDetailsDialog extends ConsumerWidget {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? AppSpacing.lg : 12.0,
                 vertical: AppSpacing.md,
               ),
               child: Row(
@@ -190,8 +197,10 @@ class InventoryDetailsDialog extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(AppSpacing.xs),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryContainer.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            color: AppColors.primaryContainer
+                                .withValues(alpha: 0.15),
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusMd),
                           ),
                           child: const Icon(
                             Icons.inventory_2_outlined,
@@ -235,7 +244,7 @@ class InventoryDetailsDialog extends ConsumerWidget {
             // Scrollable Content
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: EdgeInsets.all(isDesktop ? AppSpacing.lg : 12.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -248,15 +257,18 @@ class InventoryDetailsDialog extends ConsumerWidget {
                     const SizedBox(height: AppSpacing.lg),
 
                     // Suppliers / Vendors Supplying This Product (unified)
-                    _buildSuppliersSection(context, ref, activeItem, dateFormat),
+                    _buildSuppliersSection(
+                        context, ref, activeItem, dateFormat),
                     const SizedBox(height: AppSpacing.lg),
 
                     // Inventory Batches
-                    _buildInventoryBatchesSection(context, ref, activeItem, dateFormat),
+                    _buildInventoryBatchesSection(
+                        context, ref, activeItem, dateFormat),
                     const SizedBox(height: AppSpacing.lg),
 
                     // Product Purchase & Supply History
-                    _buildProductPurchaseHistorySection(context, ref, activeItem, dateFormat),
+                    _buildProductPurchaseHistorySection(
+                        context, ref, activeItem, dateFormat),
                     const SizedBox(height: AppSpacing.lg),
 
                     // Recent Transactions Section
@@ -275,18 +287,25 @@ class InventoryDetailsDialog extends ConsumerWidget {
                       _buildInfoRow('Measurement Unit', activeItem.unit),
                       if (activeItem.sku != null && activeItem.sku!.isNotEmpty)
                         _buildInfoRow('SKU / Code', activeItem.sku!),
-                      if (activeItem.department != null && activeItem.department!.isNotEmpty)
-                        _buildInfoRow('Department', activeItem.department!.toUpperCase()),
-                      if (activeItem.brand != null && activeItem.brand!.isNotEmpty)
-                        _buildInfoRow('Brand / Manufacturer', activeItem.brand!),
-                      if (activeItem.vendorName != null && activeItem.vendorName!.isNotEmpty)
+                      if (activeItem.department != null &&
+                          activeItem.department!.isNotEmpty)
+                        _buildInfoRow(
+                            'Department', activeItem.department!.toUpperCase()),
+                      if (activeItem.brand != null &&
+                          activeItem.brand!.isNotEmpty)
+                        _buildInfoRow(
+                            'Brand / Manufacturer', activeItem.brand!),
+                      if (activeItem.vendorName != null &&
+                          activeItem.vendorName!.isNotEmpty)
                         _buildInfoRow('Last Supplier', activeItem.vendorName!),
                       if (activeItem.price != null)
-                        _buildInfoRow('Unit Price', '₹${activeItem.price!.toStringAsFixed(2)}'),
+                        _buildInfoRow('Unit Price',
+                            '₹${activeItem.price!.toStringAsFixed(2)}'),
                       _buildInfoRow(
                         'Item Status',
                         activeItem.isActive ? 'Active' : 'Inactive',
-                        badgeColor: activeItem.isActive ? Colors.green : Colors.grey,
+                        badgeColor:
+                            activeItem.isActive ? Colors.green : Colors.grey,
                       ),
                       _buildInfoRow(
                         'Stock Health',
@@ -317,7 +336,8 @@ class InventoryDetailsDialog extends ConsumerWidget {
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusMd),
                           border: Border.all(color: AppColors.outlineVariant),
                         ),
                         child: Text(
@@ -350,13 +370,16 @@ class InventoryDetailsDialog extends ConsumerWidget {
             ),
             const Divider(height: 1, color: AppColors.outlineVariant),
 
-            // Footer Actions (Role-Enforced)
+            // Footer Actions (Role-Enforced, Fully Responsive)
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
                 children: [
-                  if (canManageInventory) ...[
+                  if (canManageInventory)
                     OutlinedButton.icon(
                       onPressed: () => _handleDelete(context, ref, activeItem),
                       icon: const Icon(Icons.delete_outline, size: 18),
@@ -366,17 +389,16 @@ class InventoryDetailsDialog extends ConsumerWidget {
                         side: const BorderSide(color: AppColors.error),
                       ),
                     ),
-                  ] else ...[
-                    const Spacer(),
-                  ],
-                  Row(
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text('Close'),
                       ),
-                      if (canManageInventory) ...[
-                        const SizedBox(width: AppSpacing.sm),
+                      if (canManageInventory)
                         FilledButton.icon(
                           onPressed: () => _handleEdit(context, activeItem),
                           icon: const Icon(Icons.edit_outlined, size: 18),
@@ -386,7 +408,6 @@ class InventoryDetailsDialog extends ConsumerWidget {
                             foregroundColor: AppColors.onPrimary,
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],
@@ -400,7 +421,7 @@ class InventoryDetailsDialog extends ConsumerWidget {
 
   Widget _buildStockSummaryCard(InventoryItem activeItem) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
         color: activeItem.isLowStock
             ? AppColors.errorContainer.withValues(alpha: 0.15)
@@ -413,119 +434,166 @@ class InventoryDetailsDialog extends ConsumerWidget {
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'CURRENT STOCK',
-                      style: AppTypography.labelCaps.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isVeryNarrow = constraints.maxWidth < 240;
+              final currentStockCol = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CURRENT STOCK',
+                    style: AppTypography.labelCaps.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontSize: 10,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            activeItem.formattedStock,
-                            style: AppTypography.displayLg.copyWith(
-                              fontSize: 28,
+                  ),
+                  const SizedBox(height: 2),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: AppSpacing.xs,
+                    runSpacing: 2,
+                    children: [
+                      Text(
+                        activeItem.formattedStock,
+                        style: AppTypography.displayLg.copyWith(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: activeItem.isLowStock
+                              ? AppColors.error
+                              : AppColors.primary,
+                        ),
+                      ),
+                      if (activeItem.isLowStock)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'LOW STOCK',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
                               fontWeight: FontWeight.w700,
-                              color: activeItem.isLowStock
-                                  ? AppColors.error
-                                  : AppColors.primary,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (activeItem.isLowStock) ...[
-                          const SizedBox(width: AppSpacing.xs),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.error,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'LOW STOCK',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                    ],
+                  ),
+                ],
+              );
+
+              final minStockCol = activeItem.minimumStock != null
+                  ? Column(
+                      crossAxisAlignment: isVeryNarrow
+                          ? CrossAxisAlignment.start
+                          : CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'MIN THRESHOLD',
+                          style: AppTypography.labelCaps.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontSize: 10,
                           ),
-                        ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          activeItem.formattedMinStock!,
+                          style: AppTypography.bodyMd.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
-                    ),
-                  ],
-                ),
-              ),
-              if (activeItem.minimumStock != null)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                    )
+                  : null;
+
+              if (isVeryNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'MIN THRESHOLD',
-                      style: AppTypography.labelCaps.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      activeItem.formattedMinStock!,
-                      style: AppTypography.bodyMd.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    currentStockCol,
+                    if (minStockCol != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      minStockCol,
+                    ],
                   ],
-                ),
-            ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: currentStockCol),
+                  if (minStockCol != null) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    minStockCol,
+                  ],
+                ],
+              );
+            },
           ),
           if (activeItem.effectiveExpiryDate != null) ...[
             const SizedBox(height: AppSpacing.sm),
             const Divider(height: 1, color: AppColors.outlineVariant),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.xs,
+              runSpacing: 4,
               children: [
-                Icon(
-                  activeItem.expiryStatusIcon,
-                  size: 16,
-                  color: activeItem.expiryStatusColor,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      activeItem.expiryStatusIcon,
+                      size: 14,
+                      color: activeItem.expiryStatusColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Expiry: ',
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                    Flexible(
+                      child: Text(
+                        DateFormat('MMM d, yyyy')
+                            .format(activeItem.effectiveExpiryDate!),
+                        style: AppTypography.bodySm.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  'Expiry: ',
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-                Text(
-                  DateFormat('MMM d, yyyy').format(activeItem.effectiveExpiryDate!),
-                  style: AppTypography.bodySm.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                   decoration: BoxDecoration(
                     color: activeItem.expiryStatusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: activeItem.expiryStatusColor),
+                    border: Border.all(
+                      color:
+                          activeItem.expiryStatusColor.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Text(
                     activeItem.expiryStatusLabel,
                     style: TextStyle(
                       color: activeItem.expiryStatusColor,
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -538,7 +606,8 @@ class InventoryDetailsDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuickActionButtons(BuildContext context, InventoryItem activeItem) {
+  Widget _buildQuickActionButtons(
+      BuildContext context, InventoryItem activeItem) {
     return Column(
       children: [
         Row(
@@ -642,40 +711,58 @@ class InventoryDetailsDialog extends ConsumerWidget {
             border: Border.all(color: AppColors.outlineVariant),
           ),
           child: supplierVendorIds.isEmpty
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'No Vendor Associated',
-                            style: AppTypography.bodyMd.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurfaceVariant,
-                            ),
+              ? LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 280;
+                    final textCol = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'No Vendor Associated',
+                          style: AppTypography.bodyMd.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.onSurfaceVariant,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'No supplier has been recorded for this item yet.',
-                            style: AppTypography.bodySm.copyWith(
-                              color: AppColors.onSurfaceVariant,
-                              fontSize: 12,
-                            ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'No supplier has been recorded for this item yet.',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontSize: 12,
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Tooltip(
+                        ),
+                      ],
+                    );
+
+                    final orderBtn = Tooltip(
                       message: 'No vendor associated',
                       child: FilledButton.icon(
                         onPressed: null,
                         icon: const Icon(Icons.phone_outlined, size: 16),
                         label: const Text('Call Vendor'),
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          textCol,
+                          const SizedBox(height: AppSpacing.sm),
+                          orderBtn,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: textCol),
+                        const SizedBox(width: AppSpacing.sm),
+                        orderBtn,
+                      ],
+                    );
+                  },
                 )
               : ListView.separated(
                   shrinkWrap: true,
@@ -684,39 +771,56 @@ class InventoryDetailsDialog extends ConsumerWidget {
                   separatorBuilder: (_, __) => const Divider(height: 24),
                   itemBuilder: (context, index) {
                     final vendorId = supplierVendorIds.elementAt(index);
-                    final vendor = allVendors.where((v) => v.id == vendorId).firstOrNull;
+                    final vendor =
+                        allVendors.where((v) => v.id == vendorId).firstOrNull;
                     final isCurrentVendor = activeItem.vendorId == vendorId;
 
                     final vendorName = vendor?.name ??
-                        (isCurrentVendor ? (activeItem.vendorName ?? 'Vendor') : 'Vendor');
+                        (isCurrentVendor
+                            ? (activeItem.vendorName ?? 'Vendor')
+                            : 'Vendor');
                     final contactPerson = vendor?.contactPerson;
                     final vendorPhone = vendor?.phone ??
                         (isCurrentVendor ? activeItem.vendorPhone : null);
                     final vendorEmail = vendor?.email;
-                    final hasPhone = vendorPhone != null && vendorPhone.trim().isNotEmpty;
+                    final hasPhone =
+                        vendorPhone != null && vendorPhone.trim().isNotEmpty;
 
                     // Derive last supply information for this specific product & vendor
-                    final vendorPOs = matchingPOs.where((po) => po.vendorId == vendorId).toList();
-                    vendorPOs.sort((a, b) => b.orderDate.compareTo(a.orderDate));
+                    final vendorPOs = matchingPOs
+                        .where((po) => po.vendorId == vendorId)
+                        .toList();
+                    vendorPOs
+                        .sort((a, b) => b.orderDate.compareTo(a.orderDate));
                     final latestPO = vendorPOs.firstOrNull;
-                    final poItem = latestPO?.items.where((i) => i.inventoryId == activeItem.id).firstOrNull;
+                    final poItem = latestPO?.items
+                        .where((i) => i.inventoryId == activeItem.id)
+                        .firstOrNull;
 
-                    final double? lastQty = (poItem != null && poItem.receivedQuantity > 0)
-                        ? poItem.receivedQuantity
-                        : (poItem?.quantity ??
-                            (isCurrentVendor ? activeItem.lastQuantitySupplied : null));
+                    final double? lastQty =
+                        (poItem != null && poItem.receivedQuantity > 0)
+                            ? poItem.receivedQuantity
+                            : (poItem?.quantity ??
+                                (isCurrentVendor
+                                    ? activeItem.lastQuantitySupplied
+                                    : null));
 
                     final DateTime? lastDate = latestPO?.actualDeliveryDate ??
                         latestPO?.orderDate ??
-                        (isCurrentVendor ? (activeItem.updatedAt ?? activeItem.createdAt) : null);
-
-                    final double? pricePiece = (poItem != null && poItem.unitPrice > 0)
-                        ? poItem.unitPrice
-                        : (isCurrentVendor
-                            ? (activeItem.calculatedPricePerPiece ?? activeItem.price)
+                        (isCurrentVendor
+                            ? (activeItem.updatedAt ?? activeItem.createdAt)
                             : null);
 
-                    final double? totalAmount = (poItem != null && poItem.totalAmount > 0)
+                    final double? pricePiece =
+                        (poItem != null && poItem.unitPrice > 0)
+                            ? poItem.unitPrice
+                            : (isCurrentVendor
+                                ? (activeItem.calculatedPricePerPiece ??
+                                    activeItem.price)
+                                : null);
+
+                    final double? totalAmount = (poItem != null &&
+                            poItem.totalAmount > 0)
                         ? poItem.totalAmount
                         : (isCurrentVendor ? activeItem.lastTotalAmount : null);
 
@@ -726,7 +830,8 @@ class InventoryDetailsDialog extends ConsumerWidget {
                         if (isCurrentVendor) ...[
                           Row(
                             children: [
-                              const Icon(Icons.local_shipping_outlined, size: 16, color: AppColors.primary),
+                              const Icon(Icons.local_shipping_outlined,
+                                  size: 16, color: AppColors.primary),
                               const SizedBox(width: 6),
                               Text(
                                 'LAST SUPPLIED VENDOR & PRICING',
@@ -740,42 +845,72 @@ class InventoryDetailsDialog extends ConsumerWidget {
                           ),
                           const SizedBox(height: AppSpacing.xs),
                         ],
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isNarrow = constraints.maxWidth < 360;
+                            final vendorInfo = Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  vendorName,
+                                  style: AppTypography.bodyMd.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (contactPerson != null &&
+                                    contactPerson.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 2),
                                   Text(
-                                    vendorName,
-                                    style: AppTypography.bodyMd.copyWith(
-                                      fontWeight: FontWeight.w700,
+                                    'Contact: $contactPerson',
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontSize: 12,
                                     ),
                                   ),
-                                  if (contactPerson != null && contactPerson.trim().isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Contact: $contactPerson',
-                                      style: AppTypography.bodySm.copyWith(
-                                        color: AppColors.onSurfaceVariant,
-                                        fontSize: 12,
+                                ],
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.phone_outlined,
+                                      size: 13,
+                                      color: hasPhone
+                                          ? AppColors.onSurfaceVariant
+                                          : AppColors.error,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        hasPhone
+                                            ? vendorPhone
+                                            : 'Phone number unavailable',
+                                        style: AppTypography.bodySm.copyWith(
+                                          color: hasPhone
+                                              ? AppColors.onSurfaceVariant
+                                              : AppColors.error,
+                                          fontSize: 12,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
+                                ),
+                                if (vendorEmail != null &&
+                                    vendorEmail.trim().isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Row(
                                     children: [
-                                      Icon(
-                                        Icons.phone_outlined,
+                                      const Icon(
+                                        Icons.email_outlined,
                                         size: 13,
-                                        color: hasPhone ? AppColors.onSurfaceVariant : AppColors.error,
+                                        color: AppColors.onSurfaceVariant,
                                       ),
                                       const SizedBox(width: 4),
                                       Flexible(
                                         child: Text(
-                                          hasPhone ? vendorPhone : 'Phone number unavailable',
+                                          vendorEmail,
                                           style: AppTypography.bodySm.copyWith(
-                                            color: hasPhone ? AppColors.onSurfaceVariant : AppColors.error,
+                                            color: AppColors.onSurfaceVariant,
                                             fontSize: 12,
                                           ),
                                           overflow: TextOverflow.ellipsis,
@@ -783,84 +918,95 @@ class InventoryDetailsDialog extends ConsumerWidget {
                                       ),
                                     ],
                                   ),
-                                  if (vendorEmail != null && vendorEmail.trim().isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.email_outlined,
-                                          size: 13,
-                                          color: AppColors.onSurfaceVariant,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Flexible(
-                                          child: Text(
-                                            vendorEmail,
-                                            style: AppTypography.bodySm.copyWith(
-                                              color: AppColors.onSurfaceVariant,
-                                              fontSize: 12,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
                                 ],
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            FilledButton.icon(
+                              ],
+                            );
+
+                            final callBtn = FilledButton.icon(
                               onPressed: hasPhone
-                                  ? () => PhoneDialerUtil.launchDialer(context, vendorPhone)
+                                  ? () => PhoneDialerUtil.launchDialer(
+                                      context, vendorPhone)
                                   : null,
                               icon: const Icon(Icons.phone_outlined, size: 16),
                               label: const Text('Call Vendor'),
                               style: FilledButton.styleFrom(
                                 backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
-                                disabledBackgroundColor: AppColors.surfaceContainerHigh,
-                                disabledForegroundColor: AppColors.onSurfaceVariant.withValues(alpha: 0.5),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                disabledBackgroundColor:
+                                    AppColors.surfaceContainerHigh,
+                                disabledForegroundColor: AppColors
+                                    .onSurfaceVariant
+                                    .withValues(alpha: 0.5),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                               ),
-                            ),
-                          ],
+                            );
+
+                            if (isNarrow) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  vendorInfo,
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: callBtn,
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: vendorInfo),
+                                const SizedBox(width: AppSpacing.sm),
+                                callBtn,
+                              ],
+                            );
+                          },
                         ),
-                        if (lastQty != null || lastDate != null || pricePiece != null || totalAmount != null) ...[
+                        if (lastQty != null ||
+                            lastDate != null ||
+                            pricePiece != null ||
+                            totalAmount != null) ...[
                           const SizedBox(height: AppSpacing.xs),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: AppColors.surfaceContainerLowest,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                              border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusSm),
+                              border: Border.all(
+                                  color: AppColors.outlineVariant
+                                      .withValues(alpha: 0.5)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
+                                Wrap(
+                                  spacing: AppSpacing.md,
+                                  runSpacing: AppSpacing.xs,
                                   children: [
-                                    Expanded(
-                                      child: _buildVendorStat(
-                                        label: 'Last Supply',
-                                        value: lastQty != null
-                                            ? '${lastQty % 1 == 0 ? lastQty.toInt() : lastQty.toStringAsFixed(2)} ${activeItem.unit}'
-                                            : '—',
-                                      ),
+                                    _buildVendorStat(
+                                      label: 'Last Supply',
+                                      value: lastQty != null
+                                          ? '${lastQty % 1 == 0 ? lastQty.toInt() : lastQty.toStringAsFixed(2)} ${activeItem.unit}'
+                                          : '—',
                                     ),
                                     if (totalAmount != null)
-                                      Expanded(
-                                        child: _buildVendorStat(
-                                          label: 'Total Paid',
-                                          value: '₹${totalAmount.toStringAsFixed(2)}',
-                                        ),
+                                      _buildVendorStat(
+                                        label: 'Total Paid',
+                                        value:
+                                            '₹${totalAmount.toStringAsFixed(2)}',
                                       ),
-                                    Expanded(
-                                      child: _buildVendorStat(
-                                        label: 'Price/Piece',
-                                        value: pricePiece != null ? '₹${pricePiece.toStringAsFixed(2)}' : '—',
-                                        highlight: true,
-                                      ),
+                                    _buildVendorStat(
+                                      label: 'Price/Piece',
+                                      value: pricePiece != null
+                                          ? '₹${pricePiece.toStringAsFixed(2)}'
+                                          : '—',
+                                      highlight: true,
                                     ),
                                   ],
                                 ),
@@ -901,11 +1047,14 @@ class InventoryDetailsDialog extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'INVENTORY BATCHES',
-              style: AppTypography.labelCaps.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
+            Expanded(
+              child: Text(
+                'INVENTORY BATCHES',
+                style: AppTypography.labelCaps.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -923,7 +1072,10 @@ class InventoryDetailsDialog extends ConsumerWidget {
             loading: () => const Center(
               child: Padding(
                 padding: EdgeInsets.all(AppSpacing.sm),
-                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
               ),
             ),
             error: (e, _) => Text(
@@ -955,9 +1107,11 @@ class InventoryDetailsDialog extends ConsumerWidget {
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusSm),
                         ),
-                        child: const Icon(Icons.inventory_outlined, size: 20, color: AppColors.primary),
+                        child: const Icon(Icons.inventory_outlined,
+                            size: 20, color: AppColors.primary),
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
@@ -977,11 +1131,14 @@ class InventoryDetailsDialog extends ConsumerWidget {
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: b.expiryStatusColor.withValues(alpha: 0.12),
+                                    color: b.expiryStatusColor
+                                        .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: b.expiryStatusColor),
+                                    border:
+                                        Border.all(color: b.expiryStatusColor),
                                   ),
                                   child: Text(
                                     b.expiryStatusLabel,
@@ -1030,7 +1187,6 @@ class InventoryDetailsDialog extends ConsumerWidget {
     );
   }
 
-
   Widget _buildVendorStat({
     required String label,
     required String value,
@@ -1071,10 +1227,13 @@ class InventoryDetailsDialog extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'RECENT TRANSACTIONS',
-              style: AppTypography.labelCaps.copyWith(
-                color: AppColors.onSurfaceVariant,
+            Expanded(
+              child: Text(
+                'RECENT TRANSACTIONS',
+                style: AppTypography.labelCaps.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             TextButton.icon(
@@ -1267,13 +1426,18 @@ class InventoryDetailsDialog extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.onSurfaceVariant,
+          Flexible(
+            flex: 2,
+            child: Text(
+              label,
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
             ),
           ),
+          const SizedBox(width: AppSpacing.sm),
           if (badgeColor != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1293,6 +1457,7 @@ class InventoryDetailsDialog extends ConsumerWidget {
             )
           else
             Flexible(
+              flex: 3,
               child: Text(
                 value,
                 style: AppTypography.bodySm.copyWith(
@@ -1325,11 +1490,14 @@ class InventoryDetailsDialog extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'PURCHASE & SUPPLY ORDERS (${matchingPOs.length})',
-              style: AppTypography.labelCaps.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
+            Expanded(
+              child: Text(
+                'PURCHASE & SUPPLY ORDERS (${matchingPOs.length})',
+                style: AppTypography.labelCaps.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -1396,9 +1564,10 @@ class InventoryDetailsDialog extends ConsumerWidget {
                                         decoration: BoxDecoration(
                                           color: po.status.color
                                               .withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(4),
-                                          border:
-                                              Border.all(color: po.status.color),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          border: Border.all(
+                                              color: po.status.color),
                                         ),
                                         child: Text(
                                           po.status.label,

@@ -138,28 +138,34 @@ class _MetricCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Text(
-                    title,
-                    style: AppTypography.labelCaps.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (tooltip != null) ...[
-                    const SizedBox(width: 4),
-                    Tooltip(
-                      message: tooltip!,
-                      child: Icon(
-                        Icons.info_outline,
-                        size: 14,
-                        color: AppColors.outline,
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: AppTypography.labelCaps.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (tooltip != null) ...[
+                      const SizedBox(width: 4),
+                      Tooltip(
+                        message: tooltip!,
+                        child: const Icon(
+                          Icons.info_outline,
+                          size: 14,
+                          color: AppColors.outline,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
+              const SizedBox(width: AppSpacing.xs),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
@@ -171,11 +177,15 @@ class _MetricCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            style: AppTypography.headlineMd.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.onSurface,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: AppTypography.headlineMd.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
+              ),
             ),
           ),
           const SizedBox(height: 2),
@@ -185,6 +195,8 @@ class _MetricCard extends StatelessWidget {
               color: AppColors.onSurfaceVariant,
               fontSize: 11,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ],
       ),

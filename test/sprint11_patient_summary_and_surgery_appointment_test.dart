@@ -112,11 +112,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // Today's Scheduled Patients
-      expect(find.text('Scheduled Today'), findsOneWidget);
+      expect(find.text("Today's Appointment Tickets"), findsOneWidget);
       expect(find.text('1'), findsWidgets); // 1 scheduled patient
 
       // New Registrations Today
-      expect(find.text('New Registrations'), findsOneWidget);
+      expect(find.text('New Registrations Today'), findsOneWidget);
       expect(find.text('2'), findsWidgets); // 2 registered today
 
       // Department distribution for today's appointments

@@ -94,6 +94,14 @@ class _DepartmentManagementContentState
           name: result.name,
           description: result.description,
         );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Department "${result.name}" added successfully.'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
       } else {
         await notifier.updateDepartment(
           id: department.id,
@@ -101,11 +109,22 @@ class _DepartmentManagementContentState
           description: result.description,
           isActive: result.isActive,
         );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Department "${result.name}" updated successfully.'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
       }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to save department: $error')),
+          SnackBar(
+            content: Text('Unable to save department: $error'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     }
@@ -117,12 +136,13 @@ class _DepartmentManagementContentState
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete department'),
         content: Text(
-            'Delete ${department.name}? Staff assigned to it must be reassigned first.'),
+            'Delete ${department.name}? Any staff currently assigned to this department will be unassigned automatically.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel')),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Delete'),
           ),
@@ -135,10 +155,21 @@ class _DepartmentManagementContentState
       await ref
           .read(departmentsProvider.notifier)
           .deleteDepartment(department.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Department "${department.name}" deleted successfully.'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to delete department: $error')),
+          SnackBar(
+            content: Text('Unable to delete department: $error'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     }

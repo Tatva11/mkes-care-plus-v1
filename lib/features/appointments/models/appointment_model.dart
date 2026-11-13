@@ -320,6 +320,25 @@ class AppointmentModel {
     return null;
   }
 
+  bool get hasClinicalExam =>
+      (notes?.contains('[EXAMINED') ?? false) ||
+      (notes?.contains('[EXAM_RECORDED') ?? false) ||
+      (notes?.contains('[CLINICAL_EXAM') ?? false);
+
+  String? get examinationReference {
+    if (notes == null) return null;
+    final examMatch = RegExp(
+            r'\[(?:EXAMINED|EXAM_RECORDED|CLINICAL_EXAM):?\s*([^\]]+)\]')
+        .firstMatch(notes!);
+    if (examMatch != null) return examMatch.group(1)?.trim();
+    if (notes!.contains('[EXAMINED]') ||
+        notes!.contains('[EXAM_RECORDED]') ||
+        notes!.contains('[CLINICAL_EXAM]')) {
+      return 'Clinical Exam Recorded';
+    }
+    return null;
+  }
+
   String get statusLabel {
     switch (status.toLowerCase()) {
       case 'scheduled':

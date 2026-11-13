@@ -37,6 +37,12 @@ migrate_working_dir/
 api.env
 .env
 
+# Raw patient database files & PII data
+*.xlsx
+*Pt database*
+MKES_CARE_REPLACE_PATIENT_DATABASE_FROM_EXCEL.sql
+*.sql.bak
+
 # Symbolication related
 app.*.symbols
 
@@ -52,6 +58,8 @@ app.*.map.json
 api.env
 .env
 .env.*
+*google-services.json
+*firebase-service-account*.json
 
 # Flutter generated files.dart_tool/
 build/
@@ -59,3 +67,21 @@ build/
 .flutter-plugins-dependencies
 node_modules/
 supabase/.temp/
+supabase/backups/
+*.sql.bak
+**/wa_session/
+**/logs/
+**/.wwebjs_auth/
+**/.wwebjs_cache/
+whatsapp-service/.temp/
+*.qr.png
+whatsapp_qr.png
+
+
+# Local database backups - may contain sensitive clinic data
+/backups/
+
+# Local uploaded archives
+/supabase.zip
+/whatsapp-service.zip
+

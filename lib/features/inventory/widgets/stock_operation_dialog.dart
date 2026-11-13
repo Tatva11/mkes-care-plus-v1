@@ -180,12 +180,15 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
         Navigator.of(context).pop(tx);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: isStockIn ? Colors.green.shade700 : const Color(0xFFE65100),
+            backgroundColor:
+                isStockIn ? Colors.green.shade700 : const Color(0xFFE65100),
             behavior: SnackBarBehavior.floating,
             content: Row(
               children: [
                 Icon(
-                  isStockIn ? Icons.check_circle_outline : Icons.inventory_2_outlined,
+                  isStockIn
+                      ? Icons.check_circle_outline
+                      : Icons.inventory_2_outlined,
                   color: Colors.white,
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -194,7 +197,8 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                     isStockIn
                         ? 'Successfully added ${_formatNumber(_inputQuantity)} ${widget.item.unit} to stock.'
                         : 'Successfully deducted ${_formatNumber(_inputQuantity)} ${widget.item.unit} from stock.',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -230,7 +234,8 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = isStockIn ? Colors.green.shade700 : const Color(0xFFE65100);
+    final themeColor =
+        isStockIn ? Colors.green.shade700 : const Color(0xFFE65100);
     final themeBg = isStockIn
         ? Colors.green.withValues(alpha: 0.1)
         : const Color(0xFFE65100).withValues(alpha: 0.1);
@@ -241,9 +246,9 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surfaceContainerLowest,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.lg,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? AppSpacing.md : 8.0,
+        vertical: isDesktop ? AppSpacing.lg : 16.0,
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -256,8 +261,8 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
           children: [
             // Header Banner
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? AppSpacing.lg : 12.0,
                 vertical: AppSpacing.md,
               ),
               decoration: BoxDecoration(
@@ -292,7 +297,9 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isStockIn ? 'Stock In (Add Stock)' : 'Stock Out (Dispense Stock)',
+                          isStockIn
+                              ? 'Stock In (Add Stock)'
+                              : 'Stock Out (Dispense Stock)',
                           style: AppTypography.headlineMd.copyWith(
                             fontWeight: FontWeight.w700,
                             color: themeColor,
@@ -311,7 +318,9 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
@@ -320,7 +329,7 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
             // Form Content
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: EdgeInsets.all(isDesktop ? AppSpacing.lg : 12.0),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -340,20 +349,24 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                       const SizedBox(height: AppSpacing.xs),
                       TextFormField(
                         controller: _quantityController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d*')),
                         ],
                         autofocus: true,
                         decoration: InputDecoration(
-                          hintText: 'Enter quantity to ${isStockIn ? 'add' : 'deduct'}',
+                          hintText:
+                              'Enter quantity to ${isStockIn ? 'add' : 'deduct'}',
                           prefixIcon: Icon(
                             isStockIn ? Icons.add : Icons.remove,
                             color: themeColor,
                           ),
                           suffixText: widget.item.unit,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusMd),
                           ),
                           filled: true,
                           fillColor: AppColors.surfaceContainerLow,
@@ -387,7 +400,8 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                         isExpanded: true,
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusMd),
                           ),
                           filled: true,
                           fillColor: AppColors.surfaceContainerLow,
@@ -415,7 +429,8 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
 
                       // Conditional Patient Selector (Only when Reason = "Dispensed to Patient")
                       if (!isStockIn &&
-                          _selectedReason == StockOutReasons.dispensedToPatient) ...[
+                          _selectedReason ==
+                              StockOutReasons.dispensedToPatient) ...[
                         const SizedBox(height: AppSpacing.md),
                         Row(
                           children: [
@@ -447,7 +462,8 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                           decoration: InputDecoration(
                             hintText: 'Specify custom reason...',
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusMd),
                             ),
                             filled: true,
                             fillColor: AppColors.surfaceContainerLow,
@@ -473,15 +489,19 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                         const SizedBox(height: AppSpacing.xs),
                         TextFormField(
                           controller: _totalAmountController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*')),
                           ],
                           decoration: InputDecoration(
                             hintText: 'Enter total amount paid (e.g. 5000)',
-                            prefixIcon: const Icon(Icons.currency_rupee, color: Colors.green),
+                            prefixIcon: const Icon(Icons.currency_rupee,
+                                color: Colors.green),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusMd),
                             ),
                             filled: true,
                             fillColor: AppColors.surfaceContainerLow,
@@ -521,9 +541,11 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                         controller: _remarksController,
                         maxLines: 2,
                         decoration: InputDecoration(
-                          hintText: 'E.g. Batch #B-402, Patient ID, or transfer details',
+                          hintText:
+                              'E.g. Batch #B-402, Patient ID, or transfer details',
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusMd),
                           ),
                           filled: true,
                           fillColor: AppColors.surfaceContainerLow,
@@ -539,14 +561,18 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
             // Footer Actions
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
                 children: [
                   TextButton(
-                    onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
                   FilledButton.icon(
                     onPressed: _isSubmitting ? null : _submit,
                     icon: _isSubmitting
@@ -559,7 +585,9 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                             ),
                           )
                         : Icon(
-                            isStockIn ? Icons.arrow_upward : Icons.arrow_downward,
+                            isStockIn
+                                ? Icons.arrow_upward
+                                : Icons.arrow_downward,
                             size: 18,
                           ),
                     label: Text(
@@ -589,7 +617,7 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
 
   Widget _buildStockPreviewCard(Color themeColor) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -601,16 +629,20 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'STOCK PREVIEW',
-                style: AppTypography.labelCaps.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                  fontSize: 10,
+              Flexible(
+                child: Text(
+                  'STOCK PREVIEW',
+                  style: AppTypography.labelCaps.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (_willBeLowStock && !isStockIn && _inputQuantity > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.errorContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(4),
@@ -619,7 +651,8 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.warning_amber_rounded, size: 12, color: AppColors.error),
+                      Icon(Icons.warning_amber_rounded,
+                          size: 12, color: AppColors.error),
                       SizedBox(width: 4),
                       Text(
                         'ENTERS LOW STOCK',
@@ -635,90 +668,156 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              // Current Stock
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 350;
+              if (isNarrow) {
+                return Column(
                   children: [
-                    Text(
-                      'Current',
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Current Stock:',
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: Text(
+                            widget.item.formattedStock,
+                            style: AppTypography.bodyMd
+                                .copyWith(fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.item.formattedStock,
-                      style: AppTypography.bodyMd.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            isStockIn ? 'Adding (+):' : 'Deducting (-):',
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: Text(
+                            _inputQuantity > 0
+                                ? '${isStockIn ? '+' : '-'}${_formatNumber(_inputQuantity)} ${widget.item.unit}'
+                                : '—',
+                            style: AppTypography.bodyMd.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: themeColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'New Stock (=):',
+                            style: AppTypography.bodySm
+                                .copyWith(fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: Text(
+                            '${_formatNumber(_projectedStock)} ${widget.item.unit}',
+                            style: AppTypography.bodyMd.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: _willBeLowStock
+                                  ? AppColors.error
+                                  : AppColors.primary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ),
+                );
+              }
 
-              // Operator Arrow
-              Icon(
-                Icons.arrow_forward_rounded,
-                size: 20,
-                color: AppColors.onSurfaceVariant,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-
-              // Operation Delta
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      isStockIn ? 'Adding' : 'Deducting',
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                      ),
+              return Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Current',
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant)),
+                        const SizedBox(height: 2),
+                        Text(widget.item.formattedStock,
+                            style: AppTypography.bodyMd
+                                .copyWith(fontWeight: FontWeight.w700)),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _inputQuantity > 0
-                          ? '${isStockIn ? '+' : '-'}${_formatNumber(_inputQuantity)} ${widget.item.unit}'
-                          : '—',
-                      style: AppTypography.bodyMd.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: themeColor,
-                      ),
+                  ),
+                  Icon(Icons.arrow_forward_rounded,
+                      size: 20, color: AppColors.onSurfaceVariant),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(isStockIn ? 'Adding' : 'Deducting',
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant)),
+                        const SizedBox(height: 2),
+                        Text(
+                          _inputQuantity > 0
+                              ? '${isStockIn ? '+' : '-'}${_formatNumber(_inputQuantity)} ${widget.item.unit}'
+                              : '—',
+                          style: AppTypography.bodyMd.copyWith(
+                              fontWeight: FontWeight.w700, color: themeColor),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-
-              // Operator Equals
-              const Text('=', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(width: AppSpacing.sm),
-
-              // Resulting Stock
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'New Stock',
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                      ),
+                  ),
+                  const Text('=',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('New Stock',
+                            style: AppTypography.bodySm
+                                .copyWith(color: AppColors.onSurfaceVariant)),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${_formatNumber(_projectedStock)} ${widget.item.unit}',
+                          style: AppTypography.bodyMd.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: _willBeLowStock
+                                ? AppColors.error
+                                : AppColors.primary,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${_formatNumber(_projectedStock)} ${widget.item.unit}',
-                      style: AppTypography.bodyMd.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: _willBeLowStock ? AppColors.error : AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -835,11 +934,15 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
           data: (patients) {
             final matches = search.isEmpty
                 ? patients.take(4).toList()
-                : patients.where((p) {
-                    return p.name.toLowerCase().contains(search) ||
-                        p.patientNumber.toLowerCase().contains(search) ||
-                        (p.mobile != null && p.mobile!.toLowerCase().contains(search));
-                  }).take(5).toList();
+                : patients
+                    .where((p) {
+                      return p.name.toLowerCase().contains(search) ||
+                          p.patientNumber.toLowerCase().contains(search) ||
+                          (p.mobile != null &&
+                              p.mobile!.toLowerCase().contains(search));
+                    })
+                    .take(5)
+                    .toList();
 
             if (matches.isEmpty) {
               return Padding(
@@ -920,7 +1023,7 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
         color: Colors.green.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -931,46 +1034,50 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
         children: [
           Row(
             children: [
-              const Icon(Icons.calculate_outlined, size: 16, color: Colors.green),
+              const Icon(Icons.calculate_outlined,
+                  size: 16, color: Colors.green),
               const SizedBox(width: 6),
-              Text(
-                'AUTOMATIC PRICE PER PIECE',
-                style: AppTypography.labelCaps.copyWith(
-                  color: Colors.green.shade800,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
+              Flexible(
+                child: Text(
+                  'AUTOMATIC PRICE PER PIECE',
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelCaps.copyWith(
+                    color: Colors.green.shade800,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Quantity: ${_formatNumber(qty)} ${widget.item.unit}',
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        fontSize: 12,
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 340;
+              final qtyTotal = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quantity: ${_formatNumber(qty)} ${widget.item.unit}',
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontSize: 12,
                     ),
-                    Text(
-                      'Total Paid: ₹${total.toStringAsFixed(2)}',
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        fontSize: 12,
-                      ),
+                  ),
+                  Text(
+                    'Total Paid: ₹${total.toStringAsFixed(2)}',
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontSize: 12,
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                  ),
+                ],
+              );
+
+              final pricePiece = Column(
+                crossAxisAlignment: isNarrow
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.end,
                 children: [
                   Text(
                     'Price Per Piece',
@@ -988,8 +1095,28 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
                     ),
                   ),
                 ],
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    qtyTotal,
+                    const SizedBox(height: 6),
+                    pricePiece,
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: qtyTotal),
+                  const SizedBox(width: AppSpacing.sm),
+                  pricePiece,
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -998,7 +1125,8 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
 
   Widget _buildVendorSelector() {
     final vendorsAsync = ref.watch(vendorsProvider);
-    final vendors = (vendorsAsync.value ?? []).where((v) => v.isActive).toList();
+    final vendors =
+        (vendorsAsync.value ?? []).where((v) => v.isActive).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1025,13 +1153,16 @@ class _StockOperationDialogState extends ConsumerState<StockOperationDialog> {
           items: [
             const DropdownMenuItem<String?>(
               value: null,
-              child: Text('None / Unknown Vendor', style: TextStyle(color: AppColors.onSurfaceVariant)),
+              child: Text('None / Unknown Vendor',
+                  style: TextStyle(color: AppColors.onSurfaceVariant)),
             ),
             ...vendors.map((v) {
               return DropdownMenuItem<String?>(
                 value: v.id,
                 child: Text(
-                  v.contactPerson != null ? '${v.name} (${v.contactPerson})' : v.name,
+                  v.contactPerson != null
+                      ? '${v.name} (${v.contactPerson})'
+                      : v.name,
                   overflow: TextOverflow.ellipsis,
                 ),
               );

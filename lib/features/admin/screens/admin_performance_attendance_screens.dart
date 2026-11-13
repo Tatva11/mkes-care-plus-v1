@@ -135,40 +135,84 @@ class _PerformanceWorkloadView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Staff Performance & Workload',
-                      style: AppTypography.headlineMd),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Track task completion, overdue rates, and staff capacity in real-time.',
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.onSurfaceVariant,
+          // Header Row (Responsive)
+          if (!isDesktop) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Staff Performance & Workload',
+                  style: AppTypography.headlineMd,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Track task completion, overdue rates, and staff capacity in real-time.',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                if (currentUser != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.add_task, size: 18),
+                      label: const Text('Assign Task'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primaryContainer,
+                      ),
+                      onPressed: () => _openCreateTaskDialog(
+                        context,
+                        ref,
+                        currentUser.id,
+                        usersAsync.valueOrNull ?? [],
+                      ),
                     ),
                   ),
                 ],
-              ),
-              if (currentUser != null)
-                FilledButton.icon(
-                  icon: const Icon(Icons.add_task, size: 18),
-                  label: const Text('Assign Task'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primaryContainer,
-                  ),
-                  onPressed: () => _openCreateTaskDialog(
-                    context,
-                    ref,
-                    currentUser.id,
-                    usersAsync.valueOrNull ?? [],
+              ],
+            ),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Staff Performance & Workload',
+                        style: AppTypography.headlineMd,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Track task completion, overdue rates, and staff capacity in real-time.',
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          ),
+                if (currentUser != null) ...[
+                  const SizedBox(width: AppSpacing.md),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.add_task, size: 18),
+                    label: const Text('Assign Task'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primaryContainer,
+                    ),
+                    onPressed: () => _openCreateTaskDialog(
+                      context,
+                      ref,
+                      currentUser.id,
+                      usersAsync.valueOrNull ?? [],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
 
           const SizedBox(height: AppSpacing.md),
 
@@ -426,22 +470,28 @@ class _PerformanceWorkloadView extends ConsumerWidget {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${staff.fullName} — Tasks',
-                        style: AppTypography.headlineMd,
-                      ),
-                      Text(
-                        '${staff.designation ?? 'Staff'} • ${tasks.length} total tasks',
-                        style: AppTypography.bodySm.copyWith(
-                          color: AppColors.onSurfaceVariant,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${staff.fullName} — Tasks',
+                          style: AppTypography.headlineMd,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        Text(
+                          '${staff.designation ?? 'Staff'} • ${tasks.length} total tasks',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: AppSpacing.xs),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(ctx).pop(),
@@ -471,80 +521,140 @@ class _PerformanceWorkloadView extends ConsumerWidget {
                                     : AppColors.outlineVariant,
                               ),
                             ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  isDone
-                                      ? Icons.check_circle
-                                      : Icons.radio_button_unchecked,
-                                  color: isDone
-                                      ? AppColors.primaryContainer
-                                      : AppColors.outline,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: Column(
+                            child: LayoutBuilder(
+                              builder: (context, itemConstraints) {
+                                final isNarrow = itemConstraints.maxWidth < 340;
+                                final detailsCol = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      task.title,
+                                      style: AppTypography.bodyMd.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    if (task.description != null &&
+                                        task.description!
+                                            .trim()
+                                            .isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        task.description!,
+                                        style: AppTypography.bodySm.copyWith(
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                    if (task.dueDate != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Due: ${DateFormat('MMM d, yyyy').format(task.dueDate!)}${task.isOverdue ? ' (OVERDUE)' : ''}',
+                                        style: AppTypography.bodySm.copyWith(
+                                          color: task.isOverdue
+                                              ? AppColors.error
+                                              : AppColors.onSurfaceVariant,
+                                          fontWeight: task.isOverdue
+                                              ? FontWeight.w700
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                );
+
+                                final badgeAndAction = Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isDone
+                                            ? AppColors.primaryContainer
+                                                .withValues(alpha: 0.12)
+                                            : AppColors.surfaceContainerHigh,
+                                        borderRadius: BorderRadius.circular(
+                                            AppSpacing.radiusSm),
+                                      ),
+                                      child: Text(
+                                        task.statusLabel,
+                                        style: AppTypography.labelCaps.copyWith(
+                                          color: isDone
+                                              ? AppColors.primaryContainer
+                                              : AppColors.onSurfaceVariant,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined,
+                                          size: 18, color: AppColors.primary),
+                                      tooltip: 'Edit Task',
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () {
+                                        Navigator.of(ctx).pop();
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) =>
+                                              TaskFormDialog(task: task),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                );
+
+                                if (isNarrow) {
+                                  return Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        task.title,
-                                        style: AppTypography.bodyMd.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      if (task.dueDate != null)
-                                        Text(
-                                          'Due: ${DateFormat('MMM d, yyyy').format(task.dueDate!)}${task.isOverdue ? ' (OVERDUE)' : ''}',
-                                          style: AppTypography.bodySm.copyWith(
-                                            color: task.isOverdue
-                                                ? AppColors.error
-                                                : AppColors.onSurfaceVariant,
-                                            fontWeight: task.isOverdue
-                                                ? FontWeight.w700
-                                                : FontWeight.normal,
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            isDone
+                                                ? Icons.check_circle
+                                                : Icons.radio_button_unchecked,
+                                            color: isDone
+                                                ? AppColors.primaryContainer
+                                                : AppColors.outline,
+                                            size: 20,
                                           ),
-                                        ),
+                                          const SizedBox(width: AppSpacing.sm),
+                                          Expanded(child: detailsCol),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: badgeAndAction,
+                                      ),
                                     ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isDone
-                                        ? AppColors.primaryContainer
-                                            .withValues(alpha: 0.12)
-                                        : AppColors.surfaceContainerHigh,
-                                    borderRadius: BorderRadius.circular(
-                                        AppSpacing.radiusSm),
-                                  ),
-                                  child: Text(
-                                    task.statusLabel,
-                                    style: AppTypography.labelCaps.copyWith(
+                                  );
+                                }
+
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      isDone
+                                          ? Icons.check_circle
+                                          : Icons.radio_button_unchecked,
                                       color: isDone
                                           ? AppColors.primaryContainer
-                                          : AppColors.onSurfaceVariant,
-                                      fontSize: 10,
+                                          : AppColors.outline,
+                                      size: 20,
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.xs),
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined,
-                                      size: 18, color: AppColors.primary),
-                                  tooltip: 'Edit Task',
-                                  onPressed: () {
-                                    Navigator.of(ctx).pop();
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) =>
-                                          TaskFormDialog(task: task),
-                                    );
-                                  },
-                                ),
-                              ],
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Expanded(child: detailsCol),
+                                    const SizedBox(width: AppSpacing.xs),
+                                    badgeAndAction,
+                                  ],
+                                );
+                              },
                             ),
                           );
                         },
@@ -690,39 +800,70 @@ class _StaffPerformanceCard extends StatelessWidget {
           const Divider(height: 1),
           const SizedBox(height: AppSpacing.sm),
 
-          // Metrics Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _MiniMetric(
-                label: 'Workload',
-                value: '$activeTasks active',
-                color: activeTasks > 5 ? AppColors.secondary : null,
-              ),
-              _MiniMetric(
-                label: 'Completed',
-                value: '$completedTasks / $totalTasks',
-                color: AppColors.primaryContainer,
-              ),
-              _MiniMetric(
-                label: 'Overdue',
-                value: '$overdueTasks',
-                color: overdueTasks > 0 ? AppColors.error : null,
-              ),
-              _MiniMetric(
-                label: 'Rate',
-                value: '$completionRate%',
-                color: _ratingColor,
-              ),
-              OutlinedButton(
+          // Metrics Row (Fully Responsive)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 420;
+              final metrics = Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _MiniMetric(
+                    label: 'Workload',
+                    value: '$activeTasks active',
+                    color: activeTasks > 5 ? AppColors.secondary : null,
+                  ),
+                  _MiniMetric(
+                    label: 'Completed',
+                    value: '$completedTasks / $totalTasks',
+                    color: AppColors.primaryContainer,
+                  ),
+                  _MiniMetric(
+                    label: 'Overdue',
+                    value: '$overdueTasks',
+                    color: overdueTasks > 0 ? AppColors.error : null,
+                  ),
+                  _MiniMetric(
+                    label: 'Rate',
+                    value: '$completionRate%',
+                    color: _ratingColor,
+                  ),
+                ],
+              );
+
+              final viewTasksBtn = OutlinedButton(
                 onPressed: onViewTasks,
                 style: OutlinedButton.styleFrom(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 ),
                 child: const Text('View Tasks'),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    metrics,
+                    const SizedBox(height: AppSpacing.sm),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: viewTasksBtn,
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: metrics),
+                  const SizedBox(width: AppSpacing.sm),
+                  viewTasksBtn,
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -863,30 +1004,59 @@ class _AttendanceView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
+          if (!isDesktop) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   'Staff Attendance — ${DateFormat('MMMM d, yyyy').format(selectedDate)}',
                   style: AppTypography.headlineMd,
                 ),
-              ),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                label: const Text('Change Date'),
-                onPressed: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2024),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) onDateSelected(picked);
-                },
-              ),
-            ],
-          ),
+                const SizedBox(height: AppSpacing.xs),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                    label: const Text('Change Date'),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2024),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) onDateSelected(picked);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Staff Attendance — ${DateFormat('MMMM d, yyyy').format(selectedDate)}',
+                    style: AppTypography.headlineMd,
+                  ),
+                ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                  label: const Text('Change Date'),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2024),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) onDateSelected(picked);
+                  },
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           summaryAsync.when(
             data: (summary) {

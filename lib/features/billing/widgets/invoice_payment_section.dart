@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/billing_payment_model.dart';
+import 'upi_qr_card.dart';
 
 class InvoicePaymentSection extends StatefulWidget {
   final double subtotal;
@@ -39,6 +40,7 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
 
   String _paymentMode = 'cash';
   double _amountPaid = 0.0;
+  bool _isFullyPaid = true;
 
   @override
   void initState() {
@@ -55,9 +57,14 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
       text: widget.payment?.paymentReference ?? '',
     );
 
+    _isFullyPaid = widget.payment == null
+        ? true
+        : (_amountPaid >= widget.finalTotal && widget.finalTotal > 0);
+
     // Default amount paid to final total
     if (widget.payment == null && widget.finalTotal > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         _amountPaid = widget.finalTotal;
         _amountPaidController.text =
             _amountPaid > 0 ? _amountPaid.toStringAsFixed(0) : '';
@@ -76,11 +83,24 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
     }
 
     if (oldWidget.finalTotal != widget.finalTotal) {
-      if (_amountPaid > widget.finalTotal) {
+      if (_isFullyPaid) {
+        _amountPaid = widget.finalTotal;
+        _amountPaidController.text =
+            widget.finalTotal > 0 ? widget.finalTotal.toStringAsFixed(0) : '0';
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _notifyPaymentChanged();
+          }
+        });
+      } else if (_amountPaid > widget.finalTotal) {
         _amountPaid = widget.finalTotal;
         _amountPaidController.text =
             _amountPaid > 0 ? _amountPaid.toStringAsFixed(0) : '';
-        _notifyPaymentChanged();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _notifyPaymentChanged();
+          }
+        });
       }
     }
   }
@@ -94,6 +114,7 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
   }
 
   void _notifyPaymentChanged() {
+    if (!mounted) return;
     if (_amountPaid <= 0) {
       widget.onPaymentChanged(null);
     } else {
@@ -113,7 +134,6 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
   Widget build(BuildContext context) {
     final remaining =
         (widget.finalTotal - _amountPaid).clamp(0.0, double.infinity);
-    final isPaid = _amountPaid >= widget.finalTotal && widget.finalTotal > 0;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -337,6 +357,12 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
           ),
           const SizedBox(height: AppSpacing.md),
 
+          // UPI QR Code Integration
+          if (_paymentMode == 'upi') ...[
+            const UpiPaymentQrCard(),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+
           // Payment Reference (for UPI, Bank Transfer, Other)
           if (_paymentMode != 'cash') ...[
             TextField(
@@ -356,12 +382,26 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
             const SizedBox(height: AppSpacing.md),
           ],
 
-          // Amount Paid input & Remaining Balance Display (Presets removed, auto-determining Paid/Partially Paid)
+          // Amount Paid input & Remaining Balance Display
           LayoutBuilder(
             builder: (context, constraints) {
               final isNarrow = constraints.maxWidth < 420;
+              final isPaid = _amountPaid >= widget.finalTotal && widget.finalTotal > 0;
+              final isPartiallyPaid = _amountPaid > 0 && _amountPaid < widget.finalTotal;
+
+              final badgeText = isPaid
+                  ? 'PAID'
+                  : isPartiallyPaid
+                      ? 'PARTIALLY PAID'
+                      : 'UNPAID';
+              final badgeColor = isPaid
+                  ? Colors.green
+                  : isPartiallyPaid
+                      ? Colors.orange
+                      : Colors.grey[700]!;
 
               final amountPaidField = TextField(
+                key: const Key('invoice_amount_paid_field'),
                 controller: _amountPaidController,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
@@ -380,9 +420,73 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
                   final amt = double.tryParse(val) ?? 0.0;
                   setState(() {
                     _amountPaid = amt;
+                    _isFullyPaid = (widget.finalTotal > 0 &&
+                        (amt - widget.finalTotal).abs() < 0.01);
                   });
                   _notifyPaymentChanged();
                 },
+              );
+
+              final fullyPaidCheckbox = Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: Checkbox(
+                        key: const Key('invoice_fully_paid_checkbox'),
+                        value: _isFullyPaid,
+                        onChanged: (val) {
+                          final checked = val ?? false;
+                          setState(() {
+                            _isFullyPaid = checked;
+                            if (checked) {
+                              _amountPaid = widget.finalTotal;
+                              _amountPaidController.text = widget.finalTotal > 0
+                                  ? widget.finalTotal.toStringAsFixed(0)
+                                  : '0';
+                            }
+                          });
+                          _notifyPaymentChanged();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () {
+                        final checked = !_isFullyPaid;
+                        setState(() {
+                          _isFullyPaid = checked;
+                          if (checked) {
+                            _amountPaid = widget.finalTotal;
+                            _amountPaidController.text = widget.finalTotal > 0
+                                ? widget.finalTotal.toStringAsFixed(0)
+                                : '0';
+                          }
+                        });
+                        _notifyPaymentChanged();
+                      },
+                      child: Text(
+                        'Fully Paid',
+                        style: AppTypography.bodySm.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              final amountPaidColumn = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  amountPaidField,
+                  fullyPaidCheckbox,
+                ],
               );
 
               final remainingCard = Container(
@@ -391,12 +495,16 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
                 decoration: BoxDecoration(
                   color: isPaid
                       ? Colors.green.withValues(alpha: 0.08)
-                      : Colors.orange.withValues(alpha: 0.08),
+                      : isPartiallyPaid
+                          ? Colors.orange.withValues(alpha: 0.08)
+                          : Colors.grey.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                   border: Border.all(
                     color: isPaid
                         ? Colors.green.withValues(alpha: 0.3)
-                        : Colors.orange.withValues(alpha: 0.3),
+                        : isPartiallyPaid
+                            ? Colors.orange.withValues(alpha: 0.3)
+                            : Colors.grey.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Column(
@@ -415,11 +523,11 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(
-                            color: isPaid ? Colors.green : Colors.orange,
+                            color: badgeColor,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            isPaid ? 'PAID' : 'PARTIALLY PAID',
+                            badgeText,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 9,
@@ -438,7 +546,7 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
                         style: AppTypography.bodyMd.copyWith(
                           fontWeight: FontWeight.bold,
                           color: remaining > 0
-                              ? AppColors.error
+                              ? (isPartiallyPaid ? Colors.orange[900] : AppColors.error)
                               : Colors.green[800],
                         ),
                       ),
@@ -451,7 +559,7 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    amountPaidField,
+                    amountPaidColumn,
                     const SizedBox(height: AppSpacing.sm),
                     remainingCard,
                   ],
@@ -461,7 +569,7 @@ class _InvoicePaymentSectionState extends State<InvoicePaymentSection> {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 3, child: amountPaidField),
+                  Expanded(flex: 3, child: amountPaidColumn),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(flex: 3, child: remainingCard),
                 ],

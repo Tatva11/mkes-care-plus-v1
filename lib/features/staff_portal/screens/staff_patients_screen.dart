@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +11,9 @@ import '../../inventory/utils/phone_dialer_util.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patients_provider.dart';
 import '../../patients/screens/patient_details_screen.dart';
+import '../../patients/widgets/patient_form_dialog.dart';
+import '../../whatsapp/providers/whatsapp_inbox_provider.dart';
+import '../../whatsapp/screens/whatsapp_inbox_screen.dart';
 
 /// Staff-facing patient directory & search.
 ///
@@ -31,9 +36,13 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedDepartment = 'all'; // 'all', 'eye', 'dental'
+  Timer? _debounceTimer;
+  int _currentPage = 0;
+  static const int _pageSize = 50;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -58,56 +67,194 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
     // Effective department passed to patient repository
     final effectiveDept = isRestrictedToDept
         ? staffDept
-        : (_selectedDepartment == 'all' ? '' : _selectedDepartment);
+        : (_selectedDepartment == 'all' ? 'all' : _selectedDepartment);
 
-    final patientsAsync = ref.watch(patientSearchProvider((
+    final patientsAsync = ref.watch(paginatedPatientSearchProvider((
       department: effectiveDept,
       query: _searchQuery,
+      page: _currentPage,
     )));
 
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(patientSearchProvider);
+        ref.invalidate(paginatedPatientSearchProvider);
         ref.invalidate(patientsProvider);
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(
-          isDesktop ? AppSpacing.marginDesktop : AppSpacing.marginMobile,
-        ),
+        padding: isDesktop
+            ? const EdgeInsets.all(AppSpacing.marginDesktop)
+            : const EdgeInsets.fromLTRB(
+                AppSpacing.marginMobile,
+                AppSpacing.marginMobile,
+                AppSpacing.marginMobile,
+                88.0,
+              ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Header ─────────────────────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            if (isDesktop)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Patient Directory',
+                          style: AppTypography.displayLg.copyWith(
+                            color: AppColors.onBackground,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          isRestrictedToDept
+                              ? '${staffDept.toUpperCase()} Department patient records.'
+                              : 'All accessible clinic patient records.',
+                          style: AppTypography.bodyLg
+                              .copyWith(color: AppColors.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text(
-                        'Patient Directory',
-                        style: AppTypography.displayLg.copyWith(
-                          color: AppColors.onBackground,
-                          fontSize: isDesktop ? null : 24,
+                      Tooltip(
+                        message: 'Open Shared WhatsApp Inbox',
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            ref.read(whatsappConversationsProvider.notifier).refresh();
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const WhatsAppInboxScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.chat_bubble_outline,
+                              size: 18, color: Color(0xFF25D366)),
+                          label: const Text('WhatsApp Inbox'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF128C7E),
+                            side: const BorderSide(color: Color(0xFF25D366)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.xs,
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        isRestrictedToDept
-                            ? '${staffDept.toUpperCase()} Department patient records.'
-                            : 'All accessible clinic patient records.',
-                        style: AppTypography.bodyLg
-                            .copyWith(color: AppColors.onSurfaceVariant),
+                      FilledButton.icon(
+                        onPressed: () async {
+                          final defaultDept = isRestrictedToDept
+                              ? staffDept
+                              : (_selectedDepartment == 'all' ? 'eye' : _selectedDepartment);
+                          final created = await showDialog<PatientModel>(
+                            context: context,
+                            builder: (_) => PatientFormDialog(initialDepartment: defaultDept),
+                          );
+                          if (created != null) {
+                            if (!context.mounted) return;
+                            ref.invalidate(patientSearchProvider);
+                            ref.invalidate(paginatedPatientSearchProvider);
+                            ref.invalidate(patientsProvider);
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PatientDetailsScreen(patientId: created.id),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.person_add_outlined, size: 18),
+                        label: const Text('New Patient'),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
+                ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Patient Directory',
+                    style: AppTypography.displayLg.copyWith(
+                      color: AppColors.onBackground,
+                      fontSize: 26,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    isRestrictedToDept
+                        ? '${staffDept.toUpperCase()} Department patient records.'
+                        : 'All accessible clinic patient records.',
+                    style: AppTypography.bodyLg
+                        .copyWith(color: AppColors.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      Tooltip(
+                        message: 'Open Shared WhatsApp Inbox',
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            ref.read(whatsappConversationsProvider.notifier).refresh();
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const WhatsAppInboxScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.chat_bubble_outline,
+                              size: 18, color: Color(0xFF25D366)),
+                          label: const Text('WhatsApp Inbox'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF128C7E),
+                            side: const BorderSide(color: Color(0xFF25D366)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.xs,
+                            ),
+                          ),
+                        ),
+                      ),
+                      FilledButton.icon(
+                        onPressed: () async {
+                          final defaultDept = isRestrictedToDept
+                              ? staffDept
+                              : (_selectedDepartment == 'all' ? 'eye' : _selectedDepartment);
+                          final created = await showDialog<PatientModel>(
+                            context: context,
+                            builder: (_) => PatientFormDialog(initialDepartment: defaultDept),
+                          );
+                          if (created != null) {
+                            if (!context.mounted) return;
+                            ref.invalidate(patientSearchProvider);
+                            ref.invalidate(paginatedPatientSearchProvider);
+                            ref.invalidate(patientsProvider);
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PatientDetailsScreen(patientId: created.id),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.person_add_outlined, size: 18),
+                        label: const Text('New Patient'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             const SizedBox(height: AppSpacing.md),
-
             // ── Search Bar ──────────────────────────────────────────────────
             Container(
               decoration: BoxDecoration(
@@ -117,17 +264,44 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
               ),
               child: TextField(
                 controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                onChanged: (val) {
+                  _debounceTimer?.cancel();
+                  _debounceTimer = Timer(const Duration(milliseconds: 350), () {
+                    if (mounted) {
+                      final trimmed = val.trim();
+                      if (_searchQuery != trimmed) {
+                        setState(() {
+                          _searchQuery = trimmed;
+                          _currentPage = 0;
+                        });
+                      }
+                    }
+                  });
+                },
+                onSubmitted: (val) {
+                  _debounceTimer?.cancel();
+                  final trimmed = val.trim();
+                  if (_searchQuery != trimmed) {
+                    setState(() {
+                      _searchQuery = trimmed;
+                      _currentPage = 0;
+                    });
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: 'Search patients by name, ID, or mobile...',
                   prefixIcon:
                       const Icon(Icons.search, color: AppColors.primary),
-                  suffixIcon: _searchQuery.isNotEmpty
+                  suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
                           onPressed: () {
+                            _debounceTimer?.cancel();
                             _searchController.clear();
-                            setState(() => _searchQuery = '');
+                            setState(() {
+                              _searchQuery = '';
+                              _currentPage = 0;
+                            });
                           },
                         )
                       : null,
@@ -152,7 +326,10 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                       label: const Text('All Departments'),
                       onSelected: (selected) {
                         if (selected) {
-                          setState(() => _selectedDepartment = 'all');
+                          setState(() {
+                            _selectedDepartment = 'all';
+                            _currentPage = 0;
+                          });
                         }
                       },
                       selectedColor:
@@ -172,8 +349,10 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                       selected: _selectedDepartment == 'eye',
                       label: const Text('Eye Clinic'),
                       onSelected: (selected) {
-                        setState(() =>
-                            _selectedDepartment = selected ? 'eye' : 'all');
+                        setState(() {
+                          _selectedDepartment = selected ? 'eye' : 'all';
+                          _currentPage = 0;
+                        });
                       },
                       selectedColor:
                           AppColors.primaryContainer.withValues(alpha: 0.2),
@@ -192,8 +371,10 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                       selected: _selectedDepartment == 'dental',
                       label: const Text('Dental Clinic'),
                       onSelected: (selected) {
-                        setState(() =>
-                            _selectedDepartment = selected ? 'dental' : 'all');
+                        setState(() {
+                          _selectedDepartment = selected ? 'dental' : 'all';
+                          _currentPage = 0;
+                        });
                       },
                       selectedColor:
                           AppColors.primaryContainer.withValues(alpha: 0.2),
@@ -223,7 +404,7 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
               ),
               error: (e, _) => _ErrorRetry(
                 error: e,
-                onRetry: () => ref.invalidate(patientSearchProvider),
+                onRetry: () => ref.invalidate(paginatedPatientSearchProvider),
               ),
               data: (patients) {
                 // Ensure unique patient rows by patient.id to avoid duplicate rows
@@ -283,12 +464,62 @@ class _StaffPatientsScreenState extends ConsumerState<StaffPatientsScreen> {
                         child: _StaffPatientCard(patient: patient),
                       );
                     }),
+                    _buildPaginationControls(uniquePatients.length),
                   ],
                 );
               },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls(int currentCount) {
+    if (currentCount == 0 && _currentPage == 0) return const SizedBox.shrink();
+
+    final hasNext = currentCount >= _pageSize;
+    final hasPrev = _currentPage > 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          Text(
+            'Showing $currentCount patients (Page ${_currentPage + 1})',
+            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                onPressed: hasPrev
+                    ? () => setState(() => _currentPage--)
+                    : null,
+                icon: const Icon(Icons.chevron_left, size: 18),
+                label: const Text('Previous'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: hasNext
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                icon: const Icon(Icons.chevron_right, size: 18),
+                label: const Text('Next'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -381,159 +612,277 @@ class _StaffPatientCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // ── Avatar & Info Clickable Area ───────────────────────
-              Expanded(
-                child: InkWell(
-                  key: Key('staff_patient_card_${patient.id}'),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            PatientDetailsScreen(patientId: patient.id),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      // ── Avatar ─────────────────────────────────────
-                      CircleAvatar(
-                        backgroundColor:
-                            AppColors.primaryContainer.withValues(alpha: 0.2),
-                        radius: 26,
-                        child: Text(
-                          _initials(patient.name),
-                          style: AppTypography.labelCaps.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
+        child: InkWell(
+          key: Key('staff_patient_card_${patient.id}'),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    PatientDetailsScreen(patientId: patient.id),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 460;
 
-                      // ── Patient Info ───────────────────────────────
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Tier 1: Avatar, Name & ID, Department Badge
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: AppColors.primaryContainer
+                                .withValues(alpha: 0.2),
+                            radius: 20,
+                            child: Text(
+                              _initials(patient.name),
+                              style: AppTypography.labelCaps.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   patient.name,
-                                  style: AppTypography.headlineMd
-                                      .copyWith(fontSize: 17),
+                                  style: AppTypography.headlineMd.copyWith(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    patient.patientNumber,
-                                    style: AppTypography.dataMono.copyWith(
-                                      fontSize: 12,
-                                      color: AppColors.primary,
-                                    ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  patient.patientNumber,
+                                  style: AppTypography.dataMono.copyWith(
+                                    fontSize: 11.5,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: AppSpacing.base),
-                            Wrap(
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondaryContainer
+                                  .withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              deptLabel,
+                              style: AppTypography.labelCaps.copyWith(
+                                color: AppColors.secondary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs + 2),
+                      const Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: AppColors.outlineVariant,
+                      ),
+                      const SizedBox(height: AppSpacing.xs + 2),
+                      // Tier 2: Meta (Age & Phone) on Left, Actions (Call + Chevron) on Right
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Wrap(
                               crossAxisAlignment: WrapCrossAlignment.center,
                               spacing: AppSpacing.xs,
                               runSpacing: 2,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.secondaryContainer
-                                        .withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    deptLabel,
-                                    style: AppTypography.labelCaps.copyWith(
-                                      color: AppColors.secondary,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ),
                                 if (patient.dob != null) ...[
                                   Text(
                                     '${DateTime.now().year - patient.dob!.year}y',
                                     style: AppTypography.bodySm.copyWith(
                                       color: AppColors.onSurfaceVariant,
+                                      fontSize: 12,
                                     ),
                                   ),
+                                  const Text('•',
+                                      style: TextStyle(
+                                          color: AppColors.outlineVariant,
+                                          fontSize: 10)),
                                 ],
                                 if (patient.mobile != null &&
                                     patient.mobile!.isNotEmpty) ...[
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.phone_outlined,
-                                          size: 13, color: AppColors.outline),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        patient.mobile!,
-                                        style: AppTypography.bodySm.copyWith(
-                                          color: AppColors.onSurfaceVariant,
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.phone_outlined,
+                                            size: 13, color: AppColors.outline),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          patient.mobile!,
+                                          style: AppTypography.bodySm.copyWith(
+                                            color: AppColors.onSurfaceVariant,
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          _PatientCallButton(patient: patient),
+                          const SizedBox(width: 2),
+                          const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 13,
+                            color: AppColors.outline,
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: AppSpacing.xs),
-
-              // ── Call button ─────────────────────────────────────────
-              _PatientCallButton(patient: patient),
-
-              const SizedBox(width: 2),
-
-              // ── Chevron ─────────────────────────────────────────────
-              IconButton(
-                icon: const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
-                  color: AppColors.outline,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 36),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          PatientDetailsScreen(patientId: patient.id),
-                    ),
                   );
-                },
-              ),
-            ],
+                }
+
+                // Desktop / tablet wide row
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor:
+                          AppColors.primaryContainer.withValues(alpha: 0.2),
+                      radius: 26,
+                      child: Text(
+                        _initials(patient.name),
+                        style: AppTypography.labelCaps.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            children: [
+                              Text(
+                                patient.name,
+                                style: AppTypography.headlineMd
+                                    .copyWith(fontSize: 17),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  patient.patientNumber,
+                                  style: AppTypography.dataMono.copyWith(
+                                    fontSize: 12,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.base),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: AppSpacing.xs,
+                            runSpacing: 2,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondaryContainer
+                                      .withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  deptLabel,
+                                  style: AppTypography.labelCaps.copyWith(
+                                    color: AppColors.secondary,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                              if (patient.dob != null) ...[
+                                Text(
+                                  '${DateTime.now().year - patient.dob!.year}y',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                              if (patient.mobile != null &&
+                                  patient.mobile!.isNotEmpty) ...[
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.phone_outlined,
+                                        size: 13, color: AppColors.outline),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      patient.mobile!,
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: AppColors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    _PatientCallButton(patient: patient),
+                    const SizedBox(width: 2),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: AppColors.outline,
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),

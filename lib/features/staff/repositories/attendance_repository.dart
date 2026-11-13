@@ -497,6 +497,31 @@ class AttendanceRepository {
     }
   }
 
+  /// Checks if staff member has clocked in for today's working day.
+  Future<bool> isStaffClockedInToday(String staffId) async {
+    try {
+      final now = DateTime.now();
+      final todayStr = now.toIso8601String().split('T').first;
+      final response = await _supabase
+          .from('staff_attendance')
+          .select('id, check_in_time, check_out_time, status')
+          .eq('staff_id', staffId)
+          .eq('record_date', todayStr)
+          .not('check_in_time', 'is', null)
+          .limit(5);
+
+      final rows = response as List;
+      if (rows.isEmpty) return false;
+      final hasActiveOrCheckedIn = rows.any((r) =>
+          r['check_in_time'] != null &&
+          (r['status'] as String?)?.toLowerCase() != 'leave');
+      return hasActiveOrCheckedIn;
+    } catch (e) {
+      debugPrint('isStaffClockedInToday error: $e');
+      return false;
+    }
+  }
+
   /// Shift Configurations
   Future<List<ShiftConfiguration>> fetchShiftConfigurations() async {
     try {

@@ -7,20 +7,24 @@ import '../models/department_doctor_config.dart';
 
 final departmentDoctorRepositoryProvider =
     Provider<DepartmentDoctorRepository>((ref) {
-  return DepartmentDoctorRepository(ref.watch(supabaseProvider));
+  try {
+    return DepartmentDoctorRepository(ref.watch(supabaseProvider));
+  } catch (_) {
+    return DepartmentDoctorRepository(null);
+  }
 });
 
 /// Repository for managing department doctors with persistent Supabase backend
 /// and resilient in-memory seed fallback.
 class DepartmentDoctorRepository {
-  final SupabaseClient _supabase;
+  final SupabaseClient? _supabase;
 
   static final List<DepartmentDoctor> _inMemoryCache = [
     ...DepartmentDoctorConfig.confirmedEyeDoctors,
     ...DepartmentDoctorConfig.confirmedDentalDoctors,
   ];
 
-  DepartmentDoctorRepository(this._supabase);
+  DepartmentDoctorRepository([this._supabase]);
 
   /// Initial fallback list of doctors if no records exist in DB.
   static List<DepartmentDoctor> get initialDoctors => [
@@ -35,31 +39,33 @@ class DepartmentDoctorRepository {
   }) async {
     List<DepartmentDoctor> doctors = [];
 
-    try {
-      var query = _supabase.from('department_doctors').select();
-      if (department != null && department.isNotEmpty) {
-        query = query.eq('department', department.toLowerCase().trim());
-      }
-      if (activeOnly == true) {
-        query = query.eq('is_active', true);
-      }
+    if (_supabase != null) {
+      try {
+        var query = _supabase.from('department_doctors').select();
+        if (department != null && department.isNotEmpty) {
+          query = query.eq('department', department.toLowerCase().trim());
+        }
+        if (activeOnly == true) {
+          query = query.eq('is_active', true);
+        }
 
-      final response = await query
-          .order('department', ascending: true)
-          .order('full_name', ascending: true);
+        final response = await query
+            .order('department', ascending: true)
+            .order('full_name', ascending: true);
 
-      final list = response as List;
-      if (list.isNotEmpty) {
-        doctors = list
-            .map((json) => DepartmentDoctor.fromJson(
-                Map<String, dynamic>.from(json as Map)))
-            .toList();
-        // Update cache
-        await _saveToLocalCache(doctors);
+        final list = response as List;
+        if (list.isNotEmpty) {
+          doctors = list
+              .map((json) => DepartmentDoctor.fromJson(
+                  Map<String, dynamic>.from(json as Map)))
+              .toList();
+          // Update cache
+          await _saveToLocalCache(doctors);
+        }
+      } catch (e) {
+        debugPrint(
+            'DepartmentDoctorRepository.fetchDoctors falling back to cache: $e');
       }
-    } catch (e) {
-      debugPrint(
-          'DepartmentDoctorRepository.fetchDoctors falling back to cache: $e');
     }
 
     if (doctors.isEmpty) {
@@ -107,27 +113,37 @@ class DepartmentDoctorRepository {
       isActive: true,
     );
 
-    try {
-      final insertData = {
-        'full_name': cleanName,
-        'department': cleanDept,
-        'is_active': true,
-        if (cleanSpecialty != null && cleanSpecialty.isNotEmpty)
-          'specialty': cleanSpecialty,
-      };
+    if (_supabase != null) {
+      try {
+        final insertData = {
+          'full_name': cleanName,
+          'department': cleanDept,
+          'is_active': true,
+          if (cleanSpecialty != null && cleanSpecialty.isNotEmpty)
+            'specialty': cleanSpecialty,
+        };
 
-      final response = await _supabase
-          .from('department_doctors')
-          .insert(insertData)
-          .select()
-          .single();
+        final response = await _supabase
+            .from('department_doctors')
+            .insert(insertData)
+            .select()
+            .single();
 
-      newDoctor =
-          DepartmentDoctor.fromJson(Map<String, dynamic>.from(response as Map));
-    } catch (e) {
-      debugPrint(
-          'DepartmentDoctorRepository.createDoctor Supabase fallback: $e');
-      // If DB call failed (e.g. migration pending), assign local UUID
+        newDoctor =
+            DepartmentDoctor.fromJson(Map<String, dynamic>.from(response as Map));
+      } catch (e) {
+        debugPrint(
+            'DepartmentDoctorRepository.createDoctor Supabase fallback: $e');
+        // If DB call failed (e.g. migration pending), assign local UUID
+        newDoctor = DepartmentDoctor(
+          id: 'local-${DateTime.now().millisecondsSinceEpoch}',
+          fullName: cleanName,
+          department: cleanDept,
+          specialty: cleanSpecialty,
+          isActive: true,
+        );
+      }
+    } else {
       newDoctor = DepartmentDoctor(
         id: 'local-${DateTime.now().millisecondsSinceEpoch}',
         fullName: cleanName,
@@ -174,43 +190,45 @@ class DepartmentDoctorRepository {
       isActive: isActive,
     );
 
-    try {
-      final updateData = <String, dynamic>{
-        'full_name': cleanName,
-        'department': cleanDept,
-        'is_active': isActive,
-        'specialty': cleanSpecialty,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
+    if (_supabase != null) {
+      try {
+        final updateData = <String, dynamic>{
+          'full_name': cleanName,
+          'department': cleanDept,
+          'is_active': isActive,
+          'specialty': cleanSpecialty,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
 
-      if (id.isNotEmpty && !id.startsWith('local-')) {
-        final response = await _supabase
-            .from('department_doctors')
-            .update(updateData)
-            .eq('id', id)
-            .select()
-            .single();
+        if (id.isNotEmpty && !id.startsWith('local-')) {
+          final response = await _supabase
+              .from('department_doctors')
+              .update(updateData)
+              .eq('id', id)
+              .select()
+              .single();
 
-        updated = DepartmentDoctor.fromJson(
-            Map<String, dynamic>.from(response as Map));
-      } else {
-        // Match by department + full_name
-        final response = await _supabase
-            .from('department_doctors')
-            .update(updateData)
-            .eq('department', cleanDept)
-            .eq('full_name', cleanName)
-            .select()
-            .maybeSingle();
-
-        if (response != null) {
           updated = DepartmentDoctor.fromJson(
               Map<String, dynamic>.from(response as Map));
+        } else {
+          // Match by department + full_name
+          final response = await _supabase
+              .from('department_doctors')
+              .update(updateData)
+              .eq('department', cleanDept)
+              .eq('full_name', cleanName)
+              .select()
+              .maybeSingle();
+
+          if (response != null) {
+            updated = DepartmentDoctor.fromJson(
+                Map<String, dynamic>.from(response as Map));
+          }
         }
+      } catch (e) {
+        debugPrint(
+            'DepartmentDoctorRepository.updateDoctor Supabase fallback: $e');
       }
-    } catch (e) {
-      debugPrint(
-          'DepartmentDoctorRepository.updateDoctor Supabase fallback: $e');
     }
 
     final currentList = await _loadFromLocalCache();

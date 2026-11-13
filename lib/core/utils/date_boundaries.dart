@@ -74,4 +74,53 @@ class DateBoundaries {
     '4-6p',
     '6p+',
   ];
+
+  /// Opening hour for clinic operating hours (9:00 AM).
+  static const int clinicOpeningHour = 9;
+
+  /// Closing hour for clinic operating hours (8:00 PM).
+  static const int clinicClosingHour = 20;
+
+  /// Number of 1-hour time slots spanning operating hours (9:00 AM to 8:00 PM = 11 slots).
+  static const int hourlySlotCount = clinicClosingHour - clinicOpeningHour; // 11
+
+  /// Returns the hourly slot index (0 to 10) for operating hours.
+  /// If payment occurs before 9 AM, it is counted in the opening slot (0).
+  /// If payment occurs after 8 PM, it is counted in the final slot (10).
+  static int getHourlySlotIndex(DateTime dateTime) {
+    final hour = dateTime.toLocal().hour;
+    if (hour < clinicOpeningHour) return 0;
+    if (hour >= clinicClosingHour) return hourlySlotCount - 1;
+    return hour - clinicOpeningHour;
+  }
+
+  /// Compact hourly slot labels (11 slots).
+  static const List<String> hourlySlotLabels = [
+    '9-10a',
+    '10-11a',
+    '11-12p',
+    '12-1p',
+    '1-2p',
+    '2-3p',
+    '3-4p',
+    '4-5p',
+    '5-6p',
+    '6-7p',
+    '7-8p',
+  ];
+
+  /// Full descriptive hourly slot labels for tooltips and headers.
+  static const List<String> hourlySlotFullLabels = [
+    '9:00 AM - 10:00 AM',
+    '10:00 AM - 11:00 AM',
+    '11:00 AM - 12:00 PM',
+    '12:00 PM - 1:00 PM',
+    '1:00 PM - 2:00 PM',
+    '2:00 PM - 3:00 PM',
+    '3:00 PM - 4:00 PM',
+    '4:00 PM - 5:00 PM',
+    '5:00 PM - 6:00 PM',
+    '6:00 PM - 7:00 PM',
+    '7:00 PM - 8:00 PM',
+  ];
 }

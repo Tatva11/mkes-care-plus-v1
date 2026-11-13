@@ -18,7 +18,6 @@ import '../../staff/screens/staff_management_screen.dart';
 import '../../vendors/providers/vendor_provider.dart';
 import '../providers/users_provider.dart';
 import '../widgets/admin_shell.dart';
-import '../widgets/copilot_insights_card.dart';
 import '../widgets/inventory_alerts_card.dart';
 import '../widgets/operations_tab_content.dart';
 import '../widgets/patient_summary_card.dart';
@@ -175,8 +174,7 @@ class _DesktopLayout extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        const CopilotInsightsCard(),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.sm),
         const AppFooter(),
       ],
     );
@@ -201,8 +199,7 @@ class _MobileLayout extends StatelessWidget {
         SizedBox(height: AppSpacing.md),
         VendorPurchaseOrderSummaryCard(),
         SizedBox(height: AppSpacing.md),
-        CopilotInsightsCard(),
-        SizedBox(height: AppSpacing.lg),
+        SizedBox(height: AppSpacing.sm),
         AppFooter(),
       ],
     );

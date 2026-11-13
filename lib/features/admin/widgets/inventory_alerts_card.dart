@@ -1,21 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../inventory/models/inventory_item.dart';
+import '../../inventory/models/purchase_order.dart';
 import '../../inventory/providers/inventory_provider.dart';
+import '../../inventory/providers/purchase_order_provider.dart';
 import '../../inventory/screens/inventory_screen.dart';
 import '../../inventory/widgets/inventory_details_dialog.dart';
+import '../../inventory/widgets/purchase_order_details_dialog.dart';
 
 /// Dashboard card displaying real-time critical stock alerts (low stock, expiring soon, expired).
+/// Strictly filters to active products (`isActive: true`).
+/// Displays "Replenishment Ordered" if a PO is active for a low-stock product, preventing duplicate orders.
 class InventoryAlertsCard extends ConsumerWidget {
   const InventoryAlertsCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final inventoryAsync = ref.watch(inventoryProvider);
+    final purchaseOrdersAsync = ref.watch(purchaseOrdersProvider);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -107,7 +114,10 @@ class InventoryAlertsCard extends ConsumerWidget {
               ),
               error: (err, _) => _buildErrorState(ref, err.toString()),
               data: (items) {
-                final criticalItems = items.where((item) {
+                // Strictly filter to active products only (Requirement 2: deleted/inactive products must not appear)
+                final activeItems = items.where((item) => item.isActive).toList();
+
+                final criticalItems = activeItems.where((item) {
                   return item.isLowStock ||
                       item.expiryStatus == ExpiryStatus.expiringSoon ||
                       item.expiryStatus == ExpiryStatus.expired;
@@ -117,13 +127,32 @@ class InventoryAlertsCard extends ConsumerWidget {
                   return _buildAllHealthyState();
                 }
 
-                // Show top 3 critical items
-                final displayItems = criticalItems.take(3).toList();
+                // Gather active purchase orders to identify replenishment status
+                final activeOrders = purchaseOrdersAsync.valueOrNull?.where((po) {
+                  return po.status == PurchaseOrderStatus.ordered ||
+                      po.status == PurchaseOrderStatus.partiallyReceived;
+                }).toList() ?? [];
+
+                PurchaseOrder? findActivePO(String itemId) {
+                  for (final po in activeOrders) {
+                    if (po.items.any((line) => line.inventoryId == itemId)) {
+                      return po;
+                    }
+                  }
+                  return null;
+                }
+
+                // Display all qualifying critical items
+                final displayItems = criticalItems.toList();
                 return Column(
                   children: [
                     for (int i = 0; i < displayItems.length; i++) ...[
                       if (i > 0) const SizedBox(height: AppSpacing.sm),
-                      _buildAlertTile(context, displayItems[i]),
+                      _buildAlertTile(
+                        context,
+                        displayItems[i],
+                        findActivePO(displayItems[i].id),
+                      ),
                     ],
                   ],
                 );
@@ -135,10 +164,41 @@ class InventoryAlertsCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildAlertTile(BuildContext context, InventoryItem item) {
+  Widget _buildAlertTile(
+    BuildContext context,
+    InventoryItem item,
+    PurchaseOrder? activePO,
+  ) {
     final bool isLow = item.isLowStock;
     final bool isExpired = item.expiryStatus == ExpiryStatus.expired;
     final bool isExpiringSoon = item.expiryStatus == ExpiryStatus.expiringSoon;
+
+    // If an active purchase order is in flight for a low-stock item,
+    // mark as "Replenishment Ordered" with PO number & expected delivery date.
+    if (isLow && activePO != null) {
+      final String deliveryStr = activePO.expectedDeliveryDate != null
+          ? 'Expected ${DateFormat('d MMM').format(activePO.expectedDeliveryDate!)}'
+          : 'In Transit';
+
+      return _InventoryAlertItem(
+        icon: Icons.local_shipping_outlined,
+        iconBackground: const Color(0x261976D2), // Blue 15%
+        iconColor: const Color(0xFF1976D2),
+        title: item.name,
+        departmentBadge: (item.department != null && item.department!.isNotEmpty) ? item.department!.toUpperCase() : null,
+        subtitle: 'Replenishment Ordered: PO #${activePO.purchaseOrderNumber} · $deliveryStr',
+        subtitleColor: const Color(0xFF1976D2),
+        actionLabel: 'Track PO',
+        actionBorderColor: const Color(0xFF1976D2),
+        actionTextColor: const Color(0xFF1976D2),
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (_) => PurchaseOrderDetailsDialog(order: activePO),
+          );
+        },
+      );
+    }
 
     final IconData icon;
     final Color iconBackground;
@@ -180,6 +240,7 @@ class InventoryAlertsCard extends ConsumerWidget {
       iconBackground: iconBackground,
       iconColor: iconColor,
       title: item.name,
+      departmentBadge: (item.department != null && item.department!.isNotEmpty) ? item.department!.toUpperCase() : null,
       subtitle: subtitle,
       subtitleColor: subtitleColor,
       actionLabel: 'View',
@@ -258,6 +319,17 @@ class InventoryAlertsCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
+          Text(
+            error,
+            style: AppTypography.bodySm.copyWith(
+              color: AppColors.onSurfaceVariant,
+              fontSize: 11,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.sm),
           OutlinedButton.icon(
             onPressed: () => ref.invalidate(inventoryProvider),
             icon: const Icon(Icons.refresh, size: 14),
@@ -281,6 +353,7 @@ class _InventoryAlertItem extends StatelessWidget {
     required this.iconBackground,
     required this.iconColor,
     required this.title,
+    this.departmentBadge,
     required this.subtitle,
     this.subtitleColor,
     this.actionLabel,
@@ -293,6 +366,7 @@ class _InventoryAlertItem extends StatelessWidget {
   final Color iconBackground;
   final Color iconColor;
   final String title;
+  final String? departmentBadge;
   final String subtitle;
   final Color? subtitleColor;
   final String? actionLabel;
@@ -331,18 +405,51 @@ class _InventoryAlertItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: AppTypography.bodyMd.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: AppTypography.bodyMd.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        if (departmentBadge != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: departmentBadge == 'EYE'
+                                  ? const Color(0x1F006686)
+                                  : const Color(0x1F008080),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              departmentBadge!,
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: departmentBadge == 'EYE'
+                                    ? const Color(0xFF006686)
+                                    : const Color(0xFF008080),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
                       style: AppTypography.bodySm.copyWith(
                         color: subtitleColor ?? AppColors.onSurfaceVariant,
+                        fontSize: 11,
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -359,7 +466,7 @@ class _InventoryAlertItem extends StatelessWidget {
                     side: BorderSide(
                         color: actionBorderColor ?? AppColors.outlineVariant),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
+                      horizontal: 10,
                       vertical: AppSpacing.base,
                     ),
                     minimumSize: Size.zero,
@@ -372,6 +479,7 @@ class _InventoryAlertItem extends StatelessWidget {
                     actionLabel!,
                     style: AppTypography.labelCaps.copyWith(
                       color: actionTextColor,
+                      fontSize: 10,
                     ),
                   ),
                 ),

@@ -16,6 +16,7 @@ import '../../patients/widgets/patient_form_dialog.dart';
 import '../models/appointment_model.dart';
 import '../models/department_doctor_config.dart';
 import '../providers/appointment_provider.dart';
+import '../repositories/appointment_repository.dart';
 
 class AppointmentFormDialog extends ConsumerStatefulWidget {
   const AppointmentFormDialog({
@@ -350,7 +351,7 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
     final isToday = _selectedDate.year == now.year &&
         _selectedDate.month == now.month &&
         _selectedDate.day == now.day;
-    if (isToday) {
+    if (!widget.isEditing && isToday) {
       final slotDateTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
@@ -431,6 +432,40 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
     setState(() => _isLoading = true);
     try {
+      final conflict = await ref
+          .read(appointmentRepositoryProvider)
+          .checkAppointmentConflict(
+            date: _selectedDate,
+            time: _formatTimeOfDay(_selectedTime),
+            department: _selectedDepartment,
+            patientId: _selectedPatientId,
+            doctorId: _selectedDoctorId,
+            doctorName: _selectedDoctorName,
+            excludeAppointmentId: widget.existingAppointment?.id,
+          );
+
+      if (conflict != null) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              icon: const Icon(Icons.event_busy, color: AppColors.error, size: 36),
+              title: const Text('Appointment Time Conflict'),
+              content: Text(
+                conflict,
+                style: AppTypography.bodyMd,
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Change Time Slot'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
       if (widget.isEditing && widget.existingAppointment != null) {
         final formattedNotes = AppointmentModel.formatNotesWithDoctor(
           _notesController.text.trim(),
@@ -445,7 +480,7 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
           'appointment_date': _selectedDate.toIso8601String().split('T').first,
           'appointment_time': _formatTimeOfDay(_selectedTime),
           'appointment_type': _selectedType,
-          'status': _selectedType == 'walk_in' ? 'waiting' : 'scheduled',
+          'status': widget.existingAppointment!.status,
           if (formattedNotes.isNotEmpty) 'notes': formattedNotes,
           if (formattedNotes.isEmpty) 'notes': null,
         };
@@ -482,9 +517,11 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
             .createAppointment(newAppointment);
       }
 
+      final currentViewDate =
+          ref.read(appointmentsNotifierProvider.notifier).currentDate;
       await ref
           .read(appointmentsNotifierProvider.notifier)
-          .loadTodayAppointments();
+          .loadAppointmentsForDate(currentViewDate);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -526,13 +563,14 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isNarrow = MediaQuery.sizeOf(context).width < 420;
     final dialogConstraints = AdaptiveDialogConstraints.getConstraints(
       context: context,
       maxPhoneWidth: AppBreakpoints.maxDialogWidthMobile,
       maxTabletWidth: 540.0,
       maxDesktopWidth: 580.0,
       minWidth: 280.0,
-      minHeight: 320.0,
+      minHeight: 180.0,
     );
 
     final isEditing = widget.isEditing;
@@ -541,63 +579,91 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: ConstrainedBox(
-        constraints: dialogConstraints,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Header ──
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: AppColors.outlineVariant),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 12 : 16,
+        vertical: isNarrow ? 12 : 24,
+      ),
+      child: SafeArea(
+        child: ConstrainedBox(
+          constraints: dialogConstraints,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Header ──
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isNarrow ? 12 : AppSpacing.md,
+                    vertical: isNarrow ? 10 : AppSpacing.md,
+                  ),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: AppColors.outlineVariant),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(isNarrow ? 6 : 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryContainer
+                                    .withValues(alpha: 0.15),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusSm),
+                              ),
+                              child: const Icon(
+                                Icons.calendar_month,
+                                color: AppColors.primaryContainer,
+                                size: 20,
+                              ),
+                            ),
+                            SizedBox(width: isNarrow ? 6 : AppSpacing.sm),
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      isEditing
+                                          ? 'Edit Appointment'
+                                          : 'New Appointment',
+                                      style: AppTypography.headlineMd.copyWith(
+                                        fontSize: isNarrow ? 18.0 : 20.0,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isEditing)
+                                    Text(
+                                      'Edit details or reschedule time slot',
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: AppColors.onSurfaceVariant,
+                                        fontSize: 11.0,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => Navigator.of(context).pop(),
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryContainer
-                                  .withValues(alpha: 0.15),
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusSm),
-                            ),
-                            child: const Icon(
-                              Icons.calendar_month,
-                              color: AppColors.primaryContainer,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Flexible(
-                            child: Text(
-                              isEditing
-                                  ? 'Edit Appointment'
-                                  : 'New Appointment',
-                              style: AppTypography.headlineMd,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(),
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ),
 
               // ── Form Body ──
               Flexible(
@@ -1046,45 +1112,107 @@ class _AppointmentFormDialogState extends ConsumerState<AppointmentFormDialog> {
               ),
 
               // ── Footer ──
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    top: BorderSide(color: AppColors.outlineVariant),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    TextButton(
-                      onPressed:
-                          _isLoading ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+              SafeArea(
+                top: false,
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: AppColors.outlineVariant),
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    if (_isLoading)
-                      const Expanded(
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else
-                      Expanded(
-                        child: MkesPrimaryButton(
-                          label: _selectedType == 'surgery'
-                              ? 'Proceed to Eye Surgery'
-                              : (isEditing
-                                  ? 'Update Appointment'
-                                  : 'Book Appointment'),
-                          onPressed: _submit,
-                        ),
-                      ),
-                  ],
+                  ),
+                  child: _isLoading
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      : isEditing
+                          ? LayoutBuilder(
+                              builder: (context, footerConstraints) {
+                            return Wrap(
+                              spacing: AppSpacing.sm,
+                              runSpacing: AppSpacing.xs,
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                                Wrap(
+                                  spacing: AppSpacing.xs,
+                                  runSpacing: AppSpacing.xs,
+                                  crossAxisAlignment:
+                                      WrapCrossAlignment.center,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      key: const Key(
+                                          'appointment_form_reschedule_button'),
+                                      onPressed: _submit,
+                                      icon: const Icon(Icons.edit_calendar,
+                                          size: 15),
+                                      label: const Text('Reschedule'),
+                                      style: OutlinedButton.styleFrom(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 8,
+                                        ),
+                                      ),
+                                    ),
+                                    FilledButton.icon(
+                                      key: const Key(
+                                          'appointment_form_submit_button'),
+                                      onPressed: _submit,
+                                      icon: const Icon(Icons.check, size: 15),
+                                      label: const Text('Update Appointment'),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        foregroundColor: Colors.white,
+                                        visualDensity: VisualDensity.compact,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
+                        )
+                          : Row(
+                              children: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: MkesPrimaryButton(
+                                    key: const Key(
+                                        'appointment_form_submit_button'),
+                                    label: _selectedType == 'surgery'
+                                        ? 'Proceed to Eye Surgery'
+                                        : 'Book Appointment',
+                                    onPressed: _submit,
+                                  ),
+                                ),
+                              ],
+                            ),
                 ),
               ),
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ── Widget helpers ──
 

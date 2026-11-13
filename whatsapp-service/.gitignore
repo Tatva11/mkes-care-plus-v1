@@ -1,0 +1,25 @@
+# Local environment secrets
+.env
+.env.*
+api.env
+
+# Session directories & caches
+.wwebjs_auth/
+.wwebjs_cache/
+wa_session/
+session/
+.temp/
+
+# Process locks & logs
+*.lock
+*.pid
+logs/
+*.log
+
+# QR exports
+*.png
+whatsapp_qr.png
+scan_qr.html
+
+# Dependencies
+node_modules/

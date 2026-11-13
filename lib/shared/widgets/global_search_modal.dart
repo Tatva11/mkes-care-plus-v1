@@ -134,7 +134,7 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Search powered by MKES Copilot',
+                        'Search powered by MKES CARE+',
                         style: AppTypography.labelCaps.copyWith(
                           color: AppColors.outline,
                           fontSize: 10,

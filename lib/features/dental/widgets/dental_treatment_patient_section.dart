@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../appointments/models/appointment_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../clinical/providers/clinical_inventory_provider.dart';
 import '../../clinical/widgets/clinical_inventory_consumption_dialog.dart';
@@ -19,9 +20,13 @@ class DentalTreatmentPatientSection extends ConsumerWidget {
   const DentalTreatmentPatientSection({
     super.key,
     required this.patient,
+    this.pendingAppointment,
+    this.onRecordSaved,
   });
 
   final PatientModel patient;
+  final AppointmentModel? pendingAppointment;
+  final void Function(DentalTreatmentModel treatment)? onRecordSaved;
 
   static const Color _successColor = Color(0xFF2E7D32);
 
@@ -113,10 +118,16 @@ class DentalTreatmentPatientSection extends ConsumerWidget {
                   visualDensity: VisualDensity.compact,
                 ),
                 onPressed: () async {
-                  await showDialog(
+                  final saved = await showDialog<DentalTreatmentModel>(
                     context: context,
-                    builder: (_) => DentalTreatmentFormDialog(patient: patient),
+                    builder: (_) => DentalTreatmentFormDialog(
+                      patient: patient,
+                      initialAppointmentId: pendingAppointment?.id,
+                    ),
                   );
+                  if (saved != null && onRecordSaved != null) {
+                    onRecordSaved!(saved);
+                  }
                 },
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Record Treatment'),

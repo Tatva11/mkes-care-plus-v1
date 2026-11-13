@@ -952,9 +952,10 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
                   Text('Select Products Supplied'),
                 ],
               ),
-              content: SizedBox(
-                width: 480,
-                height: 420,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480, maxHeight: 420),
+                child: SizedBox(
+                  width: double.maxFinite,
                 child: Column(
                   children: [
                     TextField(
@@ -1028,6 +1029,7 @@ class _VendorFormDialogState extends ConsumerState<VendorFormDialog> {
                     ),
                   ],
                 ),
+              ),
               ),
               actions: [
                 TextButton(

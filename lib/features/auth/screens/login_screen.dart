@@ -292,8 +292,19 @@ class _BrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final logoSize = isDesktop ? 96.0 : 80.0;
     return Column(
       children: [
+        Hero(
+          tag: 'mkes_logo',
+          child: Image.asset(
+            'assets/images/mkes_logo.png',
+            width: logoSize,
+            height: logoSize,
+            fit: BoxFit.contain,
+          ),
+        ),
+        SizedBox(height: isDesktop ? AppSpacing.md : AppSpacing.sm),
         Text(
           'MKES CARE+',
           textAlign: TextAlign.center,

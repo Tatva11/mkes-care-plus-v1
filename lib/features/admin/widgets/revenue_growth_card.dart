@@ -11,8 +11,9 @@ import '../../reports/models/reports_filter_model.dart';
 import '../../reports/providers/reports_provider.dart';
 import '../../reports/screens/admin_reports_screen.dart';
 
-/// Admin Dashboard Card showing today-only revenue collections, growth vs yesterday,
-/// payment modes, and an intraday timeline chart.
+/// Admin Dashboard Card showing revenue collections for a selected date,
+/// growth vs the preceding day, payment modes breakdown,
+/// and an hourly time-slot chart spanning clinic operating hours.
 class RevenueGrowthCard extends ConsumerWidget {
   const RevenueGrowthCard({super.key});
 
@@ -20,6 +21,7 @@ class RevenueGrowthCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selectedDate = ref.watch(selectedRevenueDateProvider);
     final revenueAsync = ref.watch(todayRevenueMetricsProvider);
     final currency = NumberFormat.currency(
       locale: 'en_IN',
@@ -89,12 +91,125 @@ class RevenueGrowthCard extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.xs),
+          _buildDateSelector(context, ref, selectedDate),
           const SizedBox(height: AppSpacing.sm),
           revenueAsync.when(
             loading: () => _buildLoadingState(),
             error: (err, _) => _buildErrorState(ref, err.toString()),
-            data: (metrics) => _buildDataContent(context, metrics, currency),
+            data: (metrics) =>
+                _buildDataContent(context, ref, metrics, currency, selectedDate),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Compact, interactive date navigation bar with previous, next, calendar picker, and quick 'Today'.
+  Widget _buildDateSelector(
+    BuildContext context,
+    WidgetRef ref,
+    DateTime selectedDate,
+  ) {
+    final isToday = DateBoundaries.isToday(selectedDate);
+    final formattedDate = isToday
+        ? 'Today'
+        : DateFormat('d MMM').format(selectedDate);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: const Color(0xFFE5E2E1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+            tooltip: 'Previous day',
+            onPressed: () {
+              final prev = selectedDate.subtract(const Duration(days: 1));
+              ref.read(selectedRevenueDateProvider.notifier).state =
+                  DateBoundaries.startOfDay(prev);
+            },
+          ),
+          InkWell(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                ref.read(selectedRevenueDateProvider.notifier).state =
+                    DateBoundaries.startOfDay(picked);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 13,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    formattedDate,
+                    style: AppTypography.labelCaps.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+            tooltip: 'Next day',
+            onPressed: isToday
+                ? null
+                : () {
+                    final next = selectedDate.add(const Duration(days: 1));
+                    if (!next.isAfter(DateTime.now())) {
+                      ref.read(selectedRevenueDateProvider.notifier).state =
+                          DateBoundaries.startOfDay(next);
+                    }
+                  },
+          ),
+          if (!isToday) ...[
+            const SizedBox(width: 2),
+            InkWell(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              onTap: () {
+                ref.read(selectedRevenueDateProvider.notifier).state =
+                    DateBoundaries.startOfDay(DateTime.now());
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Text(
+                  'Today',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -117,7 +232,7 @@ class RevenueGrowthCard extends ConsumerWidget {
             ),
             SizedBox(height: AppSpacing.sm),
             Text(
-              "Loading today's revenue...",
+              "Loading revenue data...",
               style: TextStyle(
                 color: AppColors.onSurfaceVariant,
                 fontSize: 12,
@@ -183,9 +298,27 @@ class RevenueGrowthCard extends ConsumerWidget {
 
   Widget _buildDataContent(
     BuildContext context,
+    WidgetRef ref,
     TodayRevenueMetrics metrics,
     NumberFormat currency,
+    DateTime selectedDate,
   ) {
+    final isToday = DateBoundaries.isToday(selectedDate);
+    final count = metrics.todayTransactionsCount;
+    final totalRev = metrics.todayRevenue;
+
+    final String transactionSummary;
+    if (isToday) {
+      transactionSummary = count > 0
+          ? '$count collection transaction${count == 1 ? '' : 's'} today'
+          : 'No collections recorded today';
+    } else {
+      final formattedDay = DateFormat('EEE, d MMM yyyy').format(selectedDate);
+      transactionSummary = count > 0
+          ? '$count collection transaction${count == 1 ? '' : 's'} on $formattedDay'
+          : 'No collections recorded on $formattedDay';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -195,7 +328,7 @@ class RevenueGrowthCard extends ConsumerWidget {
           runSpacing: 4,
           children: [
             Text(
-              currency.format(metrics.todayRevenue),
+              currency.format(totalRev),
               style: AppTypography.displayLg.copyWith(
                 color: AppColors.onSurface,
               ),
@@ -207,9 +340,7 @@ class RevenueGrowthCard extends ConsumerWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          metrics.todayTransactionsCount > 0
-              ? '${metrics.todayTransactionsCount} collection transaction${metrics.todayTransactionsCount == 1 ? '' : 's'} today'
-              : 'No collections recorded today',
+          transactionSummary,
           style: AppTypography.bodySm.copyWith(
             color: AppColors.onSurfaceVariant,
             fontSize: 12,
@@ -217,8 +348,8 @@ class RevenueGrowthCard extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
 
-        // Today's collections breakdown by payment mode
-        if (metrics.todayRevenue > 0) ...[
+        // Collections breakdown by payment mode
+        if (totalRev > 0) ...[
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: Wrap(
@@ -256,9 +387,8 @@ class RevenueGrowthCard extends ConsumerWidget {
 
         const SizedBox(height: AppSpacing.md),
 
-        // Intraday Chart over today's time buckets
-        _buildIntradayChart(
-            metrics.intradayHourlyBuckets, metrics.todayRevenue),
+        // Hourly Time-Slot Chart (11 operating hour slots: 9 AM to 8 PM)
+        _buildHourlySlotsChart(metrics.effectiveHourlySlots, totalRev, currency),
       ],
     );
   }
@@ -305,64 +435,41 @@ class RevenueGrowthCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildIntradayChart(List<double> buckets, double totalRevenue) {
-    if (totalRevenue <= 0) {
-      return Container(
-        height: 192,
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          border: Border(
-            left: BorderSide(color: _surfaceContainerHigh),
-            bottom: BorderSide(color: _surfaceContainerHigh),
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.bar_chart_outlined,
-              size: 36,
-              color: AppColors.outlineVariant,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'No collections recorded today',
-              style: AppTypography.bodySm.copyWith(
-                color: AppColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    double maxBucketAmount = 0.0;
-    for (final b in buckets) {
-      if (b > maxBucketAmount) {
-        maxBucketAmount = b;
+  /// Renders separate bars for individual hourly time slots with exact tooltips and baseline.
+  Widget _buildHourlySlotsChart(
+    List<HourlyRevenueSlot> slots,
+    double totalRevenue,
+    NumberFormat currency,
+  ) {
+    double maxSlotAmount = 0.0;
+    for (final s in slots) {
+      if (s.amount > maxSlotAmount) {
+        maxSlotAmount = s.amount;
       }
     }
 
     return SizedBox(
-      height: 192,
+      height: 196,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // Y-Axis reference scale
           Positioned(
             left: 0,
-            top: 32,
+            top: 28,
             bottom: 24,
             width: 44,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _YAxisLabel(_formatCompact(maxBucketAmount)),
-                _YAxisLabel(_formatCompact(maxBucketAmount * 2 / 3)),
-                _YAxisLabel(_formatCompact(maxBucketAmount / 3)),
+                _YAxisLabel(maxSlotAmount > 0 ? _formatCompact(maxSlotAmount) : '10k'),
+                _YAxisLabel(maxSlotAmount > 0 ? _formatCompact(maxSlotAmount * 2 / 3) : '5k'),
+                _YAxisLabel(maxSlotAmount > 0 ? _formatCompact(maxSlotAmount / 3) : '2k'),
                 const _YAxisLabel('0'),
               ],
             ),
           ),
+          // Chart Plot Area
           Positioned(
             left: 48,
             right: 0,
@@ -377,28 +484,23 @@ class RevenueGrowthCard extends ConsumerWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xs,
-                  AppSpacing.lg,
-                  AppSpacing.xs,
+                  2,
+                  AppSpacing.sm,
+                  2,
                   AppSpacing.base,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    for (int i = 0; i < buckets.length; i++)
-                      _ChartBar(
-                        label: DateBoundaries.intradayBucketLabels[i],
-                        heightFactor: maxBucketAmount > 0
-                            ? (buckets[i] / maxBucketAmount).clamp(0.06, 1.0)
-                            : 0.06,
-                        color: (buckets[i] == maxBucketAmount &&
-                                maxBucketAmount > 0)
-                            ? AppColors.primaryContainer
-                            : _surfaceContainerHigh,
-                        highlighted: (buckets[i] == maxBucketAmount &&
-                            maxBucketAmount > 0),
-                        tooltip:
-                            buckets[i] > 0 ? _formatCompact(buckets[i]) : null,
+                    for (int i = 0; i < slots.length; i++)
+                      _HourlyChartBar(
+                        slot: slots[i],
+                        currency: currency,
+                        heightFactor: maxSlotAmount > 0 && slots[i].amount > 0
+                            ? (slots[i].amount / maxSlotAmount).clamp(0.08, 1.0)
+                            : 0.02,
+                        isHighlighted: (slots[i].amount == maxSlotAmount &&
+                            maxSlotAmount > 0),
                       ),
                   ],
                 ),
@@ -464,86 +566,127 @@ class _YAxisLabel extends StatelessWidget {
       text,
       style: AppTypography.labelCaps.copyWith(
         color: AppColors.outlineVariant,
-        fontSize: 10,
+        fontSize: 9,
       ),
       textAlign: TextAlign.right,
     );
   }
 }
 
-class _ChartBar extends StatelessWidget {
-  const _ChartBar({
-    required this.label,
+/// Represents an individual hourly slot bar on the chart with full tooltip support.
+class _HourlyChartBar extends StatelessWidget {
+  const _HourlyChartBar({
+    required this.slot,
+    required this.currency,
     required this.heightFactor,
-    required this.color,
-    this.highlighted = false,
-    this.tooltip,
+    required this.isHighlighted,
   });
 
-  final String label;
+  final HourlyRevenueSlot slot;
+  final NumberFormat currency;
   final double heightFactor;
-  final Color color;
-  final bool highlighted;
-  final String? tooltip;
+  final bool isHighlighted;
 
   @override
   Widget build(BuildContext context) {
+    final bool hasRevenue = slot.amount > 0;
+    final String tooltipMessage = hasRevenue
+        ? '${slot.fullLabel}\nRevenue: ${currency.format(slot.amount)}\n${slot.transactionCount} transaction${slot.transactionCount == 1 ? '' : 's'}'
+        : '${slot.fullLabel}\nRevenue: ₹0 (No collections)';
+
+    final Color barColor = isHighlighted
+        ? AppColors.primaryContainer
+        : (hasRevenue
+            ? AppColors.primary.withValues(alpha: 0.75)
+            : const Color(0xFFEAE7E7));
+
     return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            if (tooltip != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 2),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 1,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.onSurface,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                ),
-                child: Text(
-                  tooltip!,
-                  style: const TextStyle(
-                    color: AppColors.surfaceContainerLowest,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
+      child: Tooltip(
+        message: tooltipMessage,
+        waitDuration: const Duration(milliseconds: 250),
+        preferBelow: false,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        textStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          height: 1.3,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 1.5),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // Amount pill above bar for highest or active slots
+              if (hasRevenue)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 1,
                   ),
-                ),
-              )
-            else
-              const SizedBox(height: 15),
-            Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: FractionallySizedBox(
-                  heightFactor: heightFactor,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(AppSpacing.radiusSm),
+                  decoration: BoxDecoration(
+                    color: isHighlighted
+                        ? AppColors.primaryContainer
+                        : AppColors.onSurface.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    RevenueGrowthCard._formatCompact(slot.amount),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(height: 14),
+              // Bar Column
+              Expanded(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: FractionallySizedBox(
+                    heightFactor: heightFactor,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: barColor,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(3),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              label,
-              style: AppTypography.labelCaps.copyWith(
-                fontSize: 10,
-                color: highlighted
-                    ? AppColors.onSurface
-                    : AppColors.outlineVariant,
-                fontWeight: highlighted ? FontWeight.w700 : FontWeight.w500,
+              const SizedBox(height: 4),
+              // Slot Label (e.g. 9-10a, 10-11a)
+              Text(
+                slot.label,
+                style: AppTypography.labelCaps.copyWith(
+                  fontSize: 8.5,
+                  color: isHighlighted
+                      ? AppColors.onSurface
+                      : AppColors.outlineVariant,
+                  fontWeight: isHighlighted ? FontWeight.w700 : FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

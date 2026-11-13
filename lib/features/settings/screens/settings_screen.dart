@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/repositories/auth_repository.dart';
+import '../../whatsapp/widgets/whatsapp_admin_settings_card.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -23,6 +24,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(currentProfileProvider);
+    final isAdmin = profileAsync.valueOrNull?.role.toLowerCase() == 'admin';
+
     final content = LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 768.0;
@@ -72,6 +75,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           _buildNotificationSettings(),
                           const SizedBox(height: AppSpacing.md),
                           _buildSecuritySettings(),
+                          if (isAdmin) ...[
+                            const SizedBox(height: AppSpacing.md),
+                            const WhatsAppAdminSettingsCard(),
+                          ],
                         ],
                       ),
                     ),
@@ -95,6 +102,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _buildClinicalDefaults(),
                     const SizedBox(height: AppSpacing.md),
                     _buildSecuritySettings(),
+                    if (isAdmin) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      const WhatsAppAdminSettingsCard(),
+                    ],
                     const SizedBox(height: AppSpacing.md),
                     _buildSystemInfoCard(),
                   ],

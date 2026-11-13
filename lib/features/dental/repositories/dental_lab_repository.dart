@@ -320,52 +320,6 @@ class DentalLabRepository {
           appointmentId = upcoming.first['id'] as String?;
         }
       } catch (_) {}
-
-      // If no existing upcoming appointment, schedule a follow-up appointment
-      if (appointmentId == null) {
-        try {
-          // Schedule 2 days after ready date (skip Sunday)
-          DateTime targetDate = effectiveReadyDate.add(const Duration(days: 2));
-          if (targetDate.weekday == DateTime.sunday) {
-            targetDate = targetDate.add(const Duration(days: 1));
-          }
-
-          // Lookup active dental doctor if available
-          String? doctorId;
-          try {
-            final doctorRows = await _client
-                .from('profiles')
-                .select('id')
-                .ilike('department', '%dental%')
-                .eq('is_active', true)
-                .limit(1);
-            if (doctorRows.isNotEmpty) {
-              doctorId = doctorRows.first['id'] as String?;
-            }
-          } catch (_) {}
-
-          final newApptPayload = {
-            'patient_id': existing.patientId,
-            'department': 'dental',
-            if (doctorId != null) 'doctor_id': doctorId,
-            'appointment_date': DateFormat('yyyy-MM-dd').format(targetDate),
-            'appointment_time': '10:30:00',
-            'appointment_type': 'follow_up',
-            'status': 'scheduled',
-            'notes': 'Follow-up fitting for Dental Lab Case #${existing.caseNumber} (${existing.caseType})',
-          };
-
-          final apptRes = await _client
-              .from('appointments')
-              .insert(newApptPayload)
-              .select('id')
-              .single();
-
-          appointmentId = apptRes['id'] as String?;
-        } catch (e) {
-          throw Exception('Failed to schedule follow-up appointment: $e');
-        }
-      }
     }
 
     final payload = <String, dynamic>{
@@ -392,10 +346,97 @@ class DentalLabRepository {
             .single();
       }
 
-      return DentalLabModel.fromJson(response as Map<String, dynamic>);
+      final updated = DentalLabModel.fromJson(response as Map<String, dynamic>);
+      // Enqueue lab ready WhatsApp notification with slot choices & notify staff
+      _enqueueDentalLabReadyWhatsApp(updated);
+      return updated;
     } catch (e) {
       throw Exception('Failed to update dental lab status: $e');
     }
+  }
+
+  void _enqueueDentalLabReadyWhatsApp(DentalLabModel caseItem) async {
+    try {
+      if (caseItem.patientId == null || caseItem.patientId!.isEmpty) return;
+
+      final pRes = await _client
+          .from('patients')
+          .select('name, mobile, whatsapp_opt_out')
+          .eq('id', caseItem.patientId!)
+          .maybeSingle();
+
+      if (pRes == null) return;
+      if (pRes['whatsapp_opt_out'] == true) return;
+
+      final rawMobile = pRes['mobile']?.toString() ?? '';
+      final digits = rawMobile.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length < 10) return;
+      final clean10 = digits.substring(digits.length - 10);
+
+      final templateKey = 'dental_lab_ready_${caseItem.id}';
+      final existing = await _client
+          .from('whatsapp_messages_outbox')
+          .select('id')
+          .eq('template_key', templateKey)
+          .maybeSingle();
+
+      if (existing != null) return;
+
+      final patientName = pRes['name']?.toString() ?? caseItem.patientName ?? 'Valued Patient';
+
+      // Compute 3 offered fitting slots (skipping Sunday)
+      DateTime d1 = DateTime.now().add(const Duration(days: 2));
+      if (d1.weekday == DateTime.sunday) d1 = d1.add(const Duration(days: 1));
+      DateTime d2 = d1.add(const Duration(days: 1));
+      if (d2.weekday == DateTime.sunday) d2 = d2.add(const Duration(days: 1));
+      DateTime d3 = d2.add(const Duration(days: 1));
+      if (d3.weekday == DateTime.sunday) d3 = d3.add(const Duration(days: 1));
+
+      final fmt = DateFormat('EEE, d MMM');
+      final s1 = '${fmt.format(d1)} at 10:30 AM';
+      final s2 = '${fmt.format(d2)} at 02:00 PM';
+      final s3 = '${fmt.format(d3)} at 11:30 AM';
+
+      final messageText = '🦷 *MKES CARE+ DENTAL CLINIC*\n\n'
+          'Dear $patientName,\n\n'
+          'Your custom dental restoration (*${caseItem.caseType}*, Ref: #${caseItem.caseNumber}) is now *READY* for fitting at MKES CARE+ Dental Clinic.\n\n'
+          'Please choose your preferred fitting appointment slot by replying with 1, 2, or 3:\n'
+          '1️⃣ $s1\n'
+          '2️⃣ $s2\n'
+          '3️⃣ $s3\n\n'
+          'Reply with *1*, *2*, or *3* to confirm your appointment, or reply with another preferred date and time.\n'
+          'Reply STOP to unsubscribe.';
+
+      await _client.from('whatsapp_messages_outbox').insert({
+        'recipient_phone': clean10,
+        'patient_id': caseItem.patientId,
+        'department': 'dental',
+        'message_type': 'dental_lab_ready',
+        'template_key': templateKey,
+        'message_text': messageText,
+        'scheduled_for': DateTime.now().toIso8601String(),
+      });
+
+      // Staff in-app notification
+      final staffList = await _client
+          .from('profiles')
+          .select('id')
+          .eq('is_active', true)
+          .or('role.eq.admin,and(role.eq.staff,department.ilike.%dental%)');
+
+      if (staffList.isNotEmpty) {
+        for (final s in staffList) {
+          await _client.from('notifications').insert({
+            'user_id': s['id'],
+            'title': 'Dental Lab Case Ready',
+            'message': 'Case #${caseItem.caseNumber} (${caseItem.caseType}) for $patientName is ready. WhatsApp slot options sent to patient.',
+            'type': 'dental_lab_ready',
+            'related_id': caseItem.id,
+            'is_read': false,
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   /// Transitions a dental lab case status with appropriate date recording and validation.

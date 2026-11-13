@@ -116,7 +116,12 @@ class _FakeDentalLabRepository extends Fake implements DentalLabRepository {
 
 class _FakePatientRepository extends Fake implements PatientRepository {
   @override
-  Future<List<PatientModel>> fetchPatients({String? department, String? searchQuery}) async {
+  Future<List<PatientModel>> fetchPatients({
+    String? department,
+    String? searchQuery,
+    int limit = 50,
+    int offset = 0,
+  }) async {
     return [
       PatientModel(
         id: 'pat-101',
@@ -238,7 +243,7 @@ void main() {
 
         // 3. Assert core scheduling elements are intact
         expect(find.text('My Schedule'), findsOneWidget);
-        expect(find.text('Book Appointment'), findsOneWidget);
+        expect(find.byKey(const Key('staff_schedule_book_appointment_button')), findsOneWidget);
         expect(find.text("Today's Schedule"), findsOneWidget);
         expect(find.byKey(const Key('staff_schedule_department_dropdown')), findsOneWidget);
       });

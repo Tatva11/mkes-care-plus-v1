@@ -77,22 +77,43 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       ];
     }
 
+    if (_finalTotal > 0) {
+      _payment = BillingPaymentModel(
+        amount: _finalTotal,
+        paymentMode: 'cash',
+      );
+    }
+
     if (_selectedPatient != null) {
-      _fetchOutstandingBalance(_selectedPatient!.id);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _fetchOutstandingBalance(_selectedPatient!.id);
+        }
+      });
     }
   }
 
   Future<void> _fetchOutstandingBalance(String? patientId) async {
     if (patientId == null || patientId.trim().isEmpty) {
-      setState(() {
+      if (mounted) {
+        setState(() {
+          _outstandingInvoices = [];
+          _includePreviousBalance = false;
+          _isLoadingOutstanding = false;
+        });
+      } else {
         _outstandingInvoices = [];
         _includePreviousBalance = false;
         _isLoadingOutstanding = false;
-      });
+      }
       return;
     }
 
-    setState(() => _isLoadingOutstanding = true);
+    if (mounted) {
+      setState(() => _isLoadingOutstanding = true);
+    } else {
+      _isLoadingOutstanding = true;
+    }
     try {
       final repo = ref.read(billingRepositoryProvider);
       final invoices = await repo.fetchPatientOutstandingInvoices(patientId);
@@ -230,11 +251,19 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       return;
     }
 
+    final effectivePayment = _payment ??
+        (_finalTotal > 0
+            ? BillingPaymentModel(
+                amount: _finalTotal,
+                paymentMode: 'cash',
+              )
+            : null);
+
     // 4. Payment validation
-    if (_payment != null && _payment!.amount > _finalTotal) {
+    if (effectivePayment != null && effectivePayment.amount > _finalTotal) {
       setState(() {
         _validationError =
-            'Payment amount (₹${_payment!.amount.toStringAsFixed(2)}) cannot exceed final total (₹${_finalTotal.toStringAsFixed(2)}).';
+            'Payment amount (₹${effectivePayment.amount.toStringAsFixed(2)}) cannot exceed final total (₹${_finalTotal.toStringAsFixed(2)}).';
       });
       return;
     }
@@ -258,7 +287,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         department: _department,
         discount: _discount,
         items: submissionItems,
-        payment: _payment,
+        payment: effectivePayment,
         invoiceDate: _invoiceDate,
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
@@ -513,9 +542,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                   },
                   payment: _payment,
                   onPaymentChanged: (p) {
-                    setState(() {
-                      _payment = p;
-                    });
+                    _payment = p;
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),

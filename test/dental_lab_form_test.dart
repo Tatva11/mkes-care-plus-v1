@@ -15,7 +15,12 @@ class _FakeDentalLabRepo extends Fake implements DentalLabRepository {
 
 class _FakePatientRepo extends Fake implements PatientRepository {
   @override
-  Future<List<PatientModel>> fetchPatients({String? department, String? searchQuery}) async {
+  Future<List<PatientModel>> fetchPatients({
+    String? department,
+    String? searchQuery,
+    int limit = 50,
+    int offset = 0,
+  }) async {
     return [
       PatientModel(
         id: 'pat-1',

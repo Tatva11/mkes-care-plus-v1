@@ -62,21 +62,22 @@ class _ReceivePurchaseOrderDialogState
   void initState() {
     super.initState();
     final allInventory = ref.read(inventoryProvider).value ?? [];
-    _lines = widget.order.items
-        .where((i) => i.remainingQuantity > 0)
-        .map((i) {
-          final invItem = allInventory.where((inv) => inv.id == i.inventoryId).firstOrNull;
-          final requiresExpiry = invItem != null && (
-            invItem.expiryDate != null ||
-            ['pharmaceuticals', 'clinical supplies', 'dental materials', 'lab & diagnostics']
-                .contains(invItem.category.toLowerCase())
-          );
-          return _ReceiveLineState(
-            item: i,
-            requiresExpiry: requiresExpiry,
-          );
-        })
-        .toList();
+    _lines = widget.order.items.where((i) => i.remainingQuantity > 0).map((i) {
+      final invItem =
+          allInventory.where((inv) => inv.id == i.inventoryId).firstOrNull;
+      final requiresExpiry = invItem != null &&
+          (invItem.expiryDate != null ||
+              [
+                'pharmaceuticals',
+                'clinical supplies',
+                'dental materials',
+                'lab & diagnostics'
+              ].contains(invItem.category.toLowerCase()));
+      return _ReceiveLineState(
+        item: i,
+        requiresExpiry: requiresExpiry,
+      );
+    }).toList();
   }
 
   @override
@@ -117,7 +118,8 @@ class _ReceivePurchaseOrderDialogState
     if (!_formKey.currentState!.validate()) return;
 
     if (_totalBatchQuantity <= 0) {
-      setState(() => _errorMessage = 'Please enter at least one item quantity to receive.');
+      setState(() => _errorMessage =
+          'Please enter at least one item quantity to receive.');
       return;
     }
 
@@ -165,16 +167,16 @@ class _ReceivePurchaseOrderDialogState
                 'item_id': l.item.id,
                 'receive_quantity': l.receiveQuantity,
                 if (l.expiryDate != null)
-                  'expiry_date': l.expiryDate!.toIso8601String().split('T').first,
+                  'expiry_date':
+                      l.expiryDate!.toIso8601String().split('T').first,
               })
           .toList();
 
-      final result = await ref
-          .read(purchaseOrdersProvider.notifier)
-          .receiveOrder(
-            purchaseOrderId: widget.order.id,
-            items: itemsToReceive,
-          );
+      final result =
+          await ref.read(purchaseOrdersProvider.notifier).receiveOrder(
+                purchaseOrderId: widget.order.id,
+                items: itemsToReceive,
+              );
 
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -220,9 +222,9 @@ class _ReceivePurchaseOrderDialogState
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surfaceContainerLowest,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.lg,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? AppSpacing.md : 8.0,
+        vertical: isDesktop ? AppSpacing.lg : 16.0,
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -233,11 +235,11 @@ class _ReceivePurchaseOrderDialogState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildDialogHeader(),
+            _buildDialogHeader(isDesktop),
             const Divider(height: 1, color: AppColors.outlineVariant),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: EdgeInsets.all(isDesktop ? AppSpacing.lg : 12.0),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -250,10 +252,11 @@ class _ReceivePurchaseOrderDialogState
 
                       // PO Info Header Card
                       Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
+                        padding: const EdgeInsets.all(12.0),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusLg),
                           border: Border.all(color: AppColors.outlineVariant),
                         ),
                         child: Row(
@@ -325,16 +328,33 @@ class _ReceivePurchaseOrderDialogState
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 2,
                             children: [
                               TextButton(
                                 onPressed: _receiveAllRemaining,
-                                child: const Text('Receive All'),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('Receive All',
+                                    style: TextStyle(fontSize: 12)),
                               ),
                               TextButton(
                                 onPressed: _clearAllQuantities,
-                                child: const Text('Clear All'),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('Clear All',
+                                    style: TextStyle(fontSize: 12)),
                               ),
                             ],
                           ),
@@ -347,7 +367,8 @@ class _ReceivePurchaseOrderDialogState
                         const Padding(
                           padding: EdgeInsets.all(AppSpacing.lg),
                           child: Center(
-                            child: Text('All items have already been fully received.'),
+                            child: Text(
+                                'All items have already been fully received.'),
                           ),
                         )
                       else
@@ -367,8 +388,10 @@ class _ReceivePurchaseOrderDialogState
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryContainer.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                          color: AppColors.primaryContainer
+                              .withValues(alpha: 0.15),
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusLg),
                           border: Border.all(
                             color: AppColors.primary.withValues(alpha: 0.3),
                           ),
@@ -443,7 +466,8 @@ class _ReceivePurchaseOrderDialogState
 
   Widget _buildReceiveLineCard(_ReceiveLineState line) {
     final item = line.item;
-    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final today =
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
@@ -455,93 +479,124 @@ class _ReceivePurchaseOrderDialogState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Product name and quantities overview
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.inventoryName,
-                      style: AppTypography.bodyMd.copyWith(
-                        fontWeight: FontWeight.w700,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 360;
+              final infoCol = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.inventoryName,
+                    style: AppTypography.bodyMd.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: 2,
+                    children: [
+                      Text(
+                        'Ordered: ${item.formattedQuantity}',
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: 2,
-                      children: [
-                        Text(
-                          'Ordered: ${item.formattedQuantity}',
-                          style: AppTypography.bodySm.copyWith(
-                            color: AppColors.onSurfaceVariant,
-                          ),
+                      Text(
+                        'Received: ${item.formattedReceivedQuantity}',
+                        style: AppTypography.bodySm.copyWith(
+                          color: Colors.green.shade700,
                         ),
-                        Text(
-                          'Received: ${item.formattedReceivedQuantity}',
-                          style: AppTypography.bodySm.copyWith(
-                            color: Colors.green.shade700,
-                          ),
+                      ),
+                      Text(
+                        'Remaining: ${item.formattedRemainingQuantity}',
+                        style: AppTypography.bodySm.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFE65100),
                         ),
-                        Text(
-                          'Remaining: ${item.formattedRemainingQuantity}',
-                          style: AppTypography.bodySm.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFFE65100),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
+                      ),
+                    ],
+                  ),
+                ],
+              );
 
-              // Input for receive quantity
-              SizedBox(
-                width: 120,
+              final receiveInput = SizedBox(
+                width: isNarrow ? double.infinity : 120,
                 child: TextFormField(
                   controller: line.controller,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                    FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d+\.?\d{0,2}')),
                   ],
                   decoration: InputDecoration(
                     labelText: 'Receive (${item.inventoryUnit})',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    infoCol,
+                    const SizedBox(height: AppSpacing.sm),
+                    receiveInput,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: infoCol),
+                  const SizedBox(width: AppSpacing.sm),
+                  receiveInput,
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.xs),
           const Divider(height: 12, color: AppColors.outlineVariant),
 
           // Expiry Date Selection Row
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
             children: [
-              Icon(
-                Icons.event_available_outlined,
-                size: 16,
-                color: line.requiresExpiry ? AppColors.error : AppColors.primary,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.event_available_outlined,
+                    size: 14,
+                    color: line.requiresExpiry
+                        ? AppColors.error
+                        : AppColors.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    line.requiresExpiry ? 'BATCH EXPIRY *' : 'EXPIRY (OPT.)',
+                    style: AppTypography.labelCaps.copyWith(
+                      color: line.requiresExpiry
+                          ? AppColors.error
+                          : AppColors.onSurfaceVariant,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              Text(
-                line.requiresExpiry ? 'BATCH EXPIRY DATE *' : 'BATCH EXPIRY DATE (OPTIONAL)',
-                style: AppTypography.labelCaps.copyWith(
-                  color: line.requiresExpiry ? AppColors.error : AppColors.onSurfaceVariant,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
               InkWell(
                 onTap: () async {
-                  final initialTarget = line.expiryDate != null && !line.expiryDate!.isBefore(today)
+                  final initialTarget = line.expiryDate != null &&
+                          !line.expiryDate!.isBefore(today)
                       ? line.expiryDate!
                       : today.add(const Duration(days: 365));
 
@@ -559,16 +614,21 @@ class _ReceivePurchaseOrderDialogState
                 },
                 borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: line.expiryDate != null
                         ? Colors.green.shade50
-                        : (line.requiresExpiry ? Colors.red.shade50 : AppColors.surfaceContainerHigh),
+                        : (line.requiresExpiry
+                            ? Colors.red.shade50
+                            : AppColors.surfaceContainerHigh),
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     border: Border.all(
                       color: line.expiryDate != null
                           ? Colors.green.shade400
-                          : (line.requiresExpiry ? Colors.red.shade300 : AppColors.outline),
+                          : (line.requiresExpiry
+                              ? Colors.red.shade300
+                              : AppColors.outline),
                     ),
                   ),
                   child: Row(
@@ -579,26 +639,33 @@ class _ReceivePurchaseOrderDialogState
                         size: 14,
                         color: line.expiryDate != null
                             ? Colors.green.shade800
-                            : (line.requiresExpiry ? Colors.red.shade800 : AppColors.onSurfaceVariant),
+                            : (line.requiresExpiry
+                                ? Colors.red.shade800
+                                : AppColors.onSurfaceVariant),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         line.expiryDate != null
                             ? DateFormat('dd/MM/yyyy').format(line.expiryDate!)
-                            : (line.requiresExpiry ? 'Select Expiry Date *' : 'Set Expiry Date'),
+                            : (line.requiresExpiry
+                                ? 'Select Expiry Date *'
+                                : 'Set Expiry Date'),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: line.expiryDate != null
                               ? Colors.green.shade800
-                              : (line.requiresExpiry ? Colors.red.shade800 : AppColors.onSurfaceVariant),
+                              : (line.requiresExpiry
+                                  ? Colors.red.shade800
+                                  : AppColors.onSurfaceVariant),
                         ),
                       ),
                       if (line.expiryDate != null) ...[
                         const SizedBox(width: 4),
                         GestureDetector(
                           onTap: () => setState(() => line.expiryDate = null),
-                          child: Icon(Icons.close, size: 14, color: Colors.green.shade800),
+                          child: Icon(Icons.close,
+                              size: 14, color: Colors.green.shade800),
                         ),
                       ],
                     ],
@@ -639,38 +706,36 @@ class _ReceivePurchaseOrderDialogState
     );
   }
 
-  Widget _buildDialogHeader() {
+  Widget _buildDialogHeader(bool isDesktop) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? AppSpacing.lg : 12.0,
         vertical: AppSpacing.md,
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                ),
-                child: const Icon(
-                  Icons.inventory,
-                  color: Colors.green,
-                  size: 20,
-                ),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: Colors.green.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            ),
+            child: const Icon(
+              Icons.inventory,
+              color: Colors.green,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'Receive Purchase Order',
+              style: AppTypography.headlineMd.copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Receive Purchase Order',
-                style: AppTypography.headlineMd.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-            ],
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.close),
@@ -684,21 +749,24 @@ class _ReceivePurchaseOrderDialogState
   Widget _buildDialogActions() {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xs,
         children: [
           TextButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          const SizedBox(width: AppSpacing.sm),
           FilledButton.icon(
             onPressed: _isLoading ? null : _submitReceiving,
             icon: _isLoading
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.check_circle_outline, size: 18),
             label: const Text('Confirm Receiving'),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -41,9 +43,13 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
   String _department = 'eye';
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  Timer? _debounceTimer;
+  int _currentPage = 0;
+  static const int _pageSize = 50;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -58,19 +64,30 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
           (created.department == 'eye' || created.department == 'dental')
               ? created.department!
               : _department;
-      setState(() => _department = targetDept);
+      setState(() {
+        _department = targetDept;
+        _currentPage = 0;
+      });
       ref.invalidate(patientSearchProvider);
+      ref.invalidate(paginatedPatientSearchProvider);
       ref.invalidate(patientsByDepartmentProvider('eye'));
       ref.invalidate(patientsByDepartmentProvider('dental'));
       ref.invalidate(patientsProvider);
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PatientDetailsScreen(patientId: created.id),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final patientsAsync = ref.watch(patientSearchProvider((
+    final patientsAsync = ref.watch(paginatedPatientSearchProvider((
       department: _department,
       query: _searchQuery,
+      page: _currentPage,
     )));
 
     return LayoutBuilder(
@@ -90,10 +107,60 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
               isDesktop
                   ? _buildPatientTable(patientsAsync)
                   : _buildPatientCards(patientsAsync),
+              _buildPaginationControls(patientsAsync.valueOrNull?.length ?? 0),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPaginationControls(int currentCount) {
+    if (currentCount == 0 && _currentPage == 0) return const SizedBox.shrink();
+
+    final hasNext = currentCount >= _pageSize;
+    final hasPrev = _currentPage > 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          Text(
+            'Showing $currentCount patients (Page ${_currentPage + 1})',
+            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                onPressed: hasPrev
+                    ? () => setState(() => _currentPage--)
+                    : null,
+                icon: const Icon(Icons.chevron_left, size: 18),
+                label: const Text('Previous'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: hasNext
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                icon: const Icon(Icons.chevron_right, size: 18),
+                label: const Text('Next'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -126,12 +193,16 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
       decoration: InputDecoration(
         hintText: 'Search by name, ID, or mobile...',
         prefixIcon: const Icon(Icons.search, size: 20),
-        suffixIcon: _searchQuery.isNotEmpty
+        suffixIcon: _searchController.text.isNotEmpty
             ? IconButton(
                 icon: const Icon(Icons.clear, size: 18),
                 onPressed: () {
+                  _debounceTimer?.cancel();
                   _searchController.clear();
-                  setState(() => _searchQuery = '');
+                  setState(() {
+                    _searchQuery = '';
+                    _currentPage = 0;
+                  });
                 },
               )
             : null,
@@ -144,7 +215,28 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
         ),
       ),
       onChanged: (val) {
-        setState(() => _searchQuery = val.trim());
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 350), () {
+          if (mounted) {
+            final trimmed = val.trim();
+            if (_searchQuery != trimmed) {
+              setState(() {
+                _searchQuery = trimmed;
+                _currentPage = 0;
+              });
+            }
+          }
+        });
+      },
+      onSubmitted: (val) {
+        _debounceTimer?.cancel();
+        final trimmed = val.trim();
+        if (_searchQuery != trimmed) {
+          setState(() {
+            _searchQuery = trimmed;
+            _currentPage = 0;
+          });
+        }
       },
     );
   }
@@ -169,16 +261,23 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
 
   void _selectDepartment(String department) {
     if (department != 'eye' && department != 'dental') return;
-    setState(() => _department = department);
+    _debounceTimer?.cancel();
+    setState(() {
+      _department = department;
+      _currentPage = 0;
+    });
     ref.invalidate(patientSearchProvider);
+    ref.invalidate(paginatedPatientSearchProvider);
     ref.invalidate(patientsByDepartmentProvider(department));
   }
 
   Widget _buildHeader(bool isDesktop) {
     if (isDesktop) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      return Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.end,
+        spacing: AppSpacing.md,
+        runSpacing: AppSpacing.sm,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,6 +286,7 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
                 'Patients',
                 style: AppTypography.displayLg.copyWith(
                   color: AppColors.onBackground,
+                  fontSize: 36,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -198,7 +298,9 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
               ),
             ],
           ),
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
             children: [
               OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).push(
@@ -325,7 +427,7 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
             Text('Unable to load patients: $error'),
             const SizedBox(height: AppSpacing.xs),
             TextButton(
-              onPressed: () => ref.invalidate(patientSearchProvider),
+              onPressed: () => ref.invalidate(paginatedPatientSearchProvider),
               child: const Text('Retry'),
             ),
           ],
@@ -455,6 +557,7 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
                                 );
                                 if (updated != null && mounted) {
                                   ref.invalidate(patientSearchProvider);
+                                  ref.invalidate(paginatedPatientSearchProvider);
                                   ref.invalidate(
                                       patientsByDepartmentProvider('eye'));
                                   ref.invalidate(
@@ -623,7 +726,7 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
                         Text('Unable to load patients: $error'),
                         TextButton(
                           onPressed: () =>
-                              ref.invalidate(patientSearchProvider),
+                              ref.invalidate(paginatedPatientSearchProvider),
                           child: const Text('Retry'),
                         ),
                       ],
@@ -768,8 +871,12 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
               width: 80,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
                     icon: const Icon(Icons.edit_outlined, size: 18),
                     color: AppColors.primary,
                     tooltip: 'Edit Patient',
@@ -780,6 +887,7 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
                       );
                       if (updated != null && mounted) {
                         ref.invalidate(patientSearchProvider);
+                        ref.invalidate(paginatedPatientSearchProvider);
                         ref.invalidate(patientsByDepartmentProvider('eye'));
                         ref.invalidate(patientsByDepartmentProvider('dental'));
                         ref.invalidate(patientsProvider);
@@ -787,6 +895,9 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
                     },
                   ),
                   IconButton(
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
                     icon: const Icon(Icons.chevron_right, size: 20),
                     color: AppColors.outline,
                     tooltip: 'View Details',
