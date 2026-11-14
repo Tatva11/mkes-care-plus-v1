@@ -56,7 +56,22 @@ class PatientsNotifier extends StateNotifier<AsyncValue<List<PatientModel>>> {
       rethrow;
     }
   }
+
+  Future<void> deletePatient(String id) async {
+    try {
+      await _repository.deletePatient(id);
+      await loadPatients();
+    } catch (e) {
+      debugPrint('Error deleting patient: $e');
+      rethrow;
+    }
+  }
 }
+
+final nextPatientNumberProvider =
+    FutureProvider.family<String, String>((ref, department) {
+  return ref.watch(patientRepositoryProvider).getNextPatientNumber(department);
+});
 
 final patientDetailsProvider =
     FutureProvider.family<PatientModel, String>((ref, id) {

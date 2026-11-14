@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../auth/providers/auth_provider.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -269,6 +271,84 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
     ref.invalidate(patientSearchProvider);
     ref.invalidate(paginatedPatientSearchProvider);
     ref.invalidate(patientsByDepartmentProvider(department));
+  }
+
+  Future<void> _confirmDeletePatient(PatientModel patient) async {
+    final profile = ref.read(currentProfileProvider).valueOrNull;
+    final isAdmin = profile?.role == 'admin';
+    final userDept = profile?.department?.toLowerCase().trim();
+    final patientDept = patient.department?.toLowerCase().trim();
+
+    if (!isAdmin &&
+        (userDept == null || userDept.isEmpty || userDept != patientDept)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Access denied: Staff can only delete patients belonging to their assigned department.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Patient Record'),
+        content: Text(
+          'Are you sure you want to permanently delete patient ${patient.name} (${patient.patientNumber})?\n\n'
+          'This will remove the patient record and associated clinic appointments. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await ref.read(patientsProvider.notifier).deletePatient(patient.id);
+
+        ref.invalidate(patientSearchProvider);
+        ref.invalidate(paginatedPatientSearchProvider);
+        ref.invalidate(patientsByDepartmentProvider('eye'));
+        ref.invalidate(patientsByDepartmentProvider('dental'));
+        ref.invalidate(patientsProvider);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Patient ${patient.name} (${patient.patientNumber}) deleted successfully.',
+              ),
+              backgroundColor: AppColors.primaryContainer,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Error deleting patient: ${e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '')}',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildHeader(bool isDesktop) {
@@ -565,6 +645,15 @@ class _PatientListContentState extends ConsumerState<PatientListContent> {
                                   ref.invalidate(patientsProvider);
                                 }
                               },
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              color: AppColors.error,
+                              tooltip: 'Delete Patient',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => _confirmDeletePatient(patient),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             const Icon(

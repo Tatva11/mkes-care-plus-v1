@@ -10,6 +10,7 @@ import '../../../shared/widgets/mkes_text_field.dart';
 import '../../../shared/widgets/responsive_form_row.dart';
 import '../models/patient_model.dart';
 import '../providers/patients_provider.dart';
+import '../repositories/patient_repository.dart';
 
 class PatientFormDialog extends ConsumerStatefulWidget {
   const PatientFormDialog({
@@ -36,6 +37,8 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
   late String _selectedDepartment;
   DateTime? _selectedDob;
   bool _isLoading = false;
+  String? _nextPatientNumberPreview;
+  bool _isLoadingPreview = false;
 
   bool get _isEditing => widget.patient != null;
 
@@ -52,6 +55,35 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
         (p?.department ?? widget.initialDepartment).toLowerCase().trim();
     _selectedDepartment = (dept == 'dental') ? 'dental' : 'eye';
     _selectedDob = p?.dob;
+
+    if (!_isEditing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadNextPatientNumberPreview(_selectedDepartment);
+      });
+    }
+  }
+
+  Future<void> _loadNextPatientNumberPreview(String department) async {
+    if (_isEditing) return;
+    setState(() => _isLoadingPreview = true);
+    try {
+      final repo = ref.read(patientRepositoryProvider);
+      final preview = await repo.getNextPatientNumber(department);
+      if (mounted) {
+        setState(() {
+          _nextPatientNumberPreview = preview;
+          _isLoadingPreview = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _nextPatientNumberPreview =
+              department == 'eye' ? 'E-001' : 'D-001';
+          _isLoadingPreview = false;
+        });
+      }
+    }
   }
 
   @override
@@ -177,12 +209,16 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
-                      'Patient ${created.name} (${created.patientNumber}) registered successfully!',
-                      style: const TextStyle(color: Colors.white),
+                      'Patient ${created.name} registered with confirmed Patient ID: ${created.patientNumber}!',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
               ),
+              duration: const Duration(seconds: 4),
             ),
           );
           Navigator.of(context).pop(created);
@@ -312,6 +348,104 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Next Assigned Patient Number Preview (Registration Only)
+                        if (!_isEditing) ...[
+                          Container(
+                            margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm + 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer
+                                  .withValues(alpha: 0.1),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusMd),
+                              border: Border.all(
+                                color: AppColors.primaryContainer
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(
+                                        AppSpacing.radiusSm),
+                                  ),
+                                  child: const Icon(
+                                    Icons.tag,
+                                    color: AppColors.primary,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Next Assigned Patient ID (Preview)',
+                                        style: AppTypography.labelCaps.copyWith(
+                                          color: AppColors.primary,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      _isLoadingPreview
+                                          ? const SizedBox(
+                                              width: 14,
+                                              height: 14,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2),
+                                            )
+                                          : Text(
+                                              _nextPatientNumberPreview ??
+                                                  'Generating...',
+                                              style: AppTypography.dataMono
+                                                  .copyWith(
+                                                color: AppColors.onSurface,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: AppColors.outlineVariant
+                                          .withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _selectedDepartment == 'eye'
+                                        ? 'Eye Clinic'
+                                        : 'Dental Clinic',
+                                    style: AppTypography.labelCaps.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
                         // Full Name
                         MkesTextField(
                           controller: _nameController,
@@ -364,8 +498,9 @@ class _PatientFormDialogState extends ConsumerState<PatientFormDialog> {
                                 ),
                               ],
                               onChanged: (val) {
-                                if (val != null) {
+                                if (val != null && val != _selectedDepartment) {
                                   setState(() => _selectedDepartment = val);
+                                  _loadNextPatientNumberPreview(val);
                                 }
                               },
                             ),

@@ -116,6 +116,24 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
       return;
     }
 
+    if (user.role.toLowerCase() == 'admin') {
+      final allUsers = ref.read(usersProvider).valueOrNull ?? [];
+      final activeAdmins = allUsers
+          .where((u) => u.role.toLowerCase() == 'admin' && u.isActive)
+          .toList();
+      if (activeAdmins.length <= 1) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot delete the last remaining admin account.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
     if (_deletingUserIds.contains(user.id)) return;
 
     final confirmed = await showDialog<bool>(

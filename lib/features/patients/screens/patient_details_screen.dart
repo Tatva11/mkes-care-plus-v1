@@ -1,3 +1,4 @@
+import '../../auth/providers/auth_provider.dart';
 import 'package:flutter/foundation.dart';
 import '../../appointments/models/appointment_model.dart';
 import '../../appointments/providers/appointment_provider.dart';
@@ -130,6 +131,88 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
     }
   }
 
+  Future<void> _confirmDeletePatient(
+    PatientModel patient,
+  ) async {
+    final profile = ref.read(currentProfileProvider).valueOrNull;
+    final isAdmin = profile?.role == 'admin';
+    final userDept = profile?.department?.toLowerCase().trim();
+    final patientDept = patient.department?.toLowerCase().trim();
+
+    if (!isAdmin &&
+        (userDept == null || userDept.isEmpty || userDept != patientDept)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Access denied: Staff can only delete patients belonging to their assigned department.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Patient Record'),
+        content: Text(
+          'Are you sure you want to permanently delete patient ${patient.name} (${patient.patientNumber})?\n\n'
+          'This will remove the patient record and associated clinic appointments. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await ref.read(patientsProvider.notifier).deletePatient(patient.id);
+
+        ref.invalidate(patientDetailsProvider(patient.id));
+        ref.invalidate(patientsProvider);
+        ref.invalidate(patientsByDepartmentProvider('eye'));
+        ref.invalidate(patientsByDepartmentProvider('dental'));
+        ref.invalidate(patientSearchProvider);
+        ref.invalidate(paginatedPatientSearchProvider);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Patient ${patient.name} (${patient.patientNumber}) deleted successfully.',
+              ),
+              backgroundColor: AppColors.primaryContainer,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Error deleting patient: ${e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '')}',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final patientAsync = ref.watch(patientDetailsProvider(patientId));
@@ -169,6 +252,12 @@ class _PatientDetailsScreenState extends ConsumerState<PatientDetailsScreen> {
                           ref.invalidate(patientDetailsProvider(patientId));
                         }
                       },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      color: AppColors.error,
+                      tooltip: 'Delete Patient',
+                      onPressed: () => _confirmDeletePatient(patient),
                     ),
                   ],
                 ),

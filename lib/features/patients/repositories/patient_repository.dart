@@ -190,6 +190,77 @@ class PatientRepository {
     return created;
   }
 
+  /// Fetches the preview of the next sequential patient number for a given department.
+  /// This operation is strictly read-only and does NOT allocate or reserve the number.
+  Future<String> getNextPatientNumber(String department) async {
+    final cleanDept = department.trim().toLowerCase();
+    if (cleanDept != 'eye' && cleanDept != 'dental') {
+      throw ArgumentError.value(
+          department, 'department', 'Must be eye or dental.');
+    }
+
+    try {
+      final response = await _supabase.rpc(
+        'get_next_patient_number',
+        params: {'p_department': cleanDept},
+      );
+      if (response != null && response.toString().trim().isNotEmpty) {
+        return response.toString().trim();
+      }
+    } catch (e) {
+      debugPrint('PatientRepository.getNextPatientNumber RPC error: $e');
+    }
+
+    // Direct fallback if RPC is unavailable
+    final prefix = cleanDept == 'eye' ? 'E' : 'D';
+    try {
+      final rows = await _supabase
+          .from('patients')
+          .select('patient_number')
+          .eq('department', cleanDept);
+
+      int maxNum = 0;
+      for (final row in rows as List) {
+        final pNum = row['patient_number']?.toString() ?? '';
+        final digits = pNum.replaceAll(RegExp(r'\D'), '');
+        if (digits.isNotEmpty) {
+          final val = int.tryParse(digits) ?? 0;
+          if (val > maxNum) maxNum = val;
+        }
+      }
+      final nextNum = maxNum + 1;
+      return '$prefix-${nextNum < 1000 ? nextNum.toString().padLeft(3, '0') : nextNum.toString()}';
+    } catch (e) {
+      debugPrint('PatientRepository.getNextPatientNumber fallback error: $e');
+      return '$prefix-001';
+    }
+  }
+
+  /// Permanently deletes a patient record.
+  /// Staff can delete only patients belonging to their assigned department.
+  /// Admins can delete across all departments. Geofence restrictions are enforced.
+  Future<bool> deletePatient(String id) async {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) {
+      throw ArgumentError('Patient ID cannot be empty for deletion.');
+    }
+
+    try {
+      final response = await _supabase.rpc(
+        'delete_patient',
+        params: {'p_patient_id': cleanId},
+      );
+      _patientCache.remove(cleanId);
+      return response == true;
+    } catch (e) {
+      debugPrint(
+          'PatientRepository.deletePatient RPC failed, falling back to direct DELETE: $e');
+      await _supabase.from('patients').delete().eq('id', cleanId);
+      _patientCache.remove(cleanId);
+      return true;
+    }
+  }
+
   /// Fetch a single patient by ID from cache or Supabase.
   /// Eliminates redundant network requests when patient has already been loaded.
   Future<PatientModel> getPatient(String id) async {

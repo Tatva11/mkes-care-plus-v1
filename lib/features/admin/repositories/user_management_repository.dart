@@ -98,9 +98,17 @@ class UserManagementRepository {
       throw Exception('This email is already registered.');
     }
     if (lower.contains('forbidden') ||
-        lower.contains('only active admins') ||
+        lower.contains('only active admin') ||
         lower.contains('insufficient_privilege')) {
-      throw Exception('You do not have permission to create users.');
+      throw Exception('You do not have permission to manage this account.');
+    }
+    if (lower.contains('cannot delete your own') ||
+        lower.contains('own admin account')) {
+      throw Exception('You cannot delete your own admin account.');
+    }
+    if (lower.contains('last remaining admin') ||
+        lower.contains('last admin account')) {
+      throw Exception('Cannot delete the last remaining admin account.');
     }
     if (lower.contains('department') &&
         (lower.contains('foreign key') || lower.contains('violates'))) {
@@ -137,10 +145,44 @@ class UserManagementRepository {
         .update({'is_active': isActive}).eq('id', id);
   }
 
+  /// Deletes a staff/user account via the [delete-staff-user] Edge Function.
+  ///
+  /// The Edge Function executes with server-side service-role authorization to:
+  /// 1. Verify caller is an active admin and not deleting themselves or the last admin.
+  /// 2. Clean up foreign keys in billing, appointments, and audit tables.
+  /// 3. Permanently remove the user from Supabase Auth via GoTrue Admin API.
   Future<void> deleteUser(String id) async {
-    // Usually, you should delete from auth.users (which cascades to profiles),
-    // but client-side delete requires an RPC or Edge Function.
-    await _supabase.rpc('delete_user_by_admin', params: {'target_user_id': id});
+    try {
+      final response = await _supabase.functions.invoke(
+        'delete-staff-user',
+        body: {'target_user_id': id},
+      );
+
+      final responseBody = response.data;
+      if (responseBody is Map && responseBody.containsKey('error')) {
+        final serverError =
+            responseBody['error']?.toString() ?? 'Failed to delete user';
+        debugPrint('delete-staff-user Edge Function error: $serverError');
+        _throwFriendlyError(serverError);
+      }
+    } on FunctionException catch (e) {
+      debugPrint('FunctionException deleting user: ${e.details}');
+      String errorText = e.details?.toString() ?? e.toString();
+      try {
+        final decoded = jsonDecode(errorText);
+        if (decoded is Map && decoded['error'] != null) {
+          errorText = decoded['error'].toString();
+        }
+      } catch (_) {}
+      _throwFriendlyError(errorText);
+    } catch (e) {
+      debugPrint('Edge function invocation failed, falling back to delete_user_by_admin RPC: $e');
+      try {
+        await _supabase.rpc('delete_user_by_admin', params: {'target_user_id': id});
+      } catch (rpcErr) {
+        _throwFriendlyError(_errorText(rpcErr));
+      }
+    }
   }
 
   /// Grants a temporary GPS geofence bypass to a specific staff member.
