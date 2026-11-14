@@ -185,10 +185,16 @@ BEGIN
 
   -- Security check: Enforce staff profile department boundary (prevents cross-dept leakage)
   IF NOT public.is_admin() THEN
-    SELECT lower(trim(COALESCE(department, '')))
+    SELECT 
+      CASE 
+        WHEN lower(trim(d.name)) LIKE '%eye%' THEN 'eye'
+        WHEN lower(trim(d.name)) LIKE '%dental%' THEN 'dental'
+        ELSE lower(trim(d.name))
+      END
     INTO v_user_dept
-    FROM public.profiles
-    WHERE id = auth.uid();
+    FROM public.departments d
+    JOIN public.profiles p ON p.department_id = d.id
+    WHERE p.id = auth.uid();
 
     IF v_user_dept IN ('eye', 'dental') THEN
       v_dept := v_user_dept;
@@ -366,10 +372,16 @@ BEGIN
 
   -- Security check: Enforce staff profile department boundary
   IF NOT public.is_admin() THEN
-    SELECT lower(trim(COALESCE(department, '')))
+    SELECT 
+      CASE 
+        WHEN lower(trim(d.name)) LIKE '%eye%' THEN 'eye'
+        WHEN lower(trim(d.name)) LIKE '%dental%' THEN 'dental'
+        ELSE lower(trim(d.name))
+      END
     INTO v_user_dept
-    FROM public.profiles
-    WHERE id = auth.uid();
+    FROM public.departments d
+    JOIN public.profiles p ON p.department_id = d.id
+    WHERE p.id = auth.uid();
 
     IF v_user_dept IN ('eye', 'dental') THEN
       v_dept := v_user_dept;

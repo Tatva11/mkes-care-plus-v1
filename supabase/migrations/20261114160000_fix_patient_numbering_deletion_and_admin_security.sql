@@ -3,22 +3,67 @@
 -- File: supabase/migrations/20261114160000_fix_patient_numbering_deletion_and_admin_security.sql
 --
 -- Description:
---   1. Implements read-only get_next_patient_number(department) to preview the next
+--   1. Defines helper get_staff_department_name(user_id) joining profiles.department_id
+--      to departments.name, resolving the missing profiles.department column error.
+--   2. Implements read-only get_next_patient_number(department) to preview the next
 --      patient number without consuming or reserving it.
---   2. Updates create_patient(...) to atomically allocate sequential department numbers
+--   3. Updates create_patient(...) to atomically allocate sequential department numbers
 --      continuing from highest existing imported Excel records (E-001 / D-001 format),
 --      locking concurrently with pg_advisory_xact_lock to prevent duplicates.
---   3. Implements delete_patient(uuid) with geofencing validation, department isolation
+--   4. Implements delete_patient(uuid) with geofencing validation, department isolation
 --      for staff, admin full-access, and safe child record cascade/cleanup.
---   4. Adds RLS DELETE policy on public.patients for authorized staff and admins.
---   5. Enhances delete_user_by_admin(uuid) to safely nullify foreign key references,
+--   5. Adds RLS DELETE policy on public.patients for authorized staff and admins.
+--   6. Enhances delete_user_by_admin(uuid) to safely nullify foreign key references,
 --      prevent self-deletion, and prevent deletion of the last admin account.
 -- ============================================================================
 
 BEGIN;
 
 -- ----------------------------------------------------------------------------
--- 1. Read-Only Preview Function: public.get_next_patient_number
+-- 1. Helper Function: public.get_staff_department_name
+--    Resolves the staff member's department name ('eye' or 'dental') by joining
+--    profiles.department_id to public.departments(id).
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_staff_department_name(p_user_id UUID DEFAULT auth.uid())
+RETURNS TEXT
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $func$
+DECLARE
+  v_dept_name TEXT;
+BEGIN
+  IF p_user_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT lower(trim(d.name))
+  INTO v_dept_name
+  FROM public.departments d
+  JOIN public.profiles p ON p.department_id = d.id
+  WHERE p.id = p_user_id AND p.is_active = true;
+
+  IF v_dept_name LIKE '%eye%' THEN
+    RETURN 'eye';
+  ELSIF v_dept_name LIKE '%dental%' THEN
+    RETURN 'dental';
+  ELSE
+    RETURN v_dept_name;
+  END IF;
+END;
+$func$;
+
+ALTER FUNCTION public.get_staff_department_name(UUID) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.get_staff_department_name(UUID) FROM anon;
+REVOKE ALL ON FUNCTION public.get_staff_department_name(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_staff_department_name(UUID) TO authenticated, service_role;
+
+COMMENT ON FUNCTION public.get_staff_department_name(UUID) IS
+  'Resolves staff department normalized name (eye or dental) by joining profiles.department_id with public.departments.';
+
+-- ----------------------------------------------------------------------------
+-- 2. Read-Only Preview Function: public.get_next_patient_number
 --    Calculates the next available patient number from existing records
 --    without holding locks or incrementing sequences.
 -- ----------------------------------------------------------------------------
@@ -78,7 +123,7 @@ COMMENT ON FUNCTION public.get_next_patient_number(TEXT) IS
   'Read-only calculation of the next sequential patient number for a department without reserving or incrementing sequences.';
 
 -- ----------------------------------------------------------------------------
--- 2. Atomic Patient Registration: public.create_patient
+-- 3. Atomic Patient Registration: public.create_patient
 --    Serializes registrations per department using pg_advisory_xact_lock to ensure
 --    zero duplicate patient numbers, continuing from the highest existing Excel import.
 -- ----------------------------------------------------------------------------
@@ -120,10 +165,7 @@ BEGIN
 
   -- Staff department boundary: non-admins can only register patients for their own department
   IF NOT public.is_admin() THEN
-    SELECT lower(trim(COALESCE(department, '')))
-    INTO v_user_dept
-    FROM public.profiles
-    WHERE id = auth.uid() AND is_active = true;
+    v_user_dept := public.get_staff_department_name(auth.uid());
 
     IF v_user_dept IN ('eye', 'dental') AND v_user_dept <> normalized_department THEN
       RAISE EXCEPTION 'Access denied: Staff can only register patients in their assigned department.';
@@ -196,7 +238,7 @@ REVOKE ALL ON FUNCTION public.create_patient(TEXT, TEXT, DATE, TEXT, TEXT, TEXT,
 GRANT EXECUTE ON FUNCTION public.create_patient(TEXT, TEXT, DATE, TEXT, TEXT, TEXT, DATE) TO authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
--- 3. Patient Deletion Function: public.delete_patient
+-- 4. Patient Deletion Function: public.delete_patient
 --    Validates geofencing, enforces department boundary for staff, and safely
 --    removes dependent records before deleting the patient.
 -- ----------------------------------------------------------------------------
@@ -232,10 +274,7 @@ BEGIN
 
   -- Staff department boundary: non-admins can only delete patients in their own department
   IF NOT v_is_adm THEN
-    SELECT lower(trim(COALESCE(department, '')))
-    INTO v_user_dept
-    FROM public.profiles
-    WHERE id = auth.uid() AND is_active = true;
+    v_user_dept := public.get_staff_department_name(auth.uid());
 
     IF v_user_dept IS NULL OR v_user_dept NOT IN ('eye', 'dental') OR v_user_dept <> lower(trim(v_patient.department)) THEN
       RAISE EXCEPTION 'Access denied: Staff can only delete patients belonging to their assigned department.';
@@ -303,7 +342,8 @@ COMMENT ON FUNCTION public.delete_patient(UUID) IS
   'Deletes a patient record with geofence validation, staff department boundary isolation, and child record cascade.';
 
 -- ----------------------------------------------------------------------------
--- 4. RLS Policy for Patient Deletion
+-- 5. RLS Policy for Patient Deletion
+--    Uses public.profiles.department_id -> public.departments.name join.
 -- ----------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Authorized staff and admins can delete patients" ON public.patients;
 
@@ -313,17 +353,22 @@ CREATE POLICY "Authorized staff and admins can delete patients"
     public.is_admin()
     OR (
       EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE profiles.id = auth.uid()
-          AND profiles.role IN ('admin', 'staff', 'doctor', 'receptionist')
-          AND profiles.is_active = true
-          AND lower(trim(COALESCE(profiles.department, ''))) = lower(trim(COALESCE(patients.department, '')))
+        SELECT 1 
+        FROM public.profiles p
+        JOIN public.departments d ON d.id = p.department_id
+        WHERE p.id = auth.uid()
+          AND p.is_active = true
+          AND (
+            (lower(trim(d.name)) LIKE '%eye%' AND lower(trim(patients.department)) = 'eye')
+            OR (lower(trim(d.name)) LIKE '%dental%' AND lower(trim(patients.department)) = 'dental')
+            OR lower(trim(d.name)) = lower(trim(patients.department))
+          )
       )
     )
   );
 
 -- ----------------------------------------------------------------------------
--- 5. Safe Admin Staff Deletion Helper: public.delete_user_by_admin
+-- 6. Safe Admin Staff Deletion Helper: public.delete_user_by_admin
 --    Pre-cleans foreign keys, prevents self-deletion, and prevents deleting last admin.
 -- ----------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.delete_user_by_admin(UUID);
@@ -468,7 +513,7 @@ REVOKE ALL ON FUNCTION public.delete_user_by_admin(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.delete_user_by_admin(UUID) TO authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
--- 6. Schema Reload Notification & Transaction Closure
+-- 7. Schema Reload Notification & Transaction Closure
 -- ----------------------------------------------------------------------------
 NOTIFY pgrst, 'reload schema';
 
