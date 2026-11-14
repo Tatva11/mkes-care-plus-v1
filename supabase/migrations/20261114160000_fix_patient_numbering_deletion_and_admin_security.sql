@@ -89,20 +89,19 @@ BEGIN
     ELSE 'D'
   END;
 
-  -- Extract the maximum numeric value among all patient numbers in this department
+  -- Extract the maximum numeric value among all patient numbers in this department.
+  -- Uses leading digit matching ^[A-Za-z]*-?([0-9]{1,9}) to safely handle all formats:
+  -- pure numbers ('1', '4000', '15562'), prefixed ('E-4000', 'E4000', 'D-100', 'D3819'),
+  -- composite strings ('D270/937', 'D2271+A16+A750'), avoiding BIGINT overflow on outlier rows.
   SELECT COALESCE(
     MAX(
-      CASE 
-        WHEN regexp_replace(patient_number, '[^0-9]', '', 'g') <> '' 
-        THEN regexp_replace(patient_number, '[^0-9]', '', 'g')::BIGINT 
-        ELSE 0 
-      END
+      (substring(patient_number FROM '^[A-Za-z]*-?([0-9]{1,9})'))::BIGINT
     ), 
     0
   )
   INTO max_num
   FROM public.patients
-  WHERE lower(department) = normalized_department;
+  WHERE lower(trim(department)) = normalized_department;
 
   next_num := max_num + 1;
 
@@ -115,9 +114,8 @@ END;
 $func$;
 
 ALTER FUNCTION public.get_next_patient_number(TEXT) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.get_next_patient_number(TEXT) FROM anon;
 REVOKE ALL ON FUNCTION public.get_next_patient_number(TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_next_patient_number(TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_next_patient_number(TEXT) TO anon, authenticated, service_role;
 
 COMMENT ON FUNCTION public.get_next_patient_number(TEXT) IS
   'Read-only calculation of the next sequential patient number for a department without reserving or incrementing sequences.';
@@ -180,20 +178,19 @@ BEGIN
   -- Atomically serialize generation per department for the duration of this transaction
   PERFORM pg_advisory_xact_lock(hashtextextended('patients:' || normalized_department, 0));
 
-  -- Query highest existing numeric value in this department across all formats
+  -- Query highest existing numeric value in this department across all formats.
+  -- Uses leading digit matching ^[A-Za-z]*-?([0-9]{1,9}) to safely handle all formats:
+  -- pure numbers ('1', '4000', '15562'), prefixed ('E-4000', 'E4000', 'D-100', 'D3819'),
+  -- composite strings ('D270/937', 'D2271+A16+A750'), avoiding BIGINT overflow on outlier rows.
   SELECT COALESCE(
     MAX(
-      CASE 
-        WHEN regexp_replace(patient_number, '[^0-9]', '', 'g') <> '' 
-        THEN regexp_replace(patient_number, '[^0-9]', '', 'g')::BIGINT 
-        ELSE 0 
-      END
+      (substring(patient_number FROM '^[A-Za-z]*-?([0-9]{1,9})'))::BIGINT
     ), 
     0
   )
   INTO max_num
   FROM public.patients
-  WHERE lower(department) = normalized_department;
+  WHERE lower(trim(department)) = normalized_department;
 
   next_number := max_num + 1;
 

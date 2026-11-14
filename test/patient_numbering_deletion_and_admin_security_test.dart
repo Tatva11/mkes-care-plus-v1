@@ -29,11 +29,12 @@ class MockSimulatedPatientRepository extends Fake implements PatientRepository {
 
     final prefix = cleanDept == 'eye' ? 'E' : 'D';
     int maxNum = 0;
+    final numberPattern = RegExp(r'^[A-Za-z]*-?(\d{1,9})');
     for (final p in _database) {
       if (p.department?.toLowerCase().trim() == cleanDept) {
-        final digits = p.patientNumber.replaceAll(RegExp(r'\D'), '');
-        if (digits.isNotEmpty) {
-          final val = int.tryParse(digits) ?? 0;
+        final match = numberPattern.firstMatch(p.patientNumber.trim());
+        if (match != null) {
+          final val = int.tryParse(match.group(1)!) ?? 0;
           if (val > maxNum) maxNum = val;
         }
       }
@@ -294,6 +295,42 @@ void main() {
         ),
       ]);
       expect(await singlePatientRepo.getNextPatientNumber('eye'), equals('E-002'));
+    });
+
+    test('4b. Extracts correct next number across all real formats (1, 4000, E-4000, E4000, D-100, D3819, D3823, 15562, composite strings) without overflow', () async {
+      final now = DateTime(2026, 1, 1);
+      final multiFormatRepo = MockSimulatedPatientRepository([
+        // Eye formats: 1, 4000, E-4000, E4000, 15562, composite 200-digit string
+        PatientModel(id: 'e1', patientNumber: '1', name: 'P1', department: 'eye', createdAt: now, updatedAt: now),
+        PatientModel(id: 'e2', patientNumber: '4000', name: 'P4000', department: 'eye', createdAt: now, updatedAt: now),
+        PatientModel(id: 'e3', patientNumber: 'E-4000', name: 'PEHyphen4000', department: 'eye', createdAt: now, updatedAt: now),
+        PatientModel(id: 'e4', patientNumber: 'E4000', name: 'PE4000', department: 'eye', createdAt: now, updatedAt: now),
+        PatientModel(id: 'e5', patientNumber: '15562', name: 'Rekha Shah', department: 'eye', createdAt: now, updatedAt: now),
+        PatientModel(
+          id: 'e6',
+          patientNumber: '65.75+A5694+A5702+A5718+A5734+A5750+A5766+A5782+A5798+A5814+A5830', // outlier composite
+          name: 'aarvi jain',
+          department: 'eye',
+          createdAt: now,
+          updatedAt: now,
+        ),
+
+        // Dental formats: D-100, D1, D3819, D3823, composite D270/937, D2271+A16+A750
+        PatientModel(id: 'd1', patientNumber: 'D-100', name: 'D100', department: 'dental', createdAt: now, updatedAt: now),
+        PatientModel(id: 'd2', patientNumber: 'D1', name: 'D1', department: 'dental', createdAt: now, updatedAt: now),
+        PatientModel(id: 'd3', patientNumber: 'D3819', name: 'Kavita chalke', department: 'dental', createdAt: now, updatedAt: now),
+        PatientModel(id: 'd4', patientNumber: 'D3823', name: 'D3823', department: 'dental', createdAt: now, updatedAt: now),
+        PatientModel(id: 'd5', patientNumber: 'D270/937', name: 'Mr.Milind Bhandekar', department: 'dental', createdAt: now, updatedAt: now),
+        PatientModel(id: 'd6', patientNumber: 'D2271+A16+A750', name: 'Master. Ahaan Chauhan', department: 'dental', createdAt: now, updatedAt: now),
+      ]);
+
+      // Eye highest valid is 15562 -> next is E-15563 (composite 65.75 does NOT overflow or inflate)
+      final nextEye = await multiFormatRepo.getNextPatientNumber('eye');
+      expect(nextEye, equals('E-15563'));
+
+      // Dental highest valid is 3823 -> next is D-3824 (composite D2271 or D270/937 does NOT become 227 million)
+      final nextDental = await multiFormatRepo.getNextPatientNumber('dental');
+      expect(nextDental, equals('D-3824'));
     });
 
     test('5. Simultaneous concurrent registrations do not collide', () async {

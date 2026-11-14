@@ -220,11 +220,12 @@ class PatientRepository {
           .eq('department', cleanDept);
 
       int maxNum = 0;
+      final numberPattern = RegExp(r'^[A-Za-z]*-?(\d{1,9})');
       for (final row in rows as List) {
-        final pNum = row['patient_number']?.toString() ?? '';
-        final digits = pNum.replaceAll(RegExp(r'\D'), '');
-        if (digits.isNotEmpty) {
-          final val = int.tryParse(digits) ?? 0;
+        final pNum = row['patient_number']?.toString().trim() ?? '';
+        final match = numberPattern.firstMatch(pNum);
+        if (match != null) {
+          final val = int.tryParse(match.group(1)!) ?? 0;
           if (val > maxNum) maxNum = val;
         }
       }
