@@ -10,12 +10,15 @@
 --   1. Enables pg_trgm extension with explicit search_path for fast ILIKE indexing.
 --   2. Drops mismatched/redundant indexes and creates functional B-Tree indexes on
 --      lower(department) matching the search query predicates exactly.
---   3. Adds B-Tree composite indexes for department-scoped and cross-department pagination.
---   4. Adds GIN trigram indexes on name, patient_number, and mobile.
---   5. Creates high-performance search_patients RPC with server-side ranking,
+--   3. Defines an IMMUTABLE canonical patient number extractor to safely index
+--      and match numbers across 'E4000', 'E-4000', 'D4000', and '4000'.
+--   4. Adds B-Tree composite indexes for department-scoped and cross-department pagination.
+--   5. Adds GIN trigram indexes on name, patient_number, and mobile.
+--   6. Creates high-performance search_patients RPC with server-side ranking,
 --      pagination (limit/offset), geofence validation, and staff department isolation.
---   6. Creates get_today_registered_patients RPC with identical geofence and auth checks.
---   7. Strictly preserves all existing RLS security policies and geofence restrictions.
+--   7. Creates get_today_registered_patients RPC with identical geofence and auth checks.
+--   8. Strictly preserves all existing RLS security policies and geofence restrictions.
+--   9. Fully self-contained transaction block with explicit grants and schema notification.
 -- ============================================================================
 
 BEGIN;
@@ -27,16 +30,39 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 SET search_path = public, extensions;
 
 -- ----------------------------------------------------------------------------
--- 2. Drop Mismatched & Redundant Legacy Indexes (Clean State)
+-- 2. Drop Legacy & Mismatched Indexes (Clean State)
 -- ----------------------------------------------------------------------------
 DROP INDEX IF EXISTS public.idx_patients_dept_name;
 DROP INDEX IF EXISTS public.idx_patients_dept_pat_num;
 DROP INDEX IF EXISTS public.idx_patients_dept_mobile;
 DROP INDEX IF EXISTS public.idx_patients_dept_created_at;
 DROP INDEX IF EXISTS public.idx_patients_registration_date;
+DROP INDEX IF EXISTS public.idx_patients_pat_num_canonical;
+DROP INDEX IF EXISTS public.idx_patients_lower_dept_pat_num_canonical;
 
 -- ----------------------------------------------------------------------------
--- 3. Functional B-Tree Composite Indexes on lower(department)
+-- 3. Immutable Canonical Number Extractor for Indexing
+--    Must be explicitly marked IMMUTABLE so PostgreSQL permits its use in index expressions
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.canonical_patient_number(p_num text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+AS $func$
+  SELECT regexp_replace(COALESCE(p_num, ''), '^[EDed\-\s]+', '');
+$func$;
+
+ALTER FUNCTION public.canonical_patient_number(text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.canonical_patient_number(text) FROM anon;
+REVOKE ALL ON FUNCTION public.canonical_patient_number(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.canonical_patient_number(text) TO authenticated, service_role;
+
+COMMENT ON FUNCTION public.canonical_patient_number(text) IS
+  'Immutable helper stripping department prefixes, hyphens, and whitespace for canonical patient number indexing.';
+
+-- ----------------------------------------------------------------------------
+-- 4. Functional B-Tree Composite Indexes on lower(department)
 --    Directly satisfies "lower(department) = v_dept" predicates with zero cast overhead
 -- ----------------------------------------------------------------------------
 -- Speeds up department browsing and sorted pagination without in-memory sort
@@ -56,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_lower_dept_created_at
   ON public.patients (lower(department), created_at DESC);
 
 -- ----------------------------------------------------------------------------
--- 4. Global B-Tree Indexes for Cross-Department Lookups & Ordering
+-- 5. Global B-Tree Indexes for Cross-Department Lookups & Ordering
 -- ----------------------------------------------------------------------------
 -- Speeds up all-department patient browsing with sorted pagination
 CREATE INDEX IF NOT EXISTS idx_patients_name_pat_num 
@@ -75,7 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_created_at
   ON public.patients (created_at DESC);
 
 -- ----------------------------------------------------------------------------
--- 5. B-Tree Prefix & Canonical Digit Indexes (text_pattern_ops)
+-- 6. B-Tree Prefix & Canonical Digit Indexes (text_pattern_ops)
 --    Enables index-backed prefix matching and bridges 'E4000' / 'E-4000' to '4000'
 -- ----------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_patients_pat_num_prefix 
@@ -84,12 +110,12 @@ CREATE INDEX IF NOT EXISTS idx_patients_pat_num_prefix
 CREATE INDEX IF NOT EXISTS idx_patients_lower_dept_pat_num_prefix 
   ON public.patients (lower(department), patient_number text_pattern_ops);
 
--- Functional canonical digit indexes (stripping 'E', 'D', hyphens, spaces)
+-- Functional canonical digit indexes (utilizing our IMMUTABLE function)
 CREATE INDEX IF NOT EXISTS idx_patients_pat_num_canonical 
-  ON public.patients ((regexp_replace(patient_number, '^[EDed\-\s]+', '')) text_pattern_ops);
+  ON public.patients ((public.canonical_patient_number(patient_number)) text_pattern_ops);
 
 CREATE INDEX IF NOT EXISTS idx_patients_lower_dept_pat_num_canonical 
-  ON public.patients (lower(department), (regexp_replace(patient_number, '^[EDed\-\s]+', '')) text_pattern_ops);
+  ON public.patients (lower(department), (public.canonical_patient_number(patient_number)) text_pattern_ops);
 
 -- Name prefix index for short queries (<3 chars where trigram cannot form)
 CREATE INDEX IF NOT EXISTS idx_patients_name_prefix 
@@ -99,7 +125,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_lower_dept_name_prefix
   ON public.patients (lower(department), lower(name) text_pattern_ops);
 
 -- ----------------------------------------------------------------------------
--- 6. GIN Trigram Indexes for Substring & Partial ILIKE Searching
+-- 7. GIN Trigram Indexes for Substring & Partial ILIKE Searching
 --    Enables PostgreSQL to use Bitmap Index Scans for '%query%' searches
 -- ----------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_patients_name_trgm 
@@ -113,7 +139,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_mobile_trgm
   WHERE mobile IS NOT NULL;
 
 -- ----------------------------------------------------------------------------
--- 7. High-Performance Server-Side Search RPC: public.search_patients
+-- 8. High-Performance Server-Side Search RPC: public.search_patients
 --    Features:
 --      - Department filtering (Eye, Dental, or All) matching functional indexes
 --      - Exact and prefix canonical patient number matching (bridges 'E4000', 'E-4000', '4000')
@@ -123,6 +149,8 @@ CREATE INDEX IF NOT EXISTS idx_patients_mobile_trgm
 --      - Security: validates authenticated user is admin or geofenced staff (<200m)
 --      - Isolation: enforces staff department boundaries from profiles table
 -- ----------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.search_patients(TEXT, TEXT, INT, INT);
+
 CREATE OR REPLACE FUNCTION public.search_patients(
   p_department TEXT DEFAULT NULL,
   p_query TEXT DEFAULT NULL,
@@ -134,7 +162,7 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public, extensions
-AS $$
+AS $func$
 DECLARE
   v_dept TEXT := lower(trim(COALESCE(p_department, '')));
   v_raw_q TEXT := trim(COALESCE(p_query, ''));
@@ -201,8 +229,8 @@ BEGIN
         -- Canonical patient number matching (bridges 'E4000', 'E-4000', '4000')
         OR (v_clean_alphanum <> '' AND regexp_replace(lower(patient_number), '[^a-zA-Z0-9]', '', 'g') ILIKE '%' || v_clean_alphanum || '%')
         OR (v_digits <> '' AND (
-             regexp_replace(patient_number, '^[EDed\-\s]+', '') = v_digits
-             OR regexp_replace(patient_number, '^[EDed\-\s]+', '') ILIKE v_digits || '%'
+             public.canonical_patient_number(patient_number) = v_digits
+             OR public.canonical_patient_number(patient_number) ILIKE v_digits || '%'
              OR patient_number = v_digits
              OR patient_number ILIKE v_digits || '%'
         ))
@@ -221,11 +249,11 @@ BEGIN
         CASE 
           -- Exact patient number match (canonical or raw) -> Top Priority
           WHEN lower(patient_number) = v_q THEN 0
-          WHEN v_digits <> '' AND regexp_replace(patient_number, '^[EDed\-\s]+', '') = v_digits THEN 0
+          WHEN v_digits <> '' AND public.canonical_patient_number(patient_number) = v_digits THEN 0
           WHEN v_clean_alphanum <> '' AND regexp_replace(lower(patient_number), '[^a-zA-Z0-9]', '', 'g') = v_clean_alphanum THEN 0
           -- Prefix patient number match
           WHEN patient_number ILIKE v_raw_q || '%' THEN 1
-          WHEN v_digits <> '' AND (regexp_replace(patient_number, '^[EDed\-\s]+', '') ILIKE v_digits || '%' OR patient_number ILIKE v_digits || '%') THEN 1
+          WHEN v_digits <> '' AND (public.canonical_patient_number(patient_number) ILIKE v_digits || '%' OR patient_number ILIKE v_digits || '%') THEN 1
           -- Exact name match
           WHEN lower(name) = v_q THEN 2
           -- Prefix name match
@@ -254,8 +282,8 @@ BEGIN
           -- Canonical patient number matching (bridges 'E4000', 'E-4000', '4000')
           OR (v_clean_alphanum <> '' AND regexp_replace(lower(patient_number), '[^a-zA-Z0-9]', '', 'g') ILIKE '%' || v_clean_alphanum || '%')
           OR (v_digits <> '' AND (
-               regexp_replace(patient_number, '^[EDed\-\s]+', '') = v_digits
-               OR regexp_replace(patient_number, '^[EDed\-\s]+', '') ILIKE v_digits || '%'
+               public.canonical_patient_number(patient_number) = v_digits
+               OR public.canonical_patient_number(patient_number) ILIKE v_digits || '%'
                OR patient_number = v_digits
                OR patient_number ILIKE v_digits || '%'
           ))
@@ -274,11 +302,11 @@ BEGIN
         CASE 
           -- Exact patient number match (canonical or raw) -> Top Priority
           WHEN lower(patient_number) = v_q THEN 0
-          WHEN v_digits <> '' AND regexp_replace(patient_number, '^[EDed\-\s]+', '') = v_digits THEN 0
+          WHEN v_digits <> '' AND public.canonical_patient_number(patient_number) = v_digits THEN 0
           WHEN v_clean_alphanum <> '' AND regexp_replace(lower(patient_number), '[^a-zA-Z0-9]', '', 'g') = v_clean_alphanum THEN 0
           -- Prefix patient number match
           WHEN patient_number ILIKE v_raw_q || '%' THEN 1
-          WHEN v_digits <> '' AND (regexp_replace(patient_number, '^[EDed\-\s]+', '') ILIKE v_digits || '%' OR patient_number ILIKE v_digits || '%') THEN 1
+          WHEN v_digits <> '' AND (public.canonical_patient_number(patient_number) ILIKE v_digits || '%' OR patient_number ILIKE v_digits || '%') THEN 1
           -- Exact name match
           WHEN lower(name) = v_q THEN 2
           -- Prefix name match
@@ -295,7 +323,7 @@ BEGIN
       OFFSET v_off;
   END IF;
 END;
-$$;
+$func$;
 
 ALTER FUNCTION public.search_patients(TEXT, TEXT, INT, INT) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.search_patients(TEXT, TEXT, INT, INT) FROM anon;
@@ -306,9 +334,11 @@ COMMENT ON FUNCTION public.search_patients(TEXT, TEXT, INT, INT) IS
   'High-performance trigram, functional B-Tree, and canonical digit indexed search across patients with ranking, pagination, geofence validation, and staff department isolation.';
 
 -- ----------------------------------------------------------------------------
--- 8. Lightweight RPC: public.get_today_registered_patients
+-- 9. Lightweight RPC: public.get_today_registered_patients
 --    Replaces the need to fetch all 17,682 rows on the Admin Dashboard
 -- ----------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.get_today_registered_patients(TEXT);
+
 CREATE OR REPLACE FUNCTION public.get_today_registered_patients(
   p_department TEXT DEFAULT NULL
 )
@@ -317,7 +347,7 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public, extensions
-AS $$
+AS $func$
 DECLARE
   v_dept TEXT := lower(trim(COALESCE(p_department, '')));
   v_today_start TIMESTAMPTZ := date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata';
@@ -364,7 +394,7 @@ BEGIN
       ORDER BY created_at DESC;
   END IF;
 END;
-$$;
+$func$;
 
 ALTER FUNCTION public.get_today_registered_patients(TEXT) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.get_today_registered_patients(TEXT) FROM anon;
@@ -374,6 +404,9 @@ GRANT EXECUTE ON FUNCTION public.get_today_registered_patients(TEXT) TO authenti
 COMMENT ON FUNCTION public.get_today_registered_patients(TEXT) IS
   'Returns only patients registered today in the clinic timezone with geofence validation and staff department isolation, avoiding full-table scans.';
 
-COMMIT;
-
+-- ----------------------------------------------------------------------------
+-- 10. Schema Reload Notification & Transaction Closure
+-- ----------------------------------------------------------------------------
 NOTIFY pgrst, 'reload schema';
+
+COMMIT;
